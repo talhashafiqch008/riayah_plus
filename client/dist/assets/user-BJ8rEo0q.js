@@ -1,0 +1,2 @@
+import{h as t,v as r}from"./index-r-9H7XgI.js";async function o(){return(await t.get("/users")).data}async function s(){try{return(await t.delete("/user")).data}catch(e){throw console.error("Failed to deleteAccount",e),r(e)}}const a=Object.freeze(Object.defineProperty({__proto__:null,deleteAccount:s,getUsers:o},Symbol.toStringTag,{value:"Module"}));export{s as d,o as g,a as u};
+//# sourceMappingURL=user-BJ8rEo0q.js.map

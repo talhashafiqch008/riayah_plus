@@ -1,0 +1,83 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const env = {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT: parseInt(process.env.PORT || '5000', 10),
+  APP_URL: process.env.APP_URL || 'http://localhost:5000',
+  BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:5000',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
+  OPEN_EXCHANGE_RATES_KEY: process.env.OPEN_EXCHANGE_RATES_KEY || '',
+  ADMIN_SECRET: process.env.ADMIN_SECRET || '',
+
+  DATABASE_URL: process.env.DATABASE_URL || '',
+
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  REDIS_HOST: process.env.REDIS_HOST || 'localhost',
+  REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD || undefined,
+
+  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'change-me-access-secret',
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'change-me-refresh-secret',
+  JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
+
+  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
+  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+  AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION || 'me-south-1',
+  AWS_BUCKET: process.env.AWS_BUCKET || '',
+
+  MAIL_HOST: process.env.MAIL_HOST || 'smtp.gmail.com',
+  MAIL_PORT: parseInt(process.env.MAIL_PORT || '587', 10),
+  MAIL_USERNAME: process.env.MAIL_USERNAME || '',
+  MAIL_PASSWORD: process.env.MAIL_PASSWORD || '',
+  MAIL_FROM_ADDRESS: process.env.MAIL_FROM_ADDRESS || 'noreply@riayahplus.com',
+  MAIL_FROM_NAME: process.env.MAIL_FROM_NAME || 'Riayah Plus',
+
+  STRIPE_KEY: process.env.STRIPE_KEY || '',
+  STRIPE_SECRET: process.env.STRIPE_SECRET || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+
+  QATAR_PAYMENT_GATEWAY: process.env.QATAR_PAYMENT_GATEWAY || 'paytabs',
+  PAYTABS_PROFILE_ID: process.env.PAYTABS_PROFILE_ID || '',
+  PAYTABS_SERVER_KEY: process.env.PAYTABS_SERVER_KEY || '',
+  PAYTABS_BASE_URL: process.env.PAYTABS_BASE_URL || 'https://secure.paytabs.sa/payment/request',
+  PAYTABS_WEBHOOK_SECRET: process.env.PAYTABS_WEBHOOK_SECRET || '',
+
+  PUSHER_APP_ID: process.env.PUSHER_APP_ID || '',
+  PUSHER_APP_KEY: process.env.PUSHER_APP_KEY || '',
+  PUSHER_APP_SECRET: process.env.PUSHER_APP_SECRET || '',
+  PUSHER_APP_CLUSTER: process.env.PUSHER_APP_CLUSTER || 'ap2',
+
+  LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || '',
+  LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || '',
+  LIVEKIT_URL: process.env.LIVEKIT_URL || '',
+
+  DAILY_API_KEY: process.env.DAILY_API_KEY || '',
+
+  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || '',
+  FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+  FIREBASE_PRIVATE_KEY_ID: process.env.FIREBASE_PRIVATE_KEY_ID || '',
+  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
+  FIREBASE_CLIENT_ID: process.env.FIREBASE_CLIENT_ID || '',
+
+  GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
+  GPS_CHECKIN_RADIUS_METERS: parseInt(process.env.GPS_CHECKIN_RADIUS_METERS || '200', 10),
+
+  WHATSAPP_BASE_URL: process.env.WHATSAPP_BASE_URL || 'https://graph.facebook.com/v18.0',
+  WHATSAPP_PHONE_ID: process.env.WHATSAPP_PHONE_ID || '',
+  WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN || '',
+  WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || '',
+  WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET || '',
+
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:8001',
+  AI_SERVICE_API_KEY: process.env.AI_SERVICE_API_KEY || '',
+
+  SENTRY_DSN: process.env.SENTRY_DSN || '',
+  SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT || 'development',
+
+  isDev: process.env.NODE_ENV !== 'production',
+  isProd: process.env.NODE_ENV === 'production',
+};

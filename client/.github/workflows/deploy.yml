@@ -1,0 +1,36 @@
+name: Deploy Raiyah Frontend (ubuntu)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            node -v
+            npm -v
+            pm2 -v
+
+            cd /var/www/Raiyah-frontend
+
+            git pull origin main
+
+            rm -rf node_modules package-lock.json .next
+            npm install
+            npm run build
+
+            pm2 delete raiyah-frontend || true
+            pm2 start npm --name "raiyah-frontend" -- start
+            pm2 save

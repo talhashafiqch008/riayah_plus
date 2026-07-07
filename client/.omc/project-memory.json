@@ -1,0 +1,199 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1779265406593,
+  "projectRoot": "/Users/karim/Downloads/raiyah-plus-main/frontend",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "16.0.10",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "18.3.1",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "18.3.1",
+        "category": "frontend"
+      },
+      {
+        "name": "@playwright/test",
+        "version": "1.57.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": null,
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "eslint src/",
+      "analyze": "cross-env ANALYZE=true next build",
+      "test:e2e": "playwright test",
+      "test:e2e:ui": "playwright test --ui",
+      "test:e2e:headed": "playwright test --headed",
+      "export": "next export"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 9,
+      "lastAccessed": 1779265406586,
+      "keyFiles": [
+        "care-hero.png",
+        "file.svg",
+        "globe.svg",
+        "logo.png",
+        "manifest.json"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 0,
+      "lastAccessed": 1779265406587,
+      "keyFiles": []
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1779265406589,
+      "keyFiles": [
+        "middleware.ts"
+      ]
+    },
+    "styles": {
+      "path": "styles",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779265406589,
+      "keyFiles": []
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1779265406589,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1779265406589,
+      "keyFiles": []
+    },
+    "src/api": {
+      "path": "src/api",
+      "purpose": "API routes",
+      "fileCount": 1,
+      "lastAccessed": 1779265406590,
+      "keyFiles": [
+        "matching.ts"
+      ]
+    },
+    "src/app": {
+      "path": "src/app",
+      "purpose": "Application code",
+      "fileCount": 8,
+      "lastAccessed": 1779265406590,
+      "keyFiles": [
+        "error.tsx",
+        "favicon.ico",
+        "global-error.tsx"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
+      "fileCount": 24,
+      "lastAccessed": 1779265406590,
+      "keyFiles": [
+        "BCard.tsx",
+        "BookingModal.tsx",
+        "ConsoleSuppressor.tsx"
+      ]
+    },
+    "src/config": {
+      "path": "src/config",
+      "purpose": "Configuration files",
+      "fileCount": 1,
+      "lastAccessed": 1779265406591,
+      "keyFiles": [
+        "countries.ts"
+      ]
+    },
+    "src/examples": {
+      "path": "src/examples",
+      "purpose": "Example code",
+      "fileCount": 0,
+      "lastAccessed": 1779265406591,
+      "keyFiles": []
+    },
+    "src/lib": {
+      "path": "src/lib",
+      "purpose": "Library code",
+      "fileCount": 14,
+      "lastAccessed": 1779265406591,
+      "keyFiles": [
+        "api.ts",
+        "availability-matcher.ts",
+        "distance-calculator.ts"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

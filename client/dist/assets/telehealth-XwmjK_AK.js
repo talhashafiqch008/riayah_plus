@@ -1,0 +1,2 @@
+import{h as o,v as r}from"./index-r-9H7XgI.js";async function n(e){try{return(await o.post("/video/token",{room_name:e.roomName,participant_name:e.participantName,booking_id:e.bookingId})).data}catch(t){throw console.error("Failed to get LiveKit token",t),r(t)}}const a=Object.freeze(Object.defineProperty({__proto__:null,getLiveKitToken:n},Symbol.toStringTag,{value:"Module"}));export{n as g,a as t};
+//# sourceMappingURL=telehealth-XwmjK_AK.js.map

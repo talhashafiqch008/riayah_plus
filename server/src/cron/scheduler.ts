@@ -1,0 +1,323 @@
+import cron from 'node-cron';
+import { prisma } from '../config/database';
+import { logger } from '../config/logger';
+import { NotificationService } from '../services/NotificationService';
+import { WalletService } from '../services/WalletService';
+import { EmailService } from '../services/EmailService';
+import { StripeService } from '../services/StripeService';
+import { PayoutIdempotencyService } from '../services/PayoutIdempotencyService';
+
+export function startScheduler(): void {
+  logger.info('Starting cron scheduler');
+
+  // ── booking:send-reminders — every minute ─────────────────────────────────
+  cron.schedule('* * * * *', async () => {
+    try {
+      const upcoming = await prisma.booking.findMany({
+        where: {
+          status: 'accepted',
+          scheduledAt: {
+            gte: new Date(),
+            lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        },
+        include: { client: true, provider: true },
+      });
+
+      for (const booking of upcoming) {
+        await NotificationService.create({
+          userId: booking.clientId,
+          title: 'Upcoming Booking Reminder',
+          body: `You have a booking with ${booking.provider.name} tomorrow.`,
+          type: 'booking_reminder',
+          data: { bookingId: booking.id },
+        });
+      }
+    } catch (err) {
+      logger.error('booking:send-reminders failed', { err });
+    }
+  });
+
+  // ── booking:expire-pending — hourly ──────────────────────────────────────
+  cron.schedule('0 * * * *', async () => {
+    try {
+      const expired = await prisma.booking.updateMany({
+        where: {
+          status: 'pending',
+          createdAt: { lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+        data: { status: 'cancelled', cancelReason: 'Auto-expired: no provider response' },
+      });
+      if (expired.count > 0) logger.info(`Expired ${expired.count} pending bookings`);
+    } catch (err) {
+      logger.error('booking:expire-pending failed', { err });
+    }
+  });
+
+  // ── bookings:expire-counter-offers — daily ────────────────────────────────
+  cron.schedule('0 0 * * *', async () => {
+    try {
+      await prisma.booking.updateMany({
+        where: {
+          isCounterOffered: true,
+          counterOfferAt: { lte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+          status: 'pending',
+        },
+        data: { status: 'cancelled', cancelReason: 'Counter offer expired' },
+      });
+    } catch (err) {
+      logger.error('bookings:expire-counter-offers failed', { err });
+    }
+  });
+
+  // ── bids:expire — daily ───────────────────────────────────────────────────
+  cron.schedule('0 1 * * *', async () => {
+    try {
+      const now = new Date();
+      await prisma.careNeedBid.updateMany({
+        where: { status: 'pending', expiresAt: { lt: now } },
+        data: { status: 'rejected' },
+      });
+    } catch (err) {
+      logger.error('bids:expire failed', { err });
+    }
+  });
+
+  // ── escrow:release — daily ────────────────────────────────────────────────
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      const completedBookings = await prisma.booking.findMany({
+        where: {
+          status: 'completed',
+          completedAt: { lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          paidWithCredits: true,
+          payment: { is: null },
+        },
+      });
+
+      for (const booking of completedBookings) {
+        if (booking.totalAmount) {
+          await WalletService.releaseEscrow(
+            booking.clientId,
+            Number(booking.totalAmount),
+            booking.providerId
+          );
+        }
+      }
+
+      logger.info(`Released escrow for ${completedBookings.length} bookings`);
+    } catch (err) {
+      logger.error('escrow:release failed', { err });
+    }
+  });
+
+  // ── shifts:auto-clock-out — hourly ────────────────────────────────────────
+  cron.schedule('0 * * * *', async () => {
+    try {
+      const staleShifts = await prisma.shift.findMany({
+        where: {
+          status: 'active',
+          startedAt: { lte: new Date(Date.now() - 12 * 60 * 60 * 1000) },
+        },
+      });
+
+      for (const shift of staleShifts) {
+        await prisma.shift.update({
+          where: { id: shift.id },
+          data: { status: 'completed', endedAt: new Date(), notes: 'Auto clocked-out by system' },
+        });
+      }
+
+      if (staleShifts.length) logger.info(`Auto clocked-out ${staleShifts.length} stale shifts`);
+    } catch (err) {
+      logger.error('shifts:auto-clock-out failed', { err });
+    }
+  });
+
+  // ── credits:reconcile-topups — every 30 min ───────────────────────────────
+  cron.schedule('*/30 * * * *', async () => {
+    try {
+      // Check for Stripe topups that succeeded but weren't credited
+      const pendingTopups = await prisma.creditTopup.findMany({
+        where: {
+          status: 'pending',
+          createdAt: { lte: new Date(Date.now() - 30 * 60 * 1000) },
+        },
+      });
+
+      for (const topup of pendingTopups) {
+        if (topup.stripeIntentId) {
+          try {
+            const Stripe = (await import('stripe')).default;
+            const stripe = new Stripe(process.env.STRIPE_SECRET!, { apiVersion: '2024-06-20' });
+            const intent = await stripe.paymentIntents.retrieve(topup.stripeIntentId);
+
+            if (intent.status === 'succeeded') {
+              await prisma.creditTopup.update({ where: { id: topup.id }, data: { status: 'paid', confirmedAt: new Date() } });
+              await WalletService.credit(topup.userId, Number(topup.amount), 'topup', 'Stripe top-up', topup.id, 'CreditTopup');
+            }
+          } catch {
+            // skip failed lookups
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('credits:reconcile-topups failed', { err });
+    }
+  });
+
+  // ── documents:mark-expired — daily ───────────────────────────────────────
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      await prisma.document.updateMany({
+        where: {
+          status: 'approved',
+          expiresAt: { lt: new Date() },
+        },
+        data: { status: 'expired' },
+      });
+    } catch (err) {
+      logger.error('documents:mark-expired failed', { err });
+    }
+  });
+
+  // ── documents:send-renewal-reminders — daily ─────────────────────────────
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      const expiringSoon = await prisma.document.findMany({
+        where: {
+          status: 'approved',
+          expiresAt: {
+            gte: new Date(),
+            lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+        include: { user: true },
+      });
+
+      for (const doc of expiringSoon) {
+        await NotificationService.create({
+          userId: doc.userId,
+          title: 'Document Expiring Soon',
+          body: `Your document "${doc.name}" expires soon. Please renew it.`,
+          type: 'document_renewal',
+          data: { documentId: doc.id },
+        });
+      }
+    } catch (err) {
+      logger.error('documents:send-renewal-reminders failed', { err });
+    }
+  });
+
+  // ── payment:reconcile — every 30 min ─────────────────────────────────────
+  cron.schedule('*/30 * * * *', async () => {
+    try {
+      // Mark invoices as overdue
+      await prisma.invoice.updateMany({
+        where: {
+          status: 'sent',
+          dueDate: { lt: new Date() },
+        },
+        data: { status: 'overdue' },
+      });
+    } catch (err) {
+      logger.error('payment:reconcile failed', { err });
+    }
+  });
+
+  // ── meetings:cleanup — daily ──────────────────────────────────────────────
+  cron.schedule('0 4 * * *', async () => {
+    try {
+      // Update sessions that started but were never completed
+      await prisma.session.updateMany({
+        where: {
+          status: 'in_progress',
+          startedAt: { lte: new Date(Date.now() - 4 * 60 * 60 * 1000) },
+        },
+        data: { status: 'completed', completedAt: new Date() },
+      });
+    } catch (err) {
+      logger.error('meetings:cleanup failed', { err });
+    }
+  });
+
+  // ── gps:flag-missed-checkins — every 15 min ───────────────────────────────
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      const overdueSessions = await prisma.session.findMany({
+        where: {
+          status: 'accepted',
+          scheduledAt: {
+            lte: new Date(Date.now() - 30 * 60 * 1000),
+          },
+          checkInAt: null,
+          type: 'home_visit',
+        },
+        include: { episode: true },
+      });
+
+      for (const session of overdueSessions) {
+        if (session.episode) {
+          await NotificationService.create({
+            userId: session.episode.coordinatorId,
+            title: 'Missed Check-In',
+            body: `Worker has not checked in for session scheduled ${new Date(session.scheduledAt).toLocaleTimeString()}.`,
+            type: 'gps_missed_checkin',
+            data: { sessionId: session.id },
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('gps:flag-missed-checkins failed', { err });
+    }
+  });
+
+  // ── payments:cancel-orphaned-intents — hourly ─────────────────────────────
+  cron.schedule('0 * * * *', async () => {
+    try {
+      const cancelled = await StripeService.cancelOrphanedIntents();
+      if (cancelled > 0) logger.info(`Cancelled ${cancelled} orphaned Stripe PaymentIntents`);
+    } catch (err) {
+      logger.error('payments:cancel-orphaned-intents failed', { err });
+    }
+  });
+
+  // ── payments:reconcile-webhooks — every 15 min ────────────────────────────
+  // Finds paid Stripe PaymentIntents whose local payment record is still 'pending' and fixes them
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      const stalePayments = await prisma.payment.findMany({
+        where: { status: 'pending', gateway: 'stripe', gatewayRef: { not: null }, createdAt: { lte: new Date(Date.now() - 15 * 60 * 1000) } },
+        take: 50,
+      });
+
+      for (const payment of stalePayments) {
+        try {
+          const intent = await StripeService.retrievePaymentIntent(payment.gatewayRef!);
+          if (intent.status === 'succeeded') {
+            await StripeService.handleWebhookEvent({ type: 'payment_intent.succeeded', data: { object: intent } } as import('stripe').Stripe.Event);
+            logger.info('Reconciled missed Stripe event', { paymentId: payment.id });
+          } else if (['canceled', 'requires_payment_method'].includes(intent.status)) {
+            await prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed' } });
+          }
+        } catch (innerErr) {
+          logger.warn('Failed to reconcile payment', { paymentId: payment.id, innerErr });
+        }
+      }
+    } catch (err) {
+      logger.error('payments:reconcile-webhooks failed', { err });
+    }
+  });
+
+  // ── payouts:process-pending — every 30 min ────────────────────────────────
+  cron.schedule('*/30 * * * *', async () => {
+    try {
+      const result = await PayoutIdempotencyService.processBatch(10);
+      if (result.processed > 0) logger.info(`Processed ${result.processed} payouts`);
+    } catch (err) {
+      logger.error('payouts:process-pending failed', { err });
+    }
+  });
+
+  logger.info('All cron jobs scheduled');
+}
