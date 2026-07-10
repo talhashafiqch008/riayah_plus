@@ -35,20 +35,177 @@ async function main() {
   // ── Admin users ──────────────────────────────────────────────────────────────
   const superAdmin = await prisma.user.upsert({
     where: { email: 'superadmin@riayahplus.com' },
-    update: {},
+    update: { isEmailVerified: true, emailVerifiedAt: new Date() },
     create: { id: uuid(), name: 'Super Admin', email: 'superadmin@riayahplus.com', passwordHash, role: 'super_admin', isActive: true, emailVerifiedAt: new Date() },
   });
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@riayahplus.com' },
-    update: {},
+    update: { isEmailVerified: true, emailVerifiedAt: new Date() },
     create: { id: uuid(), name: 'Platform Admin', email: 'admin@riayahplus.com', passwordHash, role: 'admin', isActive: true, emailVerifiedAt: new Date() },
   });
 
   const coordinator = await prisma.user.upsert({
     where: { email: 'coordinator@riayahplus.com' },
-    update: {},
+    update: { isEmailVerified: true, emailVerifiedAt: new Date() },
     create: { id: uuid(), name: 'Care Coordinator', email: 'coordinator@riayahplus.com', passwordHash, role: 'care_coordinator', isActive: true, emailVerifiedAt: new Date() },
+  });
+
+  // ── Organization hierarchy ───────────────────────────────────────────────────
+  const organization = await prisma.organization.upsert({
+    where: { slug: 'riayah-plus' },
+    update: { name: 'Riayah Plus Health', isActive: true },
+    create: {
+      id: uuid(),
+      name: 'Riayah Plus Health',
+      slug: 'riayah-plus',
+      email: 'contact@riayahplus.com',
+      phone: '+974 4000 0000',
+      address: 'West Bay, Doha, Qatar',
+      website: 'https://riayahplus.com',
+      isActive: true,
+    },
+  });
+
+  const mainClinic = await prisma.clinic.upsert({
+    where: { id: 'seed-clinic-main' },
+    update: { name: 'Riayah Plus Main Clinic', isActive: true },
+    create: {
+      id: 'seed-clinic-main',
+      organizationId: organization.id,
+      name: 'Riayah Plus Main Clinic',
+      address: 'Al Sadd, Doha, Qatar',
+      phone: '+974 4000 0001',
+      isActive: true,
+    },
+  });
+
+  const homeCareClinic = await prisma.clinic.upsert({
+    where: { id: 'seed-clinic-home' },
+    update: { name: 'Home Care Services', isActive: true },
+    create: {
+      id: 'seed-clinic-home',
+      organizationId: organization.id,
+      name: 'Home Care Services',
+      address: 'Mobile / Home Visits — Doha',
+      phone: '+974 4000 0002',
+      isActive: true,
+    },
+  });
+
+  const clinicalDept = await prisma.department.upsert({
+    where: { id: 'seed-dept-clinical' },
+    update: { name: 'Clinical Services', isActive: true },
+    create: {
+      id: 'seed-dept-clinical',
+      clinicId: mainClinic.id,
+      name: 'Clinical Services',
+      isActive: true,
+    },
+  });
+
+  const nursingDept = await prisma.department.upsert({
+    where: { id: 'seed-dept-nursing' },
+    update: { name: 'Nursing', isActive: true },
+    create: {
+      id: 'seed-dept-nursing',
+      clinicId: mainClinic.id,
+      name: 'Nursing',
+      isActive: true,
+    },
+  });
+
+  const supportDept = await prisma.department.upsert({
+    where: { id: 'seed-dept-support' },
+    update: { name: 'Support & Daily Living', isActive: true },
+    create: {
+      id: 'seed-dept-support',
+      clinicId: homeCareClinic.id,
+      name: 'Support & Daily Living',
+      isActive: true,
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: coordinator.id },
+    data: {
+      organizationId: organization.id,
+      clinicId: mainClinic.id,
+      departmentId: clinicalDept.id,
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: admin.id },
+    data: { organizationId: organization.id },
+  });
+
+  // ── Proposal role demo accounts (M1 UI shells) ───────────────────────────────
+  const familyUser = await prisma.user.upsert({
+    where: { email: 'family@demo.com' },
+    update: { isEmailVerified: true, emailVerifiedAt: new Date(), role: 'family' },
+    create: {
+      id: uuid(),
+      name: 'Demo Family',
+      email: 'family@demo.com',
+      passwordHash,
+      role: 'family',
+      isActive: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  const patientUser = await prisma.user.upsert({
+    where: { email: 'patient@demo.com' },
+    update: { isEmailVerified: true, emailVerifiedAt: new Date(), role: 'patient' },
+    create: {
+      id: uuid(),
+      name: 'Demo Patient',
+      email: 'patient@demo.com',
+      passwordHash,
+      role: 'patient',
+      isActive: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  const clinicalUser = await prisma.user.upsert({
+    where: { email: 'clinical@demo.com' },
+    update: { isEmailVerified: true, emailVerifiedAt: new Date(), role: 'clinical_staff' },
+    create: {
+      id: uuid(),
+      name: 'Demo Clinical Staff',
+      email: 'clinical@demo.com',
+      passwordHash,
+      role: 'clinical_staff',
+      isActive: true,
+      emailVerifiedAt: new Date(),
+      organizationId: organization.id,
+      clinicId: mainClinic.id,
+      departmentId: clinicalDept.id,
+    },
+  });
+
+  const supportUser = await prisma.user.upsert({
+    where: { email: 'support@demo.com' },
+    update: { isEmailVerified: true, emailVerifiedAt: new Date(), role: 'support_worker' },
+    create: {
+      id: uuid(),
+      name: 'Demo Support Worker',
+      email: 'support@demo.com',
+      passwordHash,
+      role: 'support_worker',
+      isActive: true,
+      emailVerifiedAt: new Date(),
+      organizationId: organization.id,
+      clinicId: homeCareClinic.id,
+      departmentId: supportDept.id,
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: familyUser.id },
+    data: { organizationId: organization.id },
   });
 
   // ── Clients ──────────────────────────────────────────────────────────────────
@@ -61,7 +218,7 @@ async function main() {
   ].map(({ email, name }) =>
     prisma.user.upsert({
       where: { email },
-      update: {},
+      update: { isEmailVerified: true, emailVerifiedAt: new Date() },
       create: { id: uuid(), name, email, passwordHash, role: 'client', isActive: true, emailVerifiedAt: new Date(), phone: `+97455${Math.floor(Math.random() * 900000 + 100000)}` },
     })
   ));
@@ -81,8 +238,19 @@ async function main() {
   const providers = await Promise.all(providerData.map(({ email, name, role }) =>
     prisma.user.upsert({
       where: { email },
-      update: {},
-      create: { id: uuid(), name, email, passwordHash, role: role as any, isActive: true, emailVerifiedAt: new Date(), verificationStatus: 'approved', phone: `+97450${Math.floor(Math.random() * 900000 + 100000)}` },
+      update: { isEmailVerified: true, emailVerifiedAt: new Date(), onboardingStatus: 'complete' },
+      create: {
+        id: uuid(),
+        name,
+        email,
+        passwordHash,
+        role: role as any,
+        isActive: true,
+        emailVerifiedAt: new Date(),
+        onboardingStatus: 'complete',
+        verificationStatus: 'approved',
+        phone: `+97450${Math.floor(Math.random() * 900000 + 100000)}`,
+      },
     })
   ));
 
@@ -108,10 +276,10 @@ async function main() {
   // ── Wallets ──────────────────────────────────────────────────────────────────
   const allUsers = [superAdmin, admin, coordinator, ...clients, ...providers];
   await Promise.all(allUsers.map(u =>
-    prisma.wallet.upsert({
+    prisma.walletBalance.upsert({
       where: { userId: u.id },
       update: {},
-      create: { userId: u.id, balance: 1000 + Math.random() * 4000, currency: 'QAR' },
+      create: { userId: u.id, balance: 1000 + Math.random() * 4000, escrow: 0, currency: 'QAR' },
     }).catch(() => {})
   ));
 
@@ -206,6 +374,7 @@ async function main() {
       id: 'seed-course-1',
       title: 'Foundations of Person-Centred Care',
       description: 'A comprehensive introduction to person-centred care principles for care professionals in Qatar.',
+      trainerId: providers[0].id,
       instructorId: providers[0].id,
       category: 'care_fundamentals',
       isPublished: true,
@@ -243,10 +412,22 @@ async function main() {
         courseId: course1.id,
         title: 'Module 1 Assessment',
         passingScore: 70,
-        questions: [
-          { id: 'q1', text: 'Person-centred care focuses on:', options: ['The diagnosis', 'The individual\'s needs and preferences', 'Cost efficiency', 'Standard protocols'], correct: 'The individual\'s needs and preferences' },
-          { id: 'q2', text: 'A care plan should be:', options: ['Generic', 'Doctor-only', 'Individualised and regularly reviewed', 'Written once and never changed'], correct: 'Individualised and regularly reviewed' },
-        ],
+        questions: {
+          create: [
+            {
+              question: 'Person-centred care focuses on:',
+              options: ['The diagnosis', 'The individual\'s needs and preferences', 'Cost efficiency', 'Standard protocols'],
+              correctAnswer: 'The individual\'s needs and preferences',
+              order: 1,
+            },
+            {
+              question: 'A care plan should be:',
+              options: ['Generic', 'Doctor-only', 'Individualised and regularly reviewed', 'Written once and never changed'],
+              correctAnswer: 'Individualised and regularly reviewed',
+              order: 2,
+            },
+          ],
+        },
       },
     }).catch(() => null);
   }
@@ -266,11 +447,15 @@ async function main() {
 
   console.log('✅ Seeding complete!');
   console.log('\n📧 Test credentials (password: Password123!):');
-  console.log('   Super Admin : superadmin@riayahplus.com');
-  console.log('   Admin       : admin@riayahplus.com');
-  console.log('   Coordinator : coordinator@riayahplus.com');
-  console.log('   Client      : fatima@demo.com');
-  console.log('   Provider    : dr.hassan@demo.com');
+  console.log('   Super Admin    : superadmin@riayahplus.com');
+  console.log('   Admin          : admin@riayahplus.com');
+  console.log('   Coordinator    : coordinator@riayahplus.com  → /coordinator');
+  console.log('   Family         : family@demo.com             → /family');
+  console.log('   Patient        : patient@demo.com            → /patient');
+  console.log('   Clinical Staff : clinical@demo.com           → /clinical');
+  console.log('   Support Worker : support@demo.com            → /support');
+  console.log('   Client         : fatima@demo.com             → /careseeker');
+  console.log('   Provider       : dr.hassan@demo.com          → /provider');
 }
 
 main()

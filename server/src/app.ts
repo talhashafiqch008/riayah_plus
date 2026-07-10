@@ -1,4 +1,5 @@
 import './config/env';
+import 'express-async-errors';
 import express from 'express';
 import http from 'http';
 import path from 'path';
@@ -17,6 +18,18 @@ import { notFound, errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import { startScheduler } from './cron/scheduler';
 import apiRouter from './routes/index';
+
+// ─── Process-level safety net ────────────────────────────────────────────────
+// express-async-errors handles rejections thrown inside route handlers, but this
+// catches anything else (cron jobs, socket handlers, stray promises) so a single
+// unexpected error can't take down the whole API process.
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', { reason });
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', { message: err.message, stack: err.stack });
+});
 
 // ─── Sentry ──────────────────────────────────────────────────────────────────
 if (env.SENTRY_DSN) {

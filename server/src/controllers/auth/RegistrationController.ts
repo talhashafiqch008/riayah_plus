@@ -5,9 +5,8 @@ import { UserRole } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
-import { generateAccessToken, generateRefreshToken, AuthPayload } from '../../middleware/auth';
-import { setAuthCookies } from '../../utils/authCookies';
 import { AuditService } from '../../services/AuditService';
+import { sendEmailVerificationForUser } from '../../utils/emailVerification';
 
 const registerSchema = z
   .object({
@@ -61,29 +60,16 @@ export class RegistrationController {
       },
     });
 
-    const payload: AuthPayload = { userId: user.id, role: user.role, email: user.email };
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken({ userId: user.id });
-
-    await prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        token: refreshToken,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
-    });
+    // Create + persist an email verification token for the new account.
+    await sendEmailVerificationForUser({ id: user.id, email: user.email });
 
     await AuditService.log({ userId: user.id, action: 'register', req });
 
-    setAuthCookies(res, accessToken, refreshToken);
-
     res.status(201).json({
       success: true,
-      token: accessToken,
-      accessToken,
-      refreshToken,
+      requiresEmailVerification: true,
+      message:
+        'Registration successful. Please check your email to verify your account before logging in.',
       user: {
         id: user.id,
         name: user.name,

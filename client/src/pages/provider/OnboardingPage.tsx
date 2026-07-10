@@ -8,7 +8,7 @@ import { completeOnboarding } from '../../lib/api/auth';
 import toast from "react-hot-toast";
 import { extractApiError } from '../../lib/errors';
 import { Logo, LogoLight } from "../../components/Logo";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth, isProviderRole } from "../../contexts/AuthContext";
 import { STORAGE_KEYS } from '../../lib/storage-keys';
 
 export interface ProviderOnboardingData {
@@ -152,12 +152,12 @@ export default function ProviderOnboardingPage() {
 
  const role = typeof authUser.role === 'string' ? authUser.role.toLowerCase() : '';
 
- // Not a provider -> Home
- if (!role.includes('provider')) {
- toast.error('Unauthorized access');
- navigate('/');
- return;
- }
+    // Not a provider role (doctor, nurse, etc.) -> Home
+    if (!isProviderRole(role)) {
+      toast.error('Unauthorized access');
+      navigate('/');
+      return;
+    }
 
  // Already completed onboarding -> Dashboard
  const status = authUser.onboarding_status;

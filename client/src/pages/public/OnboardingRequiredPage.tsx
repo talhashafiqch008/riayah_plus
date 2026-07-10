@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { m, LazyMotion, domAnimation } from 'framer-motion';
 import { ArrowRight, Check, LogOut, User, LayoutDashboard, FileCheck } from 'lucide-react';
 import { Logo } from '@/components/Logo';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, isProviderRole } from '@/contexts/AuthContext';
 
 export default function OnboardingRequiredPage() {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export default function OnboardingRequiredPage() {
 
   const getOnboardingUrl = () => {
     const role = userRole.toLowerCase();
-    if (role === 'provider' || role.includes('provider')) return '/provider/onboarding';
+    if (isProviderRole(role)) return '/provider/onboarding';
     if (role === 'family' || role === 'careseeker' || role === 'client') return '/careseeker/onboarding';
     return '/';
   };

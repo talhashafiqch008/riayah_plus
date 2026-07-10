@@ -74,7 +74,13 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
           role: userRole,
         };
         try {
-          await register(registrationPayload as RegisterPayload);
+          const regResponse = await register(registrationPayload as RegisterPayload);
+          if (regResponse?.requiresEmailVerification) {
+            toast.success('Account created! Please verify your email before continuing.');
+            window.location.href = `/verify-email?email=${encodeURIComponent(data.email as string)}`;
+            setIsRegistering(false);
+            return;
+          }
         } catch (regError: unknown) {
           if (isApiError(regError) && regError.statusCode === 409) {
             toast.error('This email is already registered. Please sign in instead.');

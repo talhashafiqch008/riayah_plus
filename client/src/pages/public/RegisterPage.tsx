@@ -100,7 +100,7 @@ function RegisterContent() {
  }
 
  try {
- const registeredUser = await register({
+ const result = await register({
  email: formData.email,
  password: formData.password,
  firstName: formData.firstName,
@@ -108,20 +108,30 @@ function RegisterContent() {
  phone: formData.phone,
  role: (selectedRole || 'client') as string,
  });
+
+ if (result.requiresEmailVerification) {
+ toast.success('Account created! Please verify your email before logging in.');
+ navigate(`/verify-email?email=${encodeURIComponent(result.user.email)}`);
+ return;
+ }
+
+ const registeredUser = result.user;
  toast.success('Account created successfully! Redirecting...');
- const role = typeof registeredUser.role === 'string' ? registeredUser.role.toLowerCase() : '';
- const onboardingStatus = registeredUser.onboarding_status;
- if (onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed') {
- if (role === 'client' || role === 'family') {
- navigate('/careseeker/onboarding');
- } else {
- navigate('/provider/onboarding');
- }
- } else if (role === 'provider' || role === 'provider_admin') {
- navigate('/provider/dashboard');
- } else {
- navigate('/careseeker');
- }
+      const role = typeof registeredUser.role === 'string' ? registeredUser.role.toLowerCase() : '';
+      const onboardingStatus = registeredUser.onboarding_status;
+      if (onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed') {
+        if (role === 'client' || role === 'family' || role === 'patient') {
+          navigate('/careseeker/onboarding');
+        } else {
+          navigate('/provider/onboarding');
+        }
+      } else if (role === 'family') {
+        navigate('/family');
+      } else if (role === 'provider' || role === 'provider_admin') {
+        navigate('/provider/dashboard');
+      } else {
+        navigate('/careseeker');
+      }
  } catch (error: unknown) {
  if (isApiError(error) && error.fieldErrors) {
  setFieldErrors(error.fieldErrors);
@@ -226,39 +236,43 @@ function RegisterContent() {
  <h2 className="text-2xl font-semibold text-stone-900">
  {step === 1 ? 'Get Started' : 'Create Account'}
  </h2>
- {step === 1 && <p className="text-stone-500 text-sm mt-1">Select your role to continue</p>}
+                {step === 1 && (
+                  <p className="text-stone-500 text-sm mt-1">
+                    Select your role to continue — tap <strong>I Need Care</strong> to register
+                  </p>
+                )}
  </div>
 
  <AnimatePresence mode="wait">
- {step === 1 ? (
- <m.div key="step1-content" {...fadeIn} className="space-y-4">
-  <RoleCard
-  icon={Heart}
-  title="I Need Care"
-  subtitle="Coming Soon"
-  active={false}
-  disabled={true}
-  color="teal"
-  />
-  <RoleCard
-  icon={Stethoscope}
-  title="I Provide Care"
-  subtitle="Coming Soon"
-  active={false}
-  disabled={true}
-  color="blue"
-  />
+            {step === 1 ? (
+              <m.div key="step1-content" {...fadeIn} className="space-y-4">
+                <RoleCard
+                  icon={Heart}
+                  title="I Need Care"
+                  subtitle="Family members & care seekers"
+                  active={selectedRole === 'family' || selectedRole === 'client'}
+                  onClick={() => handleRoleSelect('family')}
+                  color="teal"
+                />
+                <RoleCard
+                  icon={Stethoscope}
+                  title="I Provide Care"
+                  subtitle="Coming Soon"
+                  active={false}
+                  disabled={true}
+                  color="blue"
+                />
 
- <div className="pt-6 text-center">
- <p className="text-stone-500 text-sm">
- Already have an account?{' '}
- <Link to="/" className="text-teal-600 hover:text-teal-700 font-bold hover:underline">
- Sign in
- </Link>
- </p>
- </div>
- </m.div>
- ) : (
+                <div className="pt-6 text-center">
+                  <p className="text-stone-500 text-sm">
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-teal-600 hover:text-teal-700 font-bold hover:underline">
+                      Sign in
+                    </Link>
+                  </p>
+                </div>
+              </m.div>
+            ) : (
  <m.form key="step2-form" {...fadeIn} onSubmit={handleSubmit} className="space-y-4">
  <FormErrorSummary errors={fieldErrors} />
  <div className="grid grid-cols-2 gap-4">

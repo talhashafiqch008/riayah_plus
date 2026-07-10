@@ -1,2 +1,0 @@
-import{j as e}from"./query-d4ag2bfL.js";import{u as a,k as o}from"./index-r-9H7XgI.js";import{N as t}from"./vendor-BObX01BL.js";import"./ui-sn1VKYjD.js";import"./charts-C8rpF3bd.js";function d(){const{user:r,loading:s}=a();return s?e.jsx("div",{className:"min-h-screen flex items-center justify-center",children:e.jsx("div",{className:"animate-spin rounded-full size-12 border-b-2 border-teal-600"})}):r?e.jsx(t,{to:o(r.role),replace:!0}):e.jsx(t,{to:"/",replace:!0})}export{d as default};
-//# sourceMappingURL=DashboardRedirectPage-C5tgKRdE.js.map

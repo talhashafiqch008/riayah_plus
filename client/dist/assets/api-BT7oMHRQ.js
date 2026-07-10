@@ -1,2 +1,0 @@
-import{h as n,v as a}from"./index-r-9H7XgI.js";async function o(e,t){try{return(await n.get(e,{params:t})).data}catch(r){throw a(r)}}async function s(e,t){try{return(await n.post(e,t)).data}catch(r){throw a(r)}}async function c(e,t){try{return(await n.put(e,t)).data}catch(r){throw a(r)}}async function i(e){try{return(await n.delete(e)).data}catch(t){throw a(t)}}const d={get:o,post:s,put:c,delete:i};export{d as a};
-//# sourceMappingURL=api-BT7oMHRQ.js.map

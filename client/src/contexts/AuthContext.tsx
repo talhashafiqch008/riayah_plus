@@ -58,11 +58,17 @@ interface RegisterData {
   role: string;
 }
 
+export interface RegisterResult {
+  user: User;
+  requiresEmailVerification?: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (identifier: string, password: string, isPhone?: boolean) => Promise<User>;
-  register: (data: RegisterData) => Promise<User>;
+  complete2faLogin: (userId: string, code: string) => Promise<User>;
+  register: (data: RegisterData) => Promise<RegisterResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -255,6 +261,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return loggedInUser;
     } catch (error: unknown) {
+      if (error instanceof TwoFactorRequiredError) {
+        throw error;
+      }
       console.error('Login error:', error);
       throw extractDomainError(error);
     } finally {
@@ -262,7 +271,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (data: RegisterData): Promise<User> => {
+  const complete2faLogin = async (userId: string, code: string): Promise<User> => {
+    isAuthenticating.current = true;
+    try {
+      const response = await client.post('/auth/2fa-verify', { userId, code });
+      const data = response.data as Record<string, unknown>;
+
+      if (!data?.user) {
+        throw new Error('Invalid response from server');
+      }
+
+      const loggedInUser = mapUserData(data.user as Record<string, unknown>, data);
+      setUser(loggedInUser);
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loggedInUser));
+      storeAuthResponse(data);
+
+      return loggedInUser;
+    } catch (error: unknown) {
+      console.error('2FA login error:', error);
+      throw extractDomainError(error);
+    } finally {
+      isAuthenticating.current = false;
+    }
+  };
+
+  const register = async (data: RegisterData): Promise<RegisterResult> => {
     isAuthenticating.current = true;
     try {
       localStorage.removeItem(STORAGE_KEYS.providerOnboardingDraft);
@@ -276,13 +309,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: data.role,
       });
       const responseData = response.data as Record<string, unknown>;
-
       const registeredUser = mapUserData(responseData.user as Record<string, unknown>, responseData);
+      const requiresEmailVerification = Boolean(responseData.requiresEmailVerification);
+
+      if (requiresEmailVerification) {
+        return { user: registeredUser, requiresEmailVerification: true };
+      }
+
       setUser(registeredUser);
       localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(registeredUser));
       storeAuthResponse(responseData);
 
-      return registeredUser;
+      return { user: registeredUser };
     } catch (error: unknown) {
       console.error('Registration error:', error);
       throw extractDomainError(error);
@@ -333,7 +371,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, refreshUser, setUser, isAuthenticated: !!user }}
+      value={{ user, loading, login, complete2faLogin, register, logout, refreshUser, setUser, isAuthenticated: !!user }}
     >
       {children}
     </AuthContext.Provider>

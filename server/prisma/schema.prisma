@@ -373,7 +373,7 @@ model RefreshToken {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String    @unique
+  token     String    @unique /// HMAC-SHA256 hash of refresh JWT (plain token never stored)
   deviceId  String?
   ipAddress String?
   userAgent String?

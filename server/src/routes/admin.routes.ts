@@ -3,12 +3,19 @@ import { z } from 'zod';
 import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/rbac';
+import {
+  requireCreate,
+  requireDelete,
+  requireEdit,
+  requireView,
+} from '../middleware/permissions';
 import { adminLimiter } from '../middleware/rateLimiter';
 import { AuditService } from '../services/AuditService';
 import { AdvancedAdminController } from '../controllers/admin/AdvancedAdminController';
 import adminDocController from '../controllers/admin/AdminDocumentController';
 import adminPayoutController from '../controllers/admin/AdminPayoutController';
 import adminProviderController from '../controllers/admin/AdminProviderController';
+import { OrganizationController } from '../controllers/admin/OrganizationController';
 
 const router = Router();
 router.use(authenticate, requireAdmin, adminLimiter);
@@ -402,6 +409,49 @@ router.post('/incidents/:id/suspend-provider', adminProviderController.suspendPr
 
 // ── Service management ─────────────────────────────────────────────────────────
 router.put('/services/:id/deactivate', adminProviderController.deactivateService.bind(adminProviderController));
+
+// ── Organization hierarchy (granular permission gates — extend in M2+) ─────────
+router.get('/organizations', requireView('organization'), OrganizationController.listOrganizations);
+router.post('/organizations', requireCreate('organization'), OrganizationController.createOrganization);
+router.get(
+  '/organizations/:orgId/clinics',
+  requireView('clinic'),
+  OrganizationController.listClinics,
+);
+router.post(
+  '/organizations/:orgId/clinics',
+  requireCreate('clinic'),
+  OrganizationController.createClinic,
+);
+router.get('/organizations/:id', requireView('organization'), OrganizationController.getOrganization);
+router.patch(
+  '/organizations/:id',
+  requireEdit('organization'),
+  OrganizationController.updateOrganization,
+);
+router.delete(
+  '/organizations/:id',
+  requireDelete('organization'),
+  OrganizationController.deleteOrganization,
+);
+
+router.get(
+  '/clinics/:clinicId/departments',
+  requireView('department'),
+  OrganizationController.listDepartments,
+);
+router.post(
+  '/clinics/:clinicId/departments',
+  requireCreate('department'),
+  OrganizationController.createDepartment,
+);
+router.get('/clinics/:id', requireView('clinic'), OrganizationController.getClinic);
+router.patch('/clinics/:id', requireEdit('clinic'), OrganizationController.updateClinic);
+router.delete('/clinics/:id', requireDelete('clinic'), OrganizationController.deleteClinic);
+
+router.get('/departments/:id', requireView('department'), OrganizationController.getDepartment);
+router.patch('/departments/:id', requireEdit('department'), OrganizationController.updateDepartment);
+router.delete('/departments/:id', requireDelete('department'), OrganizationController.deleteDepartment);
 
 // ── Internal staff CRUD ────────────────────────────────────────────────────────
 router.get('/staff', adminProviderController.listStaff.bind(adminProviderController));

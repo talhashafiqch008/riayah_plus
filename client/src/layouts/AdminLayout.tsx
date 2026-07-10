@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CreditCard, ShieldCheck, LogOut, Menu, X,
   FileText, AlertTriangle, Settings, BarChart3, Building2, UserCheck, Bell,
-  ChevronDown, ChevronRight, DollarSign, BookOpen, ClipboardList,
+  ChevronDown, ChevronRight, DollarSign, BookOpen, ClipboardList, Layers,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -60,6 +60,7 @@ const NAVIGATION: NavGroup[] = [
   {
     title: 'Config',
     items: [
+      { name: 'Organizations', href: '/admin/organizations', icon: Layers },
       { name: 'Services', href: '/admin/services', icon: Building2 },
       { name: 'Settings', href: '/admin/settings', icon: Settings },
     ],
@@ -74,9 +75,9 @@ export function AdminLayout() {
   const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.adminSidebarExpanded);
-      return saved ? JSON.parse(saved) : ['overview', 'users', 'operations'];
+      return saved ? JSON.parse(saved) : ['overview', 'users', 'operations', 'config'];
     } catch {
-      return ['overview', 'users', 'operations'];
+      return ['overview', 'users', 'operations', 'config'];
     }
   });
 

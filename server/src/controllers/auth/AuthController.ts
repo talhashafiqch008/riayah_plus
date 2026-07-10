@@ -22,6 +22,11 @@ import {
 } from '../../utils/authCookies';
 import { EmailService } from '../../services/EmailService';
 import { AuditService } from '../../services/AuditService';
+import { sendEmailVerificationForUser } from '../../utils/emailVerification';
+import { persistRefreshToken, findRefreshTokenByPlain, revokeRefreshTokenByPlain } from '../../utils/refreshTokenStore';
+import { formatDeviceLabel } from '../../utils/deviceInfo';
+
+const resendVerificationPublicSchema = z.object({ email: z.string().email() });
 
 // ─── Schemas ───────────────────────────────────────────────────────────────
 
@@ -50,17 +55,7 @@ async function issueTokens(user: { id: string; role: string; email: string }, re
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken({ userId: user.id });
 
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      token: refreshToken,
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-      expiresAt,
-    },
-  });
+  await persistRefreshToken(user.id, refreshToken, req);
 
   return { accessToken, refreshToken };
 }
@@ -82,6 +77,12 @@ export class AuthController {
 
     if (!user.isActive) {
       throw new AppError('Your account has been suspended.', 403);
+    }
+
+    // Enforce email verification before allowing login.
+    // (Seed accounts can be marked verified via prisma/seed.ts)
+    if (!user.isEmailVerified) {
+      throw new AppError('Email not verified. Please verify your email address before logging in.', 403);
     }
 
     if (user.twoFactorEnabled) {
@@ -120,6 +121,11 @@ export class AuthController {
     const user = await prisma.user.findUnique({ where: { id: userId, deletedAt: null } });
     if (!user?.twoFactorSecret) throw new AppError('Invalid request.', 400);
 
+    // Enforce email verification also for 2FA completion.
+    if (!user.isEmailVerified) {
+      throw new AppError('Email not verified. Please verify your email address before logging in.', 403);
+    }
+
     const valid = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
@@ -145,10 +151,7 @@ export class AuthController {
   static async logout(req: Request, res: Response): Promise<void> {
     const refreshToken = getRefreshTokenFromRequest(req);
     if (refreshToken && req.user) {
-      await prisma.refreshToken.updateMany({
-        where: { token: refreshToken, userId: req.user.userId },
-        data: { revokedAt: new Date() },
-      });
+      await revokeRefreshTokenByPlain(refreshToken, req.user.userId);
     }
     if (req.user) {
       await AuditService.log({ userId: req.user.userId, action: 'logout', req });
@@ -162,6 +165,7 @@ export class AuthController {
       where: { userId: req.user!.userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    clearAuthCookies(res);
     res.json({ message: 'All sessions terminated.' });
   }
 
@@ -180,7 +184,7 @@ export class AuthController {
       throw new AppError('Refresh token required.', 401);
     }
 
-    const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+    const stored = await findRefreshTokenByPlain(refreshToken);
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
       throw new AppError('Invalid or expired refresh token.', 401);
     }
@@ -322,20 +326,90 @@ export class AuthController {
   }
 
   static async listSessions(req: Request, res: Response): Promise<void> {
+    const refreshToken = getRefreshTokenFromRequest(req);
+    let currentSessionId: string | null = null;
+
+    if (refreshToken) {
+      const current = await findRefreshTokenByPlain(refreshToken);
+      currentSessionId = current?.id ?? null;
+    }
+
     const tokens = await prisma.refreshToken.findMany({
       where: { userId: req.user!.userId, revokedAt: null, expiresAt: { gt: new Date() } },
       select: { id: true, ipAddress: true, userAgent: true, createdAt: true, expiresAt: true },
       orderBy: { createdAt: 'desc' },
     });
-    res.json({ sessions: tokens });
+
+    res.json({
+      sessions: tokens.map((token) => ({
+        id: token.id,
+        name: formatDeviceLabel(token.userAgent),
+        ipAddress: token.ipAddress,
+        userAgent: token.userAgent,
+        createdAt: token.createdAt,
+        expiresAt: token.expiresAt,
+        lastUsedAt: token.createdAt,
+        current: token.id === currentSessionId,
+      })),
+    });
+  }
+
+  static async revokeOtherSessions(req: Request, res: Response): Promise<void> {
+    const refreshToken = getRefreshTokenFromRequest(req);
+    let currentSessionId: string | null = null;
+
+    if (refreshToken) {
+      const current = await findRefreshTokenByPlain(refreshToken);
+      currentSessionId = current?.id ?? null;
+    }
+
+    await prisma.refreshToken.updateMany({
+      where: {
+        userId: req.user!.userId,
+        revokedAt: null,
+        ...(currentSessionId ? { id: { not: currentSessionId } } : {}),
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    res.json({ message: 'Other sessions revoked.' });
   }
 
   static async revokeSession(req: Request, res: Response): Promise<void> {
-    await prisma.refreshToken.updateMany({
+    const refreshToken = getRefreshTokenFromRequest(req);
+    let currentSessionId: string | null = null;
+
+    if (refreshToken) {
+      const current = await findRefreshTokenByPlain(refreshToken);
+      currentSessionId = current?.id ?? null;
+    }
+
+    const result = await prisma.refreshToken.updateMany({
       where: { id: req.params.id, userId: req.user!.userId },
       data: { revokedAt: new Date() },
     });
+    if (result.count === 0) {
+      throw new AppError('Session not found.', 404);
+    }
+
+    if (req.params.id === currentSessionId) {
+      clearAuthCookies(res);
+    }
+
     res.json({ message: 'Session revoked.' });
+  }
+
+  static async resendVerificationPublic(req: Request, res: Response): Promise<void> {
+    const { email } = resendVerificationPublicSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
+
+    if (user && !user.isEmailVerified) {
+      await sendEmailVerificationForUser({ id: user.id, email: user.email });
+    }
+
+    res.json({
+      message: 'If an unverified account exists for this email, a verification link has been sent.',
+    });
   }
 
   static async resendVerification(req: Request, res: Response): Promise<void> {
@@ -346,9 +420,68 @@ export class AuthController {
       return;
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const verifyUrl = `${env.APP_URL}/api/email/verify?token=${token}&email=${encodeURIComponent(user.email)}`;
-    await EmailService.sendEmailVerification(user.email, verifyUrl);
+    await sendEmailVerificationForUser({ id: user.id, email: user.email });
     res.json({ message: 'Verification email sent.' });
+  }
+
+  /**
+   * Email verification link handler.
+   * Example: GET /api/email/verify?token=...&email=...
+   */
+  static async verifyEmailLink(req: Request, res: Response): Promise<void> {
+    const schema = z.object({
+      token: z.string().min(1),
+      email: z.string().email(),
+    });
+
+    const { token, email } = schema.parse(req.query);
+
+    const record = await prisma.otpVerification.findFirst({
+      where: {
+        identifier: email,
+        otp: token,
+        type: 'email_verification',
+        verifiedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!record) {
+      res.status(400).send(`
+        <html>
+          <body style="font-family: sans-serif; padding: 24px;">
+            <h2>Verification failed</h2>
+            <p>The link is invalid or expired.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    await prisma.otpVerification.update({
+      where: { id: record.id },
+      data: { verifiedAt: new Date() },
+    });
+
+    await prisma.user.update({
+      where: { email },
+      data: { isEmailVerified: true, emailVerifiedAt: new Date() },
+    });
+
+    const loginUrl = `${env.FRONTEND_URL}/careseeker/login?verified=1`;
+
+    res.status(200).send(`
+      <html>
+        <head>
+          <meta http-equiv="refresh" content="3;url=${loginUrl}" />
+        </head>
+        <body style="font-family: sans-serif; padding: 24px; text-align: center;">
+          <h2>Email verified successfully</h2>
+          <p>You can now log in to your account.</p>
+          <p><a href="${loginUrl}">Continue to login</a></p>
+        </body>
+      </html>
+    `);
   }
 }

@@ -3,7 +3,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Loader2, Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, isProviderRole } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 import { isApiError } from '@/lib/errors';
 
@@ -12,10 +12,10 @@ import { isApiError } from '@/lib/errors';
 
 function ProviderLoginForm() {
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { login, logout, user } = useAuth();
 
   useEffect(() => {
-    if (user) {
+    if (user && isProviderRole(user.role ?? '')) {
       const onboardingStatus = user.onboarding_status;
       if (onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed') {
         navigate('/provider/onboarding');
@@ -52,17 +52,24 @@ function ProviderLoginForm() {
  setErrors({});
  setIsLoading(true);
 
- try {
- const user = await login(email, password);
- toast.success("Welcome back!");
+    try {
+      const loggedInUser = await login(email, password);
 
- const onboardingStatus = user.onboarding_status;
+      if (!isProviderRole(loggedInUser.role ?? '')) {
+        await logout();
+        toast.error('This portal is for provider accounts only (doctor, nurse, therapist, etc.).');
+        return;
+      }
 
- if (onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed') {
- navigate('/provider/onboarding');
- } else {
- navigate('/provider/dashboard');
- }
+      toast.success("Welcome back!");
+
+      const onboardingStatus = loggedInUser.onboarding_status;
+
+      if (onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed') {
+        navigate('/provider/onboarding');
+      } else {
+        navigate('/provider/dashboard');
+      }
  } catch (error: unknown) {
  console.error("Login failed:", error);
  if (isApiError(error)) {

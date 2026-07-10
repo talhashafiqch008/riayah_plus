@@ -1,70 +1,75 @@
 
 import { Suspense } from "react";
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
 import { LogIn, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ADMIN_ROLES } from '@/routes/getRoleDashboard';
+
+function isAdminRole(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase();
+  return (ADMIN_ROLES as readonly string[]).includes(r);
+}
 
 function AdminLoginForm() {
- const { user, loading: authLoading, login } = useAuth();
- const navigate = useNavigate();
- const [searchParams] = useSearchParams();
- const redirectPath = searchParams.get('redirect') || '/admin/dashboard';
+  const { user, loading: authLoading, login, logout } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/admin/dashboard';
 
- const [email, setEmail] = useState('');
- const [password, setPassword] = useState('');
- const [showPassword, setShowPassword] = useState(false);
- const [loading, setLoading] = useState(false);
- const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
- useEffect(() => {
- if (!authLoading && user) {
- const isAdmin = user.role === 'admin' || user.role === 'ADMIN';
- if (isAdmin) {
- navigate('/admin/dashboard');
- } else {
- setError('Access denied. Admin credentials required.');
- }
- }
- }, [user, authLoading, navigate]);
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (isAdminRole(user.role)) {
+        navigate('/admin/dashboard', { replace: true });
+      }
+    }
+  }, [user, authLoading, navigate]);
 
- const handleSubmit = async (e: React.FormEvent) => {
- e.preventDefault();
- setError('');
- setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
- try {
- const userData = await login(email, password);
+    try {
+      const userData = await login(email, password);
 
- if (userData.role === 'admin' || userData.role === 'ADMIN') {
- toast.success('Welcome to Admin Panel');
- navigate(redirectPath);
- } else {
- setError('Access denied. Admin credentials required.');
- toast.error('You do not have admin access.');
- }
- } catch (err: any) {
- const message = err.message || 'Invalid credentials';
- setError(message);
- toast.error(message);
- } finally {
- setLoading(false);
- }
- };
+      if (isAdminRole(userData.role)) {
+        toast.success('Welcome to Admin Panel');
+        navigate(redirectPath);
+      } else {
+        await logout();
+        const message = 'Access denied. Admin credentials required.';
+        setError(message);
+        toast.error(message);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Invalid credentials';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
- if (authLoading) {
- return (
- <div className="min-h-screen bg-stone-100 flex items-center justify-center">
- <div className="animate-spin rounded-full size-8 border-b-2 border-teal-600" />
- </div>
- );
- }
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full size-8 border-b-2 border-teal-600" />
+      </div>
+    );
+  }
 
- if (user && (user.role === 'admin' || user.role === 'ADMIN')) {
- return null;
- }
+  if (user && isAdminRole(user.role)) {
+    return null;
+  }
 
  return (
  <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">

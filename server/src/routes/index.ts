@@ -38,13 +38,17 @@ import uploadRoutes from './upload.routes';
 import careSummaryRoutes from './care-summary.routes';
 import tasksRoutes from './tasks.routes';
 import receiptsRoutes from './receipts.routes';
+import { auditMiddleware } from '../middleware/auditMiddleware';
 
 const router = Router();
 
-// Health check
+// Health check (registered before audit middleware — no HTTP audit row)
 router.get('/health', (_req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString(), version: '1.0.0' });
 });
+
+// Automatic audit logging for all mutating API requests (POST/PUT/PATCH/DELETE)
+router.use(auditMiddleware);
 
 // Public routes
 router.use('/', publicRoutes);

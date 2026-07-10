@@ -11,6 +11,7 @@ import { BookingPaymentController } from '../controllers/payments/BookingPayment
 import { DisputeController } from '../controllers/disputes/DisputeController';
 import { NoShowPenaltyService } from '../services/NoShowPenaltyService';
 import extrasController from '../controllers/booking/BookingExtrasController';
+import { assertAppointmentTransition } from '../utils/stateMachine';
 
 const router = Router();
 router.use(authenticate);
@@ -92,6 +93,12 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Accept/reject booking
 router.patch('/:id/status', async (req: Request, res: Response) => {
   const { status, reason } = z.object({ status: z.enum(['accepted','rejected','cancelled']), reason: z.string().optional() }).parse(req.body);
+
+  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Booking not found.', 404);
+
+  assertAppointmentTransition(existing.status, status);
+
   const booking = await prisma.booking.update({
     where: { id: req.params.id },
     data: { status, cancelReason: reason },
@@ -108,6 +115,11 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
 // Start booking
 router.post('/:id/start', async (req: Request, res: Response) => {
+  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Booking not found.', 404);
+
+  assertAppointmentTransition(existing.status, 'in_progress');
+
   const booking = await prisma.booking.update({
     where: { id: req.params.id },
     data: { status: 'in_progress', startedAt: new Date() },
@@ -117,6 +129,11 @@ router.post('/:id/start', async (req: Request, res: Response) => {
 
 // Complete booking
 router.post('/:id/complete', async (req: Request, res: Response) => {
+  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Booking not found.', 404);
+
+  assertAppointmentTransition(existing.status, 'completed');
+
   const booking = await prisma.booking.update({
     where: { id: req.params.id },
     data: { status: 'completed', completedAt: new Date() },
@@ -130,6 +147,8 @@ router.post('/:id/pay-with-credits', bookingLimiter, async (req: Request, res: R
   const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
   if (!booking) throw new AppError('Booking not found.', 404);
   if (!booking.totalAmount) throw new AppError('Booking has no amount set.', 422);
+
+  assertAppointmentTransition(booking.status, 'accepted');
 
   await WalletService.holdEscrow(req.user!.userId, Number(booking.totalAmount));
   await prisma.booking.update({ where: { id: booking.id }, data: { paidWithCredits: true, status: 'accepted' } });
@@ -185,6 +204,8 @@ router.post('/:id/clock-in', async (req: Request, res: Response, next: NextFunct
     const { GPSService } = await import('../services/GPSService');
     const geofenceResult = await GPSService.validateCheckin({ lat: latitude, lng: longitude }, booking.clientId);
     await GPSService.logCheckin(req.user!.userId, null, { lat: latitude, lng: longitude }, geofenceResult);
+
+    assertAppointmentTransition(booking.status, 'in_progress');
 
     await prisma.booking.update({ where: { id: req.params.id }, data: { status: 'in_progress', startedAt: new Date() } });
     res.json({ success: true, message: 'Clocked in successfully.' });

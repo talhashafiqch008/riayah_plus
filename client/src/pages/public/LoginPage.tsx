@@ -1,20 +1,30 @@
-import { useEffect } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getRoleDashboard } from '@/routes/getRoleDashboard';
+import {
+  ProposalPortalLoginPage,
+  type ProposalPortalKey,
+} from '@/pages/public/ProposalPortalLoginPage';
+import { ROLE_SHELLS } from '@/config/proposalRoleShells';
+
+const PORTAL_KEYS = Object.keys(ROLE_SHELLS) as ProposalPortalKey[];
+
+function isProposalPortal(value: string | null): value is ProposalPortalKey {
+  return !!value && PORTAL_KEYS.includes(value as ProposalPortalKey);
+}
 
 /**
  * Generic /login entry point.
  *
- * Handles three cases:
- *  1. Already authenticated → redirect to the user's canonical dashboard.
- *  2. ?role=careseeker → redirect to /careseeker/login
- *  3. ?role=provider   → redirect to /provider/signup
- *  4. No role param    → default to /careseeker/login (most common)
+ * - ?portal=family|patient|coordinator|clinical|support → branded proposal portal login
+ * - ?role=careseeker|provider|admin → redirect to legacy login pages
+ * - default → /careseeker/login
  */
 export default function LoginPage() {
   const { user, isAuthenticated, loading } = useAuth();
   const [params] = useSearchParams();
+  const location = useLocation();
+  const redirectTo = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
 
   if (loading) {
     return (
@@ -24,17 +34,27 @@ export default function LoginPage() {
     );
   }
 
-  // Case 1: already authenticated
+  const portal = params.get('portal');
+
+  if (isProposalPortal(portal)) {
+    if (isAuthenticated && user) {
+      const role = (user.role ?? '').toLowerCase();
+      const allowed = ROLE_SHELLS[portal].allowedRoles.map((r) => r.toLowerCase());
+      if (allowed.includes(role)) {
+        return <Navigate to={redirectTo || getRoleDashboard(role)} replace />;
+      }
+    }
+    return <ProposalPortalLoginPage portal={portal} redirectTo={redirectTo} />;
+  }
+
   if (isAuthenticated && user) {
     return <Navigate to={getRoleDashboard(user.role)} replace />;
   }
 
-  // Case 2 & 3: query-param role redirects
   const role = params.get('role');
   if (role === 'careseeker') return <Navigate to="/careseeker/login" replace />;
-  if (role === 'provider')   return <Navigate to="/provider/signup" replace />;
-  if (role === 'admin')      return <Navigate to="/admin/login" replace />;
+  if (role === 'provider') return <Navigate to="/provider/signup" replace />;
+  if (role === 'admin') return <Navigate to="/admin/login" replace />;
 
-  // Case 4: default
   return <Navigate to="/careseeker/login" replace />;
 }

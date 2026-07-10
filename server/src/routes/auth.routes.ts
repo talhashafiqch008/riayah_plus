@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthController } from '../controllers/auth/AuthController';
 import { RegistrationController } from '../controllers/auth/RegistrationController';
 import { OtpController } from '../controllers/auth/OtpController';
+import { DeviceTokenController } from '../controllers/auth/DeviceTokenController';
 import { UserProfileController } from '../controllers/users/UserProfileController';
 import { authenticate, optionalAuth, generateAccessToken } from '../middleware/auth';
 import { requireAdmin } from '../middleware/rbac';
@@ -35,8 +36,9 @@ router.post('/register', registerLimiter, RegistrationController.register);
 router.post('/auth/register', registerLimiter, RegistrationController.register);
 router.post('/login', loginLimiter, AuthController.login);
 router.post('/auth/login', loginLimiter, AuthController.login);
-router.post('/forgot-password', AuthController.forgotPassword);
+router.post('/forgot-password', otpLimiter, AuthController.forgotPassword);
 router.post('/reset-password', AuthController.resetPassword);
+router.post('/email/resend-verification', otpLimiter, AuthController.resendVerificationPublic);
 router.post('/2fa/verify', AuthController.verify2faLogin);
 router.post('/auth/2fa-verify', AuthController.verify2faLogin);
 router.post('/otp/send', otpLimiter, OtpController.send);
@@ -47,6 +49,10 @@ router.post('/auth/refresh', AuthController.refresh);
 router.get('/auth/session', AuthController.session);
 router.post('/logout', optionalAuth, AuthController.logout);
 router.post('/auth/logout', optionalAuth, AuthController.logout);
+
+// Public email verification link:
+// GET /api/email/verify?token=...&email=...
+router.get('/email/verify', AuthController.verifyEmailLink);
 
 // Authenticated
 router.use(authenticate);
@@ -59,6 +65,16 @@ router.post('/2fa/verify-setup', AuthController.verify2faSetup);
 router.post('/2fa/disable', AuthController.disable2fa);
 router.get('/sessions', AuthController.listSessions);
 router.delete('/sessions/:id', AuthController.revokeSession);
+router.post('/sessions/revoke-others', AuthController.revokeOtherSessions);
+
+router.post('/device-tokens', DeviceTokenController.register);
+router.post('/auth/device-tokens', DeviceTokenController.register);
+router.get('/device-tokens', DeviceTokenController.list);
+router.get('/auth/device-tokens', DeviceTokenController.list);
+router.delete('/device-tokens/:id', DeviceTokenController.revokeById);
+router.delete('/auth/device-tokens/:id', DeviceTokenController.revokeById);
+router.post('/device-tokens/revoke', DeviceTokenController.revokeByToken);
+router.post('/auth/device-tokens/revoke', DeviceTokenController.revokeByToken);
 
 // Admin-only role migration (was public — security fix)
 router.post('/migrate-role', requireAdmin, UserProfileController.migrateRole);

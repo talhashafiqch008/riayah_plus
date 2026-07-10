@@ -1,5 +1,7 @@
+import { Request, Response } from 'express';
 import { prisma } from '../config/database';
-import { Request } from 'express';
+import { buildDeviceInfo } from '../utils/deviceInfo';
+import { redactForAudit } from '../utils/auditRedact';
 
 interface AuditOptions {
   userId?: string;
@@ -12,19 +14,72 @@ interface AuditOptions {
   req?: Request;
 }
 
+interface HttpMutationAuditOptions {
+  req: Request;
+  res: Response;
+  durationMs: number;
+  entity?: string;
+  entityId?: string;
+}
+
+function markExplicitAudit(req?: Request): void {
+  if (req?.res) {
+    req.res.locals.auditLogged = true;
+  }
+}
+
+function auditContextFromRequest(req?: Request) {
+  const deviceInfo = req ? buildDeviceInfo(req) : undefined;
+  return {
+    ipAddress: req?.ip,
+    userAgent: deviceInfo?.userAgent ?? req?.headers['user-agent'],
+    deviceInfo: deviceInfo as object | undefined,
+  };
+}
+
 export class AuditService {
   static async log(opts: AuditOptions) {
+    markExplicitAudit(opts.req);
+    const ctx = auditContextFromRequest(opts.req);
+
     return prisma.auditLog.create({
       data: {
         userId: opts.userId,
         action: opts.action,
         entity: opts.entity,
         entityId: opts.entityId,
-        ipAddress: opts.req?.ip,
-        userAgent: opts.req?.headers['user-agent'],
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+        deviceInfo: ctx.deviceInfo,
         before: opts.before ? (opts.before as object) : undefined,
         after: opts.after ? (opts.after as object) : undefined,
-        metadata: opts.metadata as any,
+        metadata: opts.metadata as object | undefined,
+      },
+    });
+  }
+
+  static async logHttpMutation(opts: HttpMutationAuditOptions) {
+    const { req, res, durationMs, entity, entityId } = opts;
+    const path = req.originalUrl.split('?')[0];
+    const action = `http.${req.method.toLowerCase()}`;
+
+    return prisma.auditLog.create({
+      data: {
+        userId: req.user?.userId,
+        action,
+        entity,
+        entityId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        deviceInfo: buildDeviceInfo(req) as object,
+        metadata: {
+          path,
+          method: req.method,
+          statusCode: res.statusCode,
+          durationMs,
+          params: redactForAudit(req.params),
+          body: req.body ? redactForAudit(req.body) : undefined,
+        } as object,
       },
     });
   }

@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { enable2fa, verify2faSetup, disable2fa, getSessions, revokeSession } from '@/lib/api';
+import { enable2fa, verify2faSetup, disable2fa, getSessions, revokeSession, revokeOtherSessions, logoutAll } from '@/lib/api';
 import { isApiError } from '@/lib/errors';
 import {
  ArrowLeft, Shield, Smartphone, Key, Mail, Lock,
@@ -25,6 +25,33 @@ interface Device {
  last_used_at: string | null;
  created_at: string;
  current: boolean;
+}
+
+interface ApiSession {
+ id: string;
+ name?: string;
+ ipAddress?: string | null;
+ ip_address?: string | null;
+ userAgent?: string | null;
+ user_agent?: string | null;
+ createdAt?: string;
+ created_at?: string;
+ lastUsedAt?: string;
+ last_used_at?: string;
+ current?: boolean;
+}
+
+function normalizeSession(raw: ApiSession): Device {
+ const ua = raw.userAgent ?? raw.user_agent ?? null;
+ return {
+ id: raw.id,
+ name: raw.name ?? (ua ? ua.slice(0, 48) : 'Unknown device'),
+ ip_address: raw.ipAddress ?? raw.ip_address ?? null,
+ user_agent: ua,
+ last_used_at: raw.lastUsedAt ?? raw.last_used_at ?? raw.createdAt ?? raw.created_at ?? null,
+ created_at: raw.createdAt ?? raw.created_at ?? '',
+ current: Boolean(raw.current),
+ };
 }
 
 function getDeviceType(userAgent: string | null): 'desktop' | 'mobile' | 'tablet' {
@@ -53,7 +80,7 @@ function formatRelativeTime(dateString: string | null): string {
 }
 
 export default function SecurityPage() {
- const { user, refreshUser } = useAuth();
+ const { user, refreshUser, logout } = useAuth();
  const [mfaEnabled, setMfaEnabled] = useState(false);
  const [mfaMethod, setMfaMethod] = useState<'app' | 'sms' | null>(null);
  const [showMfaSetup, setShowMfaSetup] = useState(false);
@@ -81,8 +108,8 @@ export default function SecurityPage() {
  setDevicesLoading(true);
  try {
  const data = await getSessions();
- const sessions = data?.data || data?.sessions || data || [];
- setDevices(Array.isArray(sessions) ? sessions : []);
+ const sessions = (data?.sessions ?? data?.data ?? []) as ApiSession[];
+ setDevices(Array.isArray(sessions) ? sessions.map(normalizeSession) : []);
  } catch (error: unknown) {
  if (isApiError(error)) {
  toast.error(error.message);
@@ -109,10 +136,10 @@ export default function SecurityPage() {
  setVerificationCode('');
  setLoading(true);
  try {
- const data = await enable2fa();
- setTwoFaSecret(data.secret);
- setQrCodeUrl(data.qr_code_url);
- setShowMfaSetup(true);
+    const data = await enable2fa();
+    setTwoFaSecret(data.secret ?? '');
+    setQrCodeUrl(data.qrCode ?? data.qr_code_url ?? '');
+    setShowMfaSetup(true);
  } catch (error: unknown) {
  if (isApiError(error)) {
  toast.error(error.message);
@@ -183,6 +210,11 @@ export default function SecurityPage() {
  setLoading(true);
  try {
  await revokeSession(deviceToRemove.id);
+ if (deviceToRemove.current) {
+ await logout();
+ toast.success('This device has been signed out');
+ return;
+ }
  setDevices(devices.filter(d => d.id !== deviceToRemove.id));
  setShowRemoveDeviceModal(false);
  setDeviceToRemove(null);
@@ -192,6 +224,40 @@ export default function SecurityPage() {
  toast.error(error.message);
  } else {
  toast.error('Failed to remove device');
+ }
+ } finally {
+ setLoading(false);
+ }
+ };
+
+ const handleSignOutAllOthers = async () => {
+ setLoading(true);
+ try {
+ await revokeOtherSessions();
+ await fetchDevices();
+ toast.success('Signed out of all other devices');
+ } catch (error: unknown) {
+ if (isApiError(error)) {
+ toast.error(error.message);
+ } else {
+ toast.error('Failed to sign out other devices');
+ }
+ } finally {
+ setLoading(false);
+ }
+ };
+
+ const handleSignOutAll = async () => {
+ setLoading(true);
+ try {
+ await logoutAll();
+ await logout();
+ toast.success('Signed out everywhere');
+ } catch (error: unknown) {
+ if (isApiError(error)) {
+ toast.error(error.message);
+ } else {
+ toast.error('Failed to sign out all devices');
  }
  } finally {
  setLoading(false);
@@ -329,8 +395,8 @@ export default function SecurityPage() {
  <p className="text-sm text-stone-500">Manage devices with active sessions</p>
  </div>
  </div>
- <Button variant="outline" size="sm" disabled={devicesLoading || devices.length === 0}>
- Sign out all
+ <Button variant="outline" size="sm" disabled={devicesLoading || devices.length <= 1} onClick={handleSignOutAllOthers}>
+ Sign out all other devices
  </Button>
  </div>
  </div>
@@ -389,10 +455,11 @@ export default function SecurityPage() {
  onClick={() => handleRemoveDevice(device)}
  disabled={loading}
  className="p-2 hover:bg-red-100 rounded-lg text-red-700 hover:text-red-600 transition-colors disabled:opacity-50"
+ title="Sign out this device"
  >
  <Trash2 className="size-4" />
  </button>
-  )}
+ )}
   </div>
   );
   })
@@ -400,8 +467,14 @@ export default function SecurityPage() {
  </div>
 
  <div className="p-4 border-t ring-1 ring-stone-100/50 bg-stone-50">
- <Button variant="outline" className="w-full" size="sm" disabled={devicesLoading || devices.length === 0}>
- Sign out of all other devices
+ <Button
+ variant="outline"
+ className="w-full"
+ size="sm"
+ disabled={devicesLoading || devices.length === 0}
+ onClick={handleSignOutAll}
+ >
+ Sign out of all devices (including this one)
  </Button>
  </div>
  </div>

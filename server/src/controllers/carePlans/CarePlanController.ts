@@ -4,6 +4,7 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
+import { assertCarePlanTransition } from '../../utils/stateMachine';
 
 const goalSchema = z.object({
   title: z.string(),
@@ -127,6 +128,8 @@ export class CarePlanController {
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
 
+    assertCarePlanTransition(plan.status, 'submitted_for_approval');
+
     await prisma.carePlan.update({
       where: { id: plan.id },
       data: { status: 'submitted_for_approval', submittedAt: new Date() },
@@ -155,6 +158,8 @@ export class CarePlanController {
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
 
+    assertCarePlanTransition(plan.status, 'approved');
+
     await prisma.carePlan.update({
       where: { id: plan.id },
       data: { status: 'approved', approvedAt: new Date(), approvedById: req.user!.userId },
@@ -177,6 +182,8 @@ export class CarePlanController {
     const { notes } = z.object({ notes: z.string() }).parse(req.body);
     const plan = await prisma.carePlan.findUnique({ where: { id: req.params.id }, include: { episode: true } });
     if (!plan) throw new AppError('Care plan not found.', 404);
+
+    assertCarePlanTransition(plan.status, 'revision_requested');
 
     await prisma.carePlan.update({
       where: { id: plan.id },

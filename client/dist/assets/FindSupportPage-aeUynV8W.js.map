@@ -1,1 +1,0 @@
-{"version":3,"file":"FindSupportPage-aeUynV8W.js","sources":["../../src/pages/public/FindSupportPage.tsx"],"sourcesContent":["\nexport default function SearchPage() {\n return (\n <div>\n <h1>Find Support</h1>\n </div>\n );\n}\n"],"names":["SearchPage","jsx"],"mappings":"qEACA,SAAwBA,GAAa,CACpC,OACAC,EAAAA,IAAC,MAAA,CACD,SAAAA,EAAAA,IAAC,KAAA,CAAG,wBAAY,EAChB,CAED"}

@@ -45,10 +45,20 @@ async function adminDelete(url: string) {
     }
 }
 
+async function adminPatch(url: string, data?: Record<string, unknown>) {
+    try {
+        const response = await client.patch(url, data);
+        return response.data;
+    } catch (error) {
+        throw extractApiError(error);
+    }
+}
+
 export const adminApi = {
     get: adminGet,
     post: adminPost,
     put: adminPut,
+    patch: adminPatch,
     delete: adminDelete,
 };
 

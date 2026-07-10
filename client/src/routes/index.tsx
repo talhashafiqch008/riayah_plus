@@ -11,6 +11,7 @@ import { StaffLayout } from '@/layouts/StaffLayout';
 import { TrainerLayout } from '@/layouts/TrainerLayout';
 import { DemoCoordinatorLayout } from '@/layouts/DemoCoordinatorLayout';
 import { PROVIDER_ROLES, CLIENT_ROLES } from './getRoleDashboard';
+import { proposalRoleRouteElements } from './ProposalRoleRoutes';
 
 const PageSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -36,6 +37,8 @@ const FindSupportDetailPage = lazy(() => import('@/pages/public/FindSupportDetai
 const PublicProviderPage  = lazy(() => import('@/pages/public/PublicProviderPage'));
 const RegisterPage        = lazy(() => import('@/pages/public/RegisterPage'));
 const ForgotPasswordPage  = lazy(() => import('@/pages/public/ForgotPasswordPage'));
+const ResetPasswordPage   = lazy(() => import('@/pages/public/ResetPasswordPage'));
+const VerifyEmailPendingPage = lazy(() => import('@/pages/public/VerifyEmailPendingPage'));
 const PrivacyPage         = lazy(() => import('@/pages/public/PrivacyPage'));
 const TermsPage           = lazy(() => import('@/pages/public/TermsPage'));
 const DeleteAccountPage        = lazy(() => import('@/pages/public/DeleteAccountPage'));
@@ -70,6 +73,7 @@ const AdminProvidersPendingPage = lazy(() => import('@/pages/admin/ProvidersPend
 const AdminServicesPage      = lazy(() => import('@/pages/admin/ServicesPage'));
 const AdminSessionsPage      = lazy(() => import('@/pages/admin/SessionsPage'));
 const AdminSettingsPage      = lazy(() => import('@/pages/admin/SettingsPage'));
+const AdminOrganizationsPage = lazy(() => import('@/pages/admin/OrganizationsPage'));
 const AdminStaffPage         = lazy(() => import('@/pages/admin/StaffPage'));
 const AdminAddStaffPage      = lazy(() => import('@/pages/admin/AddStaffPage'));
 const AdminUsersPage         = lazy(() => import('@/pages/admin/UsersPage'));
@@ -209,20 +213,24 @@ export function AppRoutes() {
         <Route path="/doctor/:id"      element={<S><PublicProviderPage /></S>} />
         <Route path="/register"        element={<S><RegisterPage /></S>} />
         <Route path="/forgot-password" element={<S><ForgotPasswordPage /></S>} />
+        <Route path="/reset-password"  element={<S><ResetPasswordPage /></S>} />
+        <Route path="/verify-email"    element={<S><VerifyEmailPendingPage /></S>} />
         <Route path="/privacy"         element={<S><PrivacyPage /></S>} />
         <Route path="/terms"           element={<S><TermsPage /></S>} />
         <Route path="/delete-account"        element={<S><DeleteAccountPage /></S>} />
         <Route path="/login"                 element={<S><LoginPage /></S>} />
         <Route path="/onboarding-required"   element={<S><OnboardingRequiredPage /></S>} />
 
-        {/* ── Public-only routes ────────────────────────────────────── */}
+        {/* ── Public-only routes (redirect if already authenticated) ── */}
         <Route element={<PublicOnlyRoute />}>
           <Route path="/careseeker/login"       element={<S><CareseekerLoginPage /></S>} />
           <Route path="/careseeker/phone-login" element={<S><PhoneLoginPage /></S>} />
           <Route path="/provider/login"         element={<S><ProviderLoginPage /></S>} />
           <Route path="/provider/signup"        element={<S><ProviderSignupPage /></S>} />
-          <Route path="/admin/login"            element={<S><AdminLoginPage /></S>} />
         </Route>
+
+        {/* Admin login handles its own role check — must not use PublicOnlyRoute */}
+        <Route path="/admin/login"            element={<S><AdminLoginPage /></S>} />
 
         {/* ── Admin routes ──────────────────────────────────────────── */}
         <Route element={<RoleRoute allowedRoles={['admin', 'super_admin']} />}>
@@ -248,6 +256,7 @@ export function AppRoutes() {
             <Route path="/admin/services"           element={<S><AdminServicesPage /></S>} />
             <Route path="/admin/sessions"           element={<S><AdminSessionsPage /></S>} />
             <Route path="/admin/settings"           element={<S><AdminSettingsPage /></S>} />
+            <Route path="/admin/organizations"     element={<S><AdminOrganizationsPage /></S>} />
             <Route path="/admin/staff"              element={<S><AdminStaffPage /></S>} />
             <Route path="/admin/staff/add"          element={<S><AdminAddStaffPage /></S>} />
             <Route path="/admin/users"              element={<S><AdminUsersPage /></S>} />
@@ -340,6 +349,9 @@ export function AppRoutes() {
             <Route path="/provider/verification"                element={<S><ProviderVerificationPage /></S>} />
           </Route>
         </Route>
+
+        {/* ── Proposal role shells (M1): Family, Patient, Coordinator, Clinical, Support ── */}
+        {proposalRoleRouteElements}
 
         {/* ── Staff routes ──────────────────────────────────────────── */}
         <Route element={<RoleRoute allowedRoles={['staff', 'admin']} />}>

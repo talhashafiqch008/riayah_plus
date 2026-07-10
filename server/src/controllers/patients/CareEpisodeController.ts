@@ -5,6 +5,7 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
+import { assertCareEpisodeTransition } from '../../utils/stateMachine';
 
 const createEpisodeSchema = z.object({
   patientId: z.string(),
@@ -97,14 +98,22 @@ export class CareEpisodeController {
   static async update(req: Request, res: Response): Promise<void> {
     const data = updateIntakeSchema.parse(req.body);
 
+    const existing = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new AppError('Episode not found.', 404);
+
+    const nextStatus = data.status as CareEpisodeStatus | undefined;
+    if (nextStatus && nextStatus !== existing.status) {
+      assertCareEpisodeTransition(existing.status, nextStatus);
+    }
+
     const episode = await prisma.careEpisode.update({
       where: { id: req.params.id },
       data: {
         ...data,
-        status: data.status as CareEpisodeStatus | undefined,
+        status: nextStatus,
         intakeSummary: data.intakeSummary as Prisma.InputJsonValue ?? undefined,
-        intakeReviewedAt: data.status === 'validated' ? new Date() : undefined,
-        intakeReviewerId: data.status === 'validated' ? req.user!.userId : undefined,
+        intakeReviewedAt: nextStatus === 'validated' ? new Date() : undefined,
+        intakeReviewerId: nextStatus === 'validated' ? req.user!.userId : undefined,
       },
     });
 
@@ -117,6 +126,8 @@ export class CareEpisodeController {
 
     const episode = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
     if (!episode) throw new AppError('Episode not found.', 404);
+
+    assertCareEpisodeTransition(episode.status, 'validated');
 
     const updated = await prisma.careEpisode.update({
       where: { id: req.params.id },

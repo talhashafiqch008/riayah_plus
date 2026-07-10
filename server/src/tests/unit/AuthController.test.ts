@@ -9,11 +9,13 @@ jest.mock('../../services/AuditService', () => ({ AuditService: { log: jest.fn()
 jest.mock('../../config/redis', () => ({ redis: { set: jest.fn(), get: jest.fn(), del: jest.fn() } }));
 
 import { AuthController } from '../../controllers/auth/AuthController';
+import { hashRefreshToken } from '../../utils/refreshTokenHash';
 
 function mockRes() {
   const res: Partial<Response> = {};
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  res.cookie = jest.fn().mockReturnValue(res);
   return res as Response;
 }
 
@@ -46,7 +48,7 @@ describe('AuthController.login', () => {
     const hash = await bcrypt.hash('Password123!', 1);
     prismaMock.user.findUnique.mockResolvedValue({
       id: 'u-1', name: 'Test', email: 'u@test.com', passwordHash: hash,
-      role: 'client', isActive: true, twoFactorEnabled: false, deletedAt: null,
+      role: 'client', isActive: true, twoFactorEnabled: false, isEmailVerified: true, deletedAt: null,
     } as any);
     prismaMock.refreshToken.create.mockResolvedValue({ id: 'rt-1' } as any);
 
@@ -54,6 +56,22 @@ describe('AuthController.login', () => {
     const res = mockRes();
 
     await AuthController.login(req, res);
+
+    expect(prismaMock.refreshToken.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'u-1',
+          token: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      }),
+    );
+
+    const createCall = prismaMock.refreshToken.create.mock.calls[0][0] as {
+      data: { token: string };
+    };
+    const responseBody = (res.json as jest.Mock).mock.calls[0][0] as { refreshToken: string };
+    expect(createCall.data.token).toBe(hashRefreshToken(responseBody.refreshToken));
+    expect(createCall.data.token).not.toBe(responseBody.refreshToken);
 
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({

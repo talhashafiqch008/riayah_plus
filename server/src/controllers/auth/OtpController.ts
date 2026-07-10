@@ -6,6 +6,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { EmailService } from '../../services/EmailService';
 import { generateAccessToken, generateRefreshToken, AuthPayload } from '../../middleware/auth';
 import { setAuthCookies } from '../../utils/authCookies';
+import { persistRefreshToken } from '../../utils/refreshTokenStore';
 
 const sendSchema = z.object({
   identifier: z.string(),
@@ -29,14 +30,18 @@ export class OtpController {
     const otp = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
+    if (parsedType === 'phone') {
+      throw new AppError(
+        'Phone OTP is not available yet. Please use email login or contact support.',
+        503,
+      );
+    }
+
     await prisma.otpVerification.create({
       data: { identifier: parsedIdentifier, otp, type: parsedType, expiresAt },
     });
 
-    if (parsedType === 'email') {
-      await EmailService.sendOtp(parsedIdentifier, otp);
-    }
-    // SMS would go here via WhatsApp or SMS gateway
+    await EmailService.sendOtp(parsedIdentifier, otp);
 
     res.json({ message: 'OTP sent.' });
   }
@@ -88,14 +93,7 @@ export class OtpController {
       const accessToken = generateAccessToken(payload);
       const refreshToken = generateRefreshToken({ userId: user.id });
 
-      await prisma.refreshToken.create({
-        data: {
-          userId: user.id,
-          token: refreshToken,
-          ipAddress: req.ip,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
+      await persistRefreshToken(user.id, refreshToken, req);
 
       setAuthCookies(res, accessToken, refreshToken);
 

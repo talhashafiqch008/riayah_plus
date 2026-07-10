@@ -16,6 +16,33 @@ export async function login(identifier: string, password: string, isPhone = fals
     }
 }
 
+export async function forgotPassword(email: string) {
+    try {
+        const response = await client.post('/forgot-password', { email });
+        return response.data;
+    } catch (error: unknown) {
+        throw extractDomainError(error);
+    }
+}
+
+export async function resetPassword(email: string, token: string, password: string) {
+    try {
+        const response = await client.post('/reset-password', { email, token, password });
+        return response.data;
+    } catch (error: unknown) {
+        throw extractDomainError(error);
+    }
+}
+
+export async function resendVerificationEmail(email: string) {
+    try {
+        const response = await client.post('/email/resend-verification', { email });
+        return response.data;
+    } catch (error: unknown) {
+        throw extractDomainError(error);
+    }
+}
+
 export async function register(data: RegisterPayload) {
     try {
         const response = await client.post('/auth/register', data);
@@ -93,7 +120,13 @@ export async function getUser() {
 export async function enable2fa() {
     try {
         const response = await client.post('/2fa/enable');
-        return response.data;
+        const data = response.data as { secret?: string; qrCode?: string; qr_code_url?: string };
+        return {
+            ...data,
+            secret: data.secret,
+            qrCode: data.qrCode ?? data.qr_code_url,
+            qr_code_url: data.qrCode ?? data.qr_code_url,
+        };
     } catch (error: unknown) {
         throw extractDomainError(error); // MIGRATED: domain error handling
     }
@@ -132,6 +165,24 @@ export async function revokeSession(id: string | number) {
         return response.data;
     } catch (error: unknown) {
         throw extractDomainError(error); // MIGRATED: domain error handling
+    }
+}
+
+export async function revokeOtherSessions() {
+    try {
+        const response = await client.post('/sessions/revoke-others');
+        return response.data;
+    } catch (error: unknown) {
+        throw extractDomainError(error);
+    }
+}
+
+export async function logoutAll() {
+    try {
+        const response = await client.post('/logout-all');
+        return response.data;
+    } catch (error: unknown) {
+        throw extractDomainError(error);
     }
 }
 
