@@ -195,6 +195,22 @@ enum SessionType {
   home_visit
 }
 
+enum UrgencyLevel {
+  low
+  medium
+  high
+  urgent
+}
+
+enum ServiceCategory {
+  speech_therapy
+  occupational_therapy
+  behavioral_support
+  physiotherapy
+  nursing
+  companion_care
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Organization & Structure
 // ─────────────────────────────────────────────────────────────────────────────
@@ -532,14 +548,18 @@ model CareEpisode {
   careRecipientId  String?
   careRecipient    CareRecipient?    @relation(fields: [careRecipientId], references: [id])
 
-  title            String
-  status           CareEpisodeStatus @default(intake_submitted)
-  urgencyLevel     String?
-  reasonForCare    String?
-  medicalHistory   String?
-  currentMeds      String?
-  diagnoses        String[]
-  serviceInterests String[]
+  title                   String
+  status                  CareEpisodeStatus @default(intake_submitted)
+  urgencyLevel            UrgencyLevel?
+  reasonForCare           String?
+  medicalHistory          String?
+  currentMeds             String?
+  diagnoses               String[]
+  serviceInterests        ServiceCategory[]
+  observedChallenges      String[]
+  developmentalMilestones String?
+  priorAssessments        String[]
+  consentGiven            Boolean           @default(false)
 
   intakeSummary    Json?
   intakeReviewedAt DateTime?
@@ -559,10 +579,39 @@ model CareEpisode {
   clinicalNotes    ClinicalNote[]    @relation("EpisodeClinicalNotes")
   tasks            Task[]            @relation("EpisodeTasks")
   incidents        Incident[]        @relation("EpisodeIncidents")
+  aiIntakeSummary  AiIntakeSummary?
 
   @@index([patientId])
   @@index([coordinatorId])
   @@map("care_episodes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Intake Summary
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AiIntakeSummary {
+  id                         String      @id @default(cuid())
+  careEpisodeId              String      @unique
+  careEpisode                CareEpisode @relation(fields: [careEpisodeId], references: [id], onDelete: Cascade)
+  model                      String
+  promptTokens               Int
+  completionTokens           Int
+  totalTokens                Int
+  keyConcerns                String[]
+  urgencyIndicators          String[]
+  suggestedServiceCategories String[]
+  flaggedRiskFactors         Json?
+  clinicalImpressions        String?
+  confidence                 String?
+  status                     String      @default("draft")
+  approvedById               String?
+  approvedAt                 DateTime?
+  createdAt                  DateTime    @default(now())
+  updatedAt                  DateTime    @updatedAt
+
+  @@index([careEpisodeId])
+  @@map("ai_intake_summaries")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
