@@ -5,6 +5,7 @@ import { CountryProvider } from '@/contexts/CountryContext';
 import { I18nProvider } from '@/components/I18nProvider';
 import { MotionProvider } from '@/components/MotionProvider';
 import { SentryProvider } from '@/components/SentryProvider';
+import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 import { AppRoutes } from '@/routes';
 import { AuthGate } from '@/routes/AuthGate';
 
@@ -19,6 +20,7 @@ export default function App() {
                 <SentryProvider>
                   <AuthGate>
                     <AppRoutes />
+                    <CookieConsentBanner />
                   </AuthGate>
                 </SentryProvider>
               </MotionProvider>

@@ -7,21 +7,25 @@ import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
 import { sendEmailVerificationForUser } from '../../utils/emailVerification';
+import { sanitizedString } from '../../utils/sanitize';
 
 const registerSchema = z
   .object({
-    name: z.string().min(2).optional(),
-    firstName: z.string().min(1).optional(),
-    lastName: z.string().min(1).optional(),
+    name: sanitizedString(z.string().min(2)).optional(),
+    firstName: sanitizedString(z.string().min(1)).optional(),
+    lastName: sanitizedString(z.string().min(1)).optional(),
     email: z.string().email(),
     password: z.string().min(8),
     phone: z.string().optional(),
     role: z.nativeEnum(UserRole).optional(),
+    consentAccepted: z.boolean().optional(),
   })
   .refine(
     (data) => Boolean(data.name?.trim() || (data.firstName?.trim() && data.lastName?.trim())),
     { message: 'Name or firstName/lastName is required.' },
   );
+
+const REGISTRATION_CONSENT_TYPE = 'terms_of_service';
 
 const onboardingSchema = z.object({
   dateOfBirth: z.string().optional(),
@@ -40,6 +44,11 @@ const onboardingSchema = z.object({
 export class RegistrationController {
   static async register(req: Request, res: Response): Promise<void> {
     const data = registerSchema.parse(req.body);
+
+    if (data.consentAccepted !== true) {
+      throw new AppError('You must accept the terms of service to register.', 422);
+    }
+
     const name =
       data.name?.trim() || `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim();
 
@@ -57,6 +66,30 @@ export class RegistrationController {
         passwordHash,
         role,
         onboardingStatus: 'pending',
+      },
+    });
+
+    await prisma.consent.create({
+      data: {
+        userId: user.id,
+        consentType: REGISTRATION_CONSENT_TYPE,
+        description: 'Terms of service accepted at registration',
+        granted: true,
+        grantedAt: new Date(),
+        documentVersion: '1.0.0',
+        ipAddress: req.ip,
+        deviceFingerprint: req.headers['x-device-fingerprint'] as string | undefined,
+        signatureStatus: 'signed',
+      },
+    });
+
+    await prisma.consentLog.create({
+      data: {
+        userId: user.id,
+        consentType: REGISTRATION_CONSENT_TYPE,
+        version: '1.0.0',
+        ipAddress: req.ip,
+        granted: true,
       },
     });
 

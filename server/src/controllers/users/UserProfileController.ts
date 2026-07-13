@@ -5,6 +5,7 @@ import { prisma } from '../../config/database';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
+import { anonymizeUser } from '../../utils/anonymizeUser';
 
 const updatePasswordSchema = z.object({
   current_password: z.string(),
@@ -115,10 +116,19 @@ export class UserProfileController {
   static async destroy(req: Request, res: Response): Promise<void> {
     await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { deletedAt: new Date(), isActive: false },
+      data: {
+        deletedAt: new Date(),
+        isActive: false,
+        deletionReason: 'User-requested deletion; PII will be anonymized after 30 days',
+      },
     });
     await AuditService.log({ userId: req.user!.userId, action: 'account_deleted', req });
-    res.json({ message: 'Account deleted.' });
+    res.json({ message: 'Account deleted. Personal data will be anonymized after a 30-day grace period.' });
+  }
+
+  /** Called by retention cron — anonymizes a soft-deleted user after grace period. */
+  static async anonymizeDeletedUser(userId: string): Promise<void> {
+    await anonymizeUser(userId);
   }
 
   static async migrateRole(req: Request, res: Response): Promise<void> {

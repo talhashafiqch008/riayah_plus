@@ -27,6 +27,7 @@ describe('POST /api/register', () => {
       email: 'newuser@test.com',
       password: 'Password123!',
       role: 'client',
+      consentAccepted: true,
     });
 
     expect(res.status).toBe(201);
@@ -41,6 +42,7 @@ describe('POST /api/register', () => {
       name: 'Dup',
       email: 'dup@test.com',
       password: 'Password123!',
+      consentAccepted: true,
     });
     expect(res.status).toBe(409);
   });

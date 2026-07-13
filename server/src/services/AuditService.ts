@@ -88,11 +88,33 @@ export class AuditService {
     userId?: string;
     entity?: string;
     action?: string;
+    from?: string;
+    to?: string;
     page?: number;
     limit?: number;
   }) {
-    const { page = 1, limit = 50, ...where } = filters;
+    const { page = 1, limit = 50, from, to, userId, entity, action } = filters;
     const skip = (page - 1) * limit;
+
+    const where: {
+      userId?: string;
+      entity?: string;
+      action?: string;
+      createdAt?: { gte?: Date; lte?: Date };
+    } = {};
+
+    if (userId) where.userId = userId;
+    if (entity) where.entity = entity;
+    if (action) where.action = action;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = toDate;
+      }
+    }
 
     const [logs, total] = await Promise.all([
       prisma.auditLog.findMany({

@@ -107,6 +107,7 @@ function RegisterContent() {
  lastName: formData.lastName,
  phone: formData.phone,
  role: (selectedRole || 'client') as string,
+ consentAccepted: agreedToTerms === true,
  });
 
  if (result.requiresEmailVerification) {

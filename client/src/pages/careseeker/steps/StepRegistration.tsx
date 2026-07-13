@@ -72,7 +72,13 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
           phone: data.phone,
           password: data.password,
           role: userRole,
+          consentAccepted: data.termsAccepted === true,
         };
+        if (!registrationPayload.consentAccepted) {
+          toast.error('Please accept the Terms of Service to create your account.');
+          setIsRegistering(false);
+          return;
+        }
         try {
           const regResponse = await register(registrationPayload as RegisterPayload);
           if (regResponse?.requiresEmailVerification) {
@@ -234,6 +240,28 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                 </div>
               </div>
             </div>
+          )}
+
+          {!isLoggedIn && (
+            <label className="mt-6 flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={data.termsAccepted === true}
+                onChange={(e) => onUpdate({ ...data, termsAccepted: e.target.checked })}
+                className="mt-1 size-4 accent-teal-600"
+              />
+              <span className="text-sm text-stone-600">
+                I agree to the{' '}
+                <a href="/terms" className="text-teal-600 underline" target="_blank" rel="noreferrer">
+                  Terms of Service
+                </a>{' '}
+                and{' '}
+                <a href="/privacy" className="text-teal-600 underline" target="_blank" rel="noreferrer">
+                  Privacy Policy
+                </a>
+                .
+              </span>
+            </label>
           )}
         </div>
       </m.div>

@@ -96,14 +96,47 @@ const ADMIN_MATRIX: RoleMatrix = {
   profile: { view: true, edit: true },
 };
 
+/** Legacy marketplace roles mapped to proposal-role permission matrices (STUB-003). */
+const LEGACY_ROLE_MAP: Partial<Record<UserRole, UserRole>> = {
+  provider: 'clinical_staff',
+  doctor: 'clinical_staff',
+  nurse: 'clinical_staff',
+  physiotherapist: 'clinical_staff',
+  occupational_therapist: 'clinical_staff',
+  speech_therapist: 'clinical_staff',
+  psychologist: 'clinical_staff',
+  dietitian: 'clinical_staff',
+  therapist: 'clinical_staff',
+  clinical_staff: 'clinical_staff',
+  support_worker: 'support_worker',
+  cleaner: 'support_worker',
+  gardener: 'support_worker',
+  driver: 'support_worker',
+  companion: 'support_worker',
+  nanny: 'support_worker',
+  caregiver: 'support_worker',
+  client: 'family',
+  consumer: 'family',
+};
+
+function resolveRoleMatrix(role: UserRole): RoleMatrix | undefined {
+  const mapped = LEGACY_ROLE_MAP[role] ?? role;
+  return ROLE_PERMISSIONS[mapped];
+}
+
+function isValidUserRole(role: string): role is UserRole {
+  return Object.values(UserRole).includes(role as UserRole);
+}
+
 export function hasPermission(
   role: UserRole,
   action: PermissionAction,
   resource: PermissionResource,
 ): boolean {
+  if (!isValidUserRole(role)) return false;
   if (ADMIN_ROLES.includes(role)) return true;
 
-  const matrix = ROLE_PERMISSIONS[role];
+  const matrix = resolveRoleMatrix(role);
   if (!matrix) return false;
 
   if (matrix.any?.[action]) return true;
@@ -133,14 +166,20 @@ export function canApprove(role: UserRole, resource: PermissionResource): boolea
 
 /** Returns the effective permission map for a role (for debugging / admin UI). */
 export function getPermissionsForRole(role: UserRole): RoleMatrix {
+  if (!isValidUserRole(role)) return {};
   if (ADMIN_ROLES.includes(role)) return ADMIN_MATRIX;
-  return ROLE_PERMISSIONS[role] ?? {};
+  return resolveRoleMatrix(role) ?? {};
 }
 
 export function requirePermission(action: PermissionAction, resource: PermissionResource) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({ message: 'Unauthenticated.' });
+      return;
+    }
+
+    if (!isValidUserRole(req.user.role)) {
+      res.status(403).json({ message: 'Forbidden. Invalid role.' });
       return;
     }
 

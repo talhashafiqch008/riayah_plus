@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
-import { env } from '../config/env';
 
 const ADMIN_ROLES: UserRole[] = ['admin', 'super_admin', 'support_admin'];
 
@@ -27,10 +26,18 @@ const PROVIDER_ROLES: UserRole[] = [
 
 const CLIENT_ROLES: UserRole[] = ['client', 'consumer', 'family', 'patient'];
 
+function isValidUserRole(role: string): role is UserRole {
+  return Object.values(UserRole).includes(role as UserRole);
+}
+
 export function requireRoles(...roles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({ message: 'Unauthenticated.' });
+      return;
+    }
+    if (!isValidUserRole(req.user.role)) {
+      res.status(403).json({ message: 'Forbidden. Invalid role.' });
       return;
     }
     if (!roles.includes(req.user.role)) {
@@ -48,6 +55,10 @@ export function requireRole(roles: string[]) {
       res.status(401).json({ message: 'Unauthenticated.' });
       return;
     }
+    if (!isValidUserRole(req.user.role)) {
+      res.status(403).json({ message: 'Forbidden. Invalid role.' });
+      return;
+    }
     if (!roles.includes(req.user.role)) {
       res.status(403).json({ message: 'Forbidden. Insufficient permissions.' });
       return;
@@ -62,11 +73,13 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     return;
   }
 
-  const isAdmin = ADMIN_ROLES.includes(req.user.role);
-  const hasAdminHeader =
-    req.headers['x-admin-request'] === env.ADMIN_SECRET && env.ADMIN_SECRET !== '';
+  if (!isValidUserRole(req.user.role)) {
+    res.status(403).json({ message: 'Forbidden. Invalid role.' });
+    return;
+  }
 
-  if (!isAdmin && !hasAdminHeader) {
+  // STUB-006: role-only — do not accept x-admin-request header as a backdoor
+  if (!ADMIN_ROLES.includes(req.user.role)) {
     res.status(403).json({ message: 'Admin access required.' });
     return;
   }

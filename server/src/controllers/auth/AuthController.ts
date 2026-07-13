@@ -12,6 +12,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
+  recordLogoutAll,
   AuthPayload,
 } from '../../middleware/auth';
 import {
@@ -56,8 +57,20 @@ async function issueTokens(user: { id: string; role: string; email: string }, re
   const refreshToken = generateRefreshToken({ userId: user.id });
 
   await persistRefreshToken(user.id, refreshToken, req);
+  await recordUserSession(user.id, req);
 
   return { accessToken, refreshToken };
+}
+
+async function recordUserSession(userId: string, req: Request): Promise<void> {
+  await prisma.userSession.create({
+    data: {
+      userId,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      deviceId: typeof req.headers['x-device-id'] === 'string' ? req.headers['x-device-id'] : undefined,
+    },
+  });
 }
 
 // ─── Controller ────────────────────────────────────────────────────────────
@@ -107,6 +120,7 @@ export class AuthController {
         role: user.role,
         avatar: user.avatar,
         onboardingStatus: user.onboardingStatus,
+        twoFactorEnabled: user.twoFactorEnabled,
       },
       onboarding_status: user.onboardingStatus,
     });
@@ -144,7 +158,7 @@ export class AuthController {
       token: accessToken,
       accessToken,
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, twoFactorEnabled: user.twoFactorEnabled },
     });
   }
 
@@ -161,10 +175,18 @@ export class AuthController {
   }
 
   static async logoutAll(req: Request, res: Response): Promise<void> {
-    await prisma.refreshToken.updateMany({
-      where: { userId: req.user!.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    const userId = req.user!.userId;
+    await Promise.all([
+      prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      recordLogoutAll(userId),
+    ]);
     clearAuthCookies(res);
     res.json({ message: 'All sessions terminated.' });
   }
@@ -326,12 +348,39 @@ export class AuthController {
   }
 
   static async listSessions(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
     const refreshToken = getRefreshTokenFromRequest(req);
     let currentSessionId: string | null = null;
 
     if (refreshToken) {
       const current = await findRefreshTokenByPlain(refreshToken);
       currentSessionId = current?.id ?? null;
+    }
+
+    const userSessionCount = await prisma.userSession.count({
+      where: { userId, revokedAt: null },
+    });
+
+    if (userSessionCount > 0) {
+      const sessions = await prisma.userSession.findMany({
+        where: { userId, revokedAt: null },
+        select: { id: true, ipAddress: true, userAgent: true, createdAt: true, lastActiveAt: true },
+        orderBy: { lastActiveAt: 'desc' },
+      });
+
+      res.json({
+        sessions: sessions.map((session) => ({
+          id: session.id,
+          name: formatDeviceLabel(session.userAgent),
+          ipAddress: session.ipAddress,
+          userAgent: session.userAgent,
+          createdAt: session.createdAt,
+          expiresAt: null,
+          lastUsedAt: session.lastActiveAt,
+          current: session.id === currentSessionId,
+        })),
+      });
+      return;
     }
 
     const tokens = await prisma.refreshToken.findMany({

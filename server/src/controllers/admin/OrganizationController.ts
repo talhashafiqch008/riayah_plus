@@ -107,6 +107,10 @@ export class OrganizationController {
   static async createOrganization(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const body = organizationCreateSchema.parse(req.body);
+
+      const nameTaken = await prisma.organization.findFirst({ where: { name: body.name } });
+      if (nameTaken) throw new AppError('An organization with this name already exists.', 409);
+
       const baseSlug = slugify(body.slug ?? body.name);
       const slug = await uniqueOrgSlug(baseSlug);
 
@@ -143,6 +147,13 @@ export class OrganizationController {
       const body = organizationUpdateSchema.parse(req.body);
       const existing = await prisma.organization.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new AppError('Organization not found.', 404);
+
+      if (body.name && body.name !== existing.name) {
+        const nameTaken = await prisma.organization.findFirst({
+          where: { name: body.name, id: { not: req.params.id } },
+        });
+        if (nameTaken) throw new AppError('An organization with this name already exists.', 409);
+      }
 
       let slug = existing.slug;
       if (body.slug) {
@@ -217,8 +228,16 @@ export class OrganizationController {
       const org = await prisma.organization.findUnique({ where: { id: req.params.orgId } });
       if (!org) throw new AppError('Organization not found.', 404);
 
+      const { search, active } = req.query as { search?: string; active?: string };
+
       const clinics = await prisma.clinic.findMany({
-        where: { organizationId: req.params.orgId },
+        where: {
+          organizationId: req.params.orgId,
+          ...(active !== undefined && { isActive: active === 'true' }),
+          ...(search?.trim() && {
+            name: { contains: search.trim(), mode: 'insensitive' },
+          }),
+        },
         include: {
           _count: { select: { departments: true, users: true } },
         },
@@ -275,6 +294,9 @@ export class OrganizationController {
 
       res.status(201).json({ success: true, data: clinic });
     } catch (err) {
+      if ((err as { code?: string }).code === 'P2002') {
+        return next(new AppError('A clinic with this name already exists in this organization.', 409));
+      }
       next(err);
     }
   }
@@ -347,8 +369,16 @@ export class OrganizationController {
       const clinic = await prisma.clinic.findUnique({ where: { id: req.params.clinicId } });
       if (!clinic) throw new AppError('Clinic not found.', 404);
 
+      const { search, active } = req.query as { search?: string; active?: string };
+
       const departments = await prisma.department.findMany({
-        where: { clinicId: clinic.id },
+        where: {
+          clinicId: clinic.id,
+          ...(active !== undefined && { isActive: active === 'true' }),
+          ...(search?.trim() && {
+            name: { contains: search.trim(), mode: 'insensitive' },
+          }),
+        },
         include: { _count: { select: { users: true } } },
         orderBy: { name: 'asc' },
       });
@@ -406,6 +436,9 @@ export class OrganizationController {
 
       res.status(201).json({ success: true, data: department });
     } catch (err) {
+      if ((err as { code?: string }).code === 'P2002') {
+        return next(new AppError('A department with this name already exists in this clinic.', 409));
+      }
       next(err);
     }
   }

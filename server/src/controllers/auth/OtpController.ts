@@ -4,18 +4,20 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { EmailService } from '../../services/EmailService';
+import { WhatsAppService } from '../../services/WhatsAppService';
+import { env } from '../../config/env';
 import { generateAccessToken, generateRefreshToken, AuthPayload } from '../../middleware/auth';
 import { setAuthCookies } from '../../utils/authCookies';
-import { persistRefreshToken } from '../../utils/refreshTokenStore';
+import { sanitizedString } from '../../utils/sanitize';
 
 const sendSchema = z.object({
-  identifier: z.string(),
+  identifier: sanitizedString(z.string().min(3)),
   type: z.enum(['email', 'phone']).default('email'),
 });
 
 const verifySchema = z.object({
-  identifier: z.string(),
-  otp: z.string(),
+  identifier: sanitizedString(z.string().min(3)),
+  otp: z.string().min(4).max(10),
   type: z.enum(['email', 'phone']).default('email'),
 });
 
@@ -30,18 +32,23 @@ export class OtpController {
     const otp = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    if (parsedType === 'phone') {
-      throw new AppError(
-        'Phone OTP is not available yet. Please use email login or contact support.',
-        503,
-      );
-    }
-
     await prisma.otpVerification.create({
       data: { identifier: parsedIdentifier, otp, type: parsedType, expiresAt },
     });
 
-    await EmailService.sendOtp(parsedIdentifier, otp);
+    if (parsedType === 'email') {
+      await EmailService.sendOtp(parsedIdentifier, otp);
+    } else {
+      // AUTH-002: deliver phone OTP via WhatsApp Business API
+      if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID) {
+        throw new AppError('Phone OTP gateway is not configured.', 503);
+      }
+      const phone = parsedIdentifier.replace(/^\+/, '');
+      await WhatsAppService.sendText(
+        phone,
+        `Your Riayah Plus verification code is: ${otp}. It expires in 10 minutes.`,
+      );
+    }
 
     res.json({ message: 'OTP sent.' });
   }
@@ -74,7 +81,6 @@ export class OtpController {
 
     await prisma.otpVerification.update({ where: { id: record.id }, data: { verifiedAt: new Date() } });
 
-    // Mark phone verified if it's a phone OTP
     let user = null;
     if (parsedType === 'phone') {
       user = await prisma.user.findFirst({ where: { phone: parsedIdentifier } });
@@ -93,7 +99,14 @@ export class OtpController {
       const accessToken = generateAccessToken(payload);
       const refreshToken = generateRefreshToken({ userId: user.id });
 
-      await persistRefreshToken(user.id, refreshToken, req);
+      await prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          token: refreshToken,
+          ipAddress: req.ip,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
 
       setAuthCookies(res, accessToken, refreshToken);
 

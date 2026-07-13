@@ -37,12 +37,10 @@ export class PrivacyController {
 
       await AuditService.log({ userId, action: 'data_export_requested', entity: 'User', entityId: userId, req });
 
-      // In production, generate and email the export. For now, return inline.
-      res.json({
-        success: true,
-        message: 'Your data export has been prepared.',
-        data: exportData,
-      });
+      const filename = `riayah-data-export-${userId}.json`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(exportData);
     } catch (err) {
       next(err);
     }
@@ -89,6 +87,37 @@ export class PrivacyController {
         orderBy: { createdAt: 'desc' },
       });
       res.json({ success: true, consents });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/privacy/restrict-processing — GDPR Art 18
+  static async restrictProcessing(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const { restricted = true } = req.body as { restricted?: boolean };
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { processingRestricted: Boolean(restricted) },
+      });
+
+      await AuditService.log({
+        userId,
+        action: restricted ? 'processing_restricted' : 'processing_restriction_lifted',
+        entity: 'User',
+        entityId: userId,
+        req,
+      });
+
+      res.json({
+        success: true,
+        message: restricted
+          ? 'Processing of your personal data has been restricted.'
+          : 'Processing restriction has been lifted.',
+        processingRestricted: Boolean(restricted),
+      });
     } catch (err) {
       next(err);
     }

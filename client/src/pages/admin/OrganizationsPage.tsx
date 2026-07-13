@@ -44,6 +44,7 @@ interface Organization {
   phone?: string | null;
   address?: string | null;
   website?: string | null;
+  logoUrl?: string | null;
   isActive: boolean;
   clinics?: Clinic[];
   _count?: CountMeta;
@@ -63,6 +64,7 @@ const emptyOrgForm = {
   phone: '',
   address: '',
   website: '',
+  logoUrl: '',
 };
 
 export default function AdminOrganizationsPage() {
@@ -133,6 +135,7 @@ export default function AdminOrganizationsPage() {
       phone: org.phone ?? '',
       address: org.address ?? '',
       website: org.website ?? '',
+      logoUrl: org.logoUrl ?? '',
     });
     setModal({ type: 'org-edit', org });
   };
@@ -143,12 +146,12 @@ export default function AdminOrganizationsPage() {
   };
 
   const openClinicEdit = (clinic: Clinic) => {
+    // ORG-004: clinic has no email/website — only name, phone, address
     setForm({
+      ...emptyOrgForm,
       name: clinic.name,
-      email: '',
       phone: clinic.phone ?? '',
       address: clinic.address ?? '',
-      website: '',
     });
     setModal({ type: 'clinic-edit', clinic });
   };
@@ -179,6 +182,7 @@ export default function AdminOrganizationsPage() {
           phone: form.phone || undefined,
           address: form.address || undefined,
           website: form.website || undefined,
+          logoUrl: form.logoUrl || undefined,
         });
         toast.success('Organization created');
       } else if (modal.type === 'org-edit') {
@@ -188,6 +192,7 @@ export default function AdminOrganizationsPage() {
           phone: form.phone || null,
           address: form.address || null,
           website: form.website || null,
+          logoUrl: form.logoUrl || null,
         });
         toast.success('Organization updated');
       } else if (modal.type === 'clinic-create') {
@@ -289,7 +294,9 @@ export default function AdminOrganizationsPage() {
                 ? 'Edit Department'
                 : '';
 
-  const showContactFields = modal?.type === 'org-create' || modal?.type === 'org-edit';
+  const showOrgOnlyFields = modal?.type === 'org-create' || modal?.type === 'org-edit';
+  const showClinicPhone =
+    modal?.type === 'clinic-create' || modal?.type === 'clinic-edit';
   const showAddressField =
     modal?.type === 'org-create' ||
     modal?.type === 'org-edit' ||
@@ -560,7 +567,7 @@ export default function AdminOrganizationsPage() {
                   className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               </div>
-              {showContactFields && (
+              {showOrgOnlyFields && (
                 <>
                   <div>
                     <label htmlFor="org-email" className="block text-sm font-medium text-stone-700 mb-1">
@@ -596,7 +603,42 @@ export default function AdminOrganizationsPage() {
                       className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
                     />
                   </div>
+                  <div>
+                    <label htmlFor="org-logo" className="block text-sm font-medium text-stone-700 mb-1">
+                      Logo URL
+                    </label>
+                    <input
+                      id="org-logo"
+                      value={form.logoUrl}
+                      onChange={(e) => setForm((prev) => ({ ...prev, logoUrl: e.target.value }))}
+                      placeholder="https://…"
+                      className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                    />
+                    {form.logoUrl ? (
+                      <img
+                        src={form.logoUrl}
+                        alt="Logo preview"
+                        className="mt-2 h-12 w-12 rounded object-contain border border-stone-200"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                  </div>
                 </>
+              )}
+              {showClinicPhone && (
+                <div>
+                  <label htmlFor="clinic-phone" className="block text-sm font-medium text-stone-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    id="clinic-phone"
+                    value={form.phone}
+                    onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                  />
+                </div>
               )}
               {showAddressField && (
                 <div>

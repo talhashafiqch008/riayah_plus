@@ -56,6 +56,7 @@ interface RegisterData {
   lastName: string;
   phone?: string;
   role: string;
+  consentAccepted?: boolean;
 }
 
 export interface RegisterResult {
@@ -307,6 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: data.password,
         phone: data.phone,
         role: data.role,
+        consentAccepted: data.consentAccepted === true,
       });
       const responseData = response.data as Record<string, unknown>;
       const registeredUser = mapUserData(responseData.user as Record<string, unknown>, responseData);

@@ -85,7 +85,7 @@ export class CareMatchingController {
           languages: providerProfile?.languages ?? [],
         }));
 
-      res.json({ data: scored });
+      res.json({ data: scored, requiresReview: true });
     } catch (err) {
       next(err);
     }

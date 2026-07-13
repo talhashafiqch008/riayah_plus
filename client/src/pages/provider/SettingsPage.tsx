@@ -5,10 +5,11 @@ import {
  Settings as SettingsIcon, Bell, Globe, Shield, Sun, Moon, Monitor,
  Smartphone, Mail, Lock, User, Save, Loader2, Eye, EyeOff,
  MessageCircle, MapPin, CheckCircle, Sparkles, KeyRound,
- Briefcase, Heart, Languages, Stethoscope, Clock, DollarSign, FileText
+ Briefcase, Heart, Languages, Stethoscope, Clock, DollarSign, FileText,
+ QrCode, AlertCircle, X
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getProviderProfile, updatePassword, updateProviderProfile } from '@/lib/api';
+import { getProviderProfile, updatePassword, updateProviderProfile, enable2fa, verify2faSetup, disable2fa } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -126,6 +127,18 @@ export default function SettingsPage() {
  });
  const [passwordLoading, setPasswordLoading] = useState(false);
  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
+
+ // 2FA state
+ const [mfaEnabled, setMfaEnabled] = useState(false);
+ const [mfaLoading, setMfaLoading] = useState(false);
+ const [showMfaSetup, setShowMfaSetup] = useState(false);
+ const [setupStep, setSetupStep] = useState(1);
+ const [twoFaSecret, setTwoFaSecret] = useState('');
+ const [qrCodeUrl, setQrCodeUrl] = useState('');
+ const [verificationCode, setVerificationCode] = useState('');
+ const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+ const [showDisableModal, setShowDisableModal] = useState(false);
+ const [disablePassword, setDisablePassword] = useState('');
 
  // Preferences (localStorage)
  const [language, setLanguage] = useState('english');
@@ -270,6 +283,61 @@ export default function SettingsPage() {
  } catch { }
  };
 
+ useEffect(() => {
+ if (user?.two_factor_enabled) setMfaEnabled(true);
+ }, [user]);
+
+ const handleEnableMfa = async () => {
+ setMfaLoading(true);
+ try {
+ const data = await enable2fa();
+ setTwoFaSecret(data.secret ?? '');
+ setQrCodeUrl(data.qrCode ?? data.qr_code_url ?? '');
+ setSetupStep(1);
+ setVerificationCode('');
+ setRecoveryCodes(null);
+ setShowMfaSetup(true);
+ } catch (err) {
+ toast.error(isApiError(err) ? err.message : 'Failed to start 2FA setup');
+ } finally {
+ setMfaLoading(false);
+ }
+ };
+
+ const handleVerifyMfa = async () => {
+ if (verificationCode.length !== 6) return;
+ setMfaLoading(true);
+ try {
+ const data = await verify2faSetup(twoFaSecret, verificationCode);
+ setMfaEnabled(true);
+ setVerificationCode('');
+ if (data.recovery_codes) setRecoveryCodes(data.recovery_codes);
+ await refreshUser();
+ toast.success('Two-factor authentication enabled');
+ } catch (err) {
+ toast.error(isApiError(err) ? err.message : 'Verification failed');
+ } finally {
+ setMfaLoading(false);
+ }
+ };
+
+ const handleDisableMfa = async () => {
+ if (!disablePassword) { toast.error('Enter your password'); return; }
+ setMfaLoading(true);
+ try {
+ await disable2fa(disablePassword);
+ setMfaEnabled(false);
+ setShowDisableModal(false);
+ setDisablePassword('');
+ await refreshUser();
+ toast.success('Two-factor authentication disabled');
+ } catch (err) {
+ toast.error(isApiError(err) ? err.message : 'Failed to disable 2FA');
+ } finally {
+ setMfaLoading(false);
+ }
+ };
+
  // Save profile + provider data
  const handleSaveProfile = async () => {
  setSaving(true);
@@ -372,6 +440,7 @@ export default function SettingsPage() {
  }
 
  return (
+ <>
  <div className="min-h-screen bg-stone-50/50 p-4 sm:p-6 lg:p-8">
  <div className="max-w-4xl mx-auto">
  {/* Header */}
@@ -609,6 +678,49 @@ export default function SettingsPage() {
  </form>
  </SectionCard>
 
+ {/* ═══ Two-Factor Authentication ═══ */}
+ <SectionCard icon={Shield} iconBg="bg-teal-100 text-teal-600" title="Two-Factor Authentication" subtitle="Add an extra layer of security to your account" delay={0.18}>
+ {mfaEnabled ? (
+ <div className="space-y-4">
+ <div className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-200">
+ <div className="flex items-center gap-3">
+ <CheckCircle className="size-6 text-green-600" />
+ <div>
+ <p className="font-bold text-green-900">2FA is enabled</p>
+ <p className="text-sm text-green-700">Using Authenticator App</p>
+ </div>
+ </div>
+ <button
+ onClick={() => setShowDisableModal(true)}
+ className="px-4 py-2 text-sm border border-stone-300 rounded-xl hover:bg-stone-50 font-medium"
+ >
+ Disable
+ </button>
+ </div>
+ <div className="p-4 bg-stone-50 rounded-2xl text-sm text-stone-500">
+ Recovery codes were shown when you first enabled 2FA. Contact support if you need them reset.
+ </div>
+ </div>
+ ) : (
+ <div className="space-y-4">
+ <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+ <AlertCircle className="size-5 text-amber-600 flex-shrink-0 mt-0.5" />
+ <p className="text-sm text-amber-700">
+ Your account is not protected by two-factor authentication. Enable it for enhanced security.
+ </p>
+ </div>
+ <button
+ onClick={handleEnableMfa}
+ disabled={mfaLoading}
+ className="flex items-center gap-2 px-5 py-3 bg-stone-900 text-white rounded-2xl text-sm font-bold hover:bg-stone-800 disabled:opacity-50"
+ >
+ <QrCode className="size-4" />
+ {mfaLoading ? 'Setting up…' : 'Enable Authenticator App'}
+ </button>
+ </div>
+ )}
+ </SectionCard>
+
  {/* ═══ Language & Region ═══ */}
  <SectionCard icon={Globe} iconBg="bg-indigo-100 text-indigo-600" title="Language & Region" subtitle="Set your preferred language and timezone" delay={0.2}>
  <div className="space-y-6">
@@ -738,5 +850,98 @@ export default function SettingsPage() {
  </div>
  </div>
  </div>
+
+ {/* 2FA Setup Modal */}
+ {showMfaSetup && (
+ <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowMfaSetup(false)}>
+ <div className="bg-white/90 backdrop-blur-xl rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+ <div className="flex items-center justify-between p-6 border-b">
+ <h2 className="text-lg font-semibold text-stone-900">Set Up Authenticator App</h2>
+ <button onClick={() => setShowMfaSetup(false)} className="p-1 hover:bg-stone-100 rounded-lg"><X className="size-5 text-stone-500" /></button>
+ </div>
+ <div className="p-6">
+ {recoveryCodes ? (
+ <div className="space-y-4">
+ <div className="text-center">
+ <CheckCircle className="size-10 text-green-600 mx-auto mb-2" />
+ <p className="font-bold text-stone-900">Two-factor authentication enabled!</p>
+ <p className="text-sm text-stone-500 mt-1">Save these recovery codes. You will only see them once.</p>
+ </div>
+ <div className="grid grid-cols-2 gap-2">
+ {recoveryCodes.map((code, i) => (
+ <code key={i} className="bg-stone-100 px-3 py-2 rounded-xl text-sm font-mono text-stone-800 text-center">{code}</code>
+ ))}
+ </div>
+ <button onClick={() => { setShowMfaSetup(false); setRecoveryCodes(null); }} className="w-full py-3 bg-teal-600 text-white rounded-2xl text-sm font-bold hover:bg-teal-700">Done</button>
+ </div>
+ ) : setupStep === 1 ? (
+ <div className="space-y-4 text-center">
+ {qrCodeUrl && <img src={qrCodeUrl} alt="2FA QR Code" className="mx-auto size-48" />}
+ <p className="text-sm text-stone-600">Scan this QR code with your authenticator app, or enter the secret key manually:</p>
+ <code className="block bg-stone-100 px-4 py-2 rounded-xl text-sm font-mono text-stone-800 break-all">{twoFaSecret}</code>
+ <button onClick={() => setSetupStep(2)} className="w-full py-3 bg-stone-900 text-white rounded-2xl text-sm font-bold hover:bg-stone-800">Next</button>
+ </div>
+ ) : (
+ <div className="space-y-4 text-center">
+ <p className="text-sm text-stone-600">Enter the 6-digit code from your authenticator app to confirm setup.</p>
+ <input
+ type="text"
+ inputMode="numeric"
+ value={verificationCode}
+ onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+ placeholder="000000"
+ className="w-full text-center text-2xl tracking-widest px-4 py-3 border border-stone-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
+ maxLength={6}
+ />
+ <button
+ onClick={handleVerifyMfa}
+ disabled={verificationCode.length !== 6 || mfaLoading}
+ className="w-full py-3 bg-stone-900 text-white rounded-2xl text-sm font-bold hover:bg-stone-800 disabled:opacity-50"
+ >
+ {mfaLoading ? 'Verifying…' : 'Verify & Enable 2FA'}
+ </button>
+ <button onClick={() => setSetupStep(1)} className="w-full text-sm text-stone-500 hover:text-stone-700">Back</button>
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* Disable 2FA Modal */}
+ {showDisableModal && (
+ <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDisableModal(false)}>
+ <div className="bg-white/90 backdrop-blur-xl rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+ <div className="flex items-center justify-between p-6 border-b">
+ <h2 className="text-lg font-semibold text-stone-900">Disable Two-Factor Authentication</h2>
+ <button onClick={() => setShowDisableModal(false)} className="p-1 hover:bg-stone-100 rounded-lg"><X className="size-5 text-stone-500" /></button>
+ </div>
+ <div className="p-6 space-y-4">
+ <p className="text-sm text-stone-600">Enter your current password to confirm.</p>
+ <div className="relative">
+ <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-stone-400" />
+ <input
+ type="password"
+ value={disablePassword}
+ onChange={(e) => setDisablePassword(e.target.value)}
+ placeholder="Current password"
+ className="w-full pl-11 pr-4 py-3 bg-stone-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium"
+ />
+ </div>
+ <div className="flex gap-3">
+ <button onClick={() => setShowDisableModal(false)} className="flex-1 py-3 border border-stone-300 rounded-2xl text-sm font-bold hover:bg-stone-50">Cancel</button>
+ <button
+ onClick={handleDisableMfa}
+ disabled={!disablePassword || mfaLoading}
+ className="flex-1 py-3 bg-red-600 text-white rounded-2xl text-sm font-bold hover:bg-red-700 disabled:opacity-50"
+ >
+ {mfaLoading ? 'Disabling…' : 'Disable 2FA'}
+ </button>
+ </div>
+ </div>
+ </div>
+ </div>
+ )}
+ </>
  );
 }

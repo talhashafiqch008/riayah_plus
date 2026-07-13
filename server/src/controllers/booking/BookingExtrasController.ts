@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
-import { z } from 'zod';
+import { AuditService } from '../../services/AuditService';
+import { assertAppointmentTransition } from '../../utils/stateMachine';
 
 const updateBookingSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
@@ -60,6 +62,8 @@ export class BookingExtrasController {
       if (['cancelled', 'completed'].includes(booking.status)) {
         throw new AppError('Booking cannot be cancelled in its current state', 400);
       }
+
+      assertAppointmentTransition(booking.status, 'cancelled');
 
       const updated = await prisma.booking.update({
         where: { id },
@@ -144,6 +148,7 @@ export class BookingExtrasController {
       if (booking.clientId !== req.user!.userId) throw new AppError('Only the client can respond to a counter-offer', 403);
 
       if (action === 'accept') {
+        assertAppointmentTransition(booking.status, 'accepted');
         await prisma.booking.update({
           where: { id },
           data: { status: 'accepted' },
@@ -156,6 +161,7 @@ export class BookingExtrasController {
         }
         res.json({ message: 'Counter-offer accepted. Booking confirmed.' });
       } else {
+        assertAppointmentTransition(booking.status, 'cancelled');
         await prisma.booking.update({ where: { id }, data: { status: 'cancelled' } });
         res.json({ message: 'Counter-offer rejected. Booking cancelled.' });
       }

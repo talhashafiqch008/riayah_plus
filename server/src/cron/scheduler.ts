@@ -6,6 +6,7 @@ import { WalletService } from '../services/WalletService';
 import { EmailService } from '../services/EmailService';
 import { StripeService } from '../services/StripeService';
 import { PayoutIdempotencyService } from '../services/PayoutIdempotencyService';
+import { anonymizeUser } from '../utils/anonymizeUser';
 
 export function startScheduler(): void {
   logger.info('Starting cron scheduler');
@@ -316,6 +317,60 @@ export function startScheduler(): void {
       if (result.processed > 0) logger.info(`Processed ${result.processed} payouts`);
     } catch (err) {
       logger.error('payouts:process-pending failed', { err });
+    }
+  });
+
+  // ── retention:purge-expired-otp — daily ─────────────────────────────────────
+  cron.schedule('0 5 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const result = await prisma.otpVerification.deleteMany({
+        where: { createdAt: { lt: cutoff } },
+      });
+      if (result.count > 0) logger.info(`Purged ${result.count} expired OTP records`);
+    } catch (err) {
+      logger.error('retention:purge-expired-otp failed', { err });
+    }
+  });
+
+  // ── retention:purge-stale-refresh-tokens — daily ────────────────────────────
+  cron.schedule('0 5 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const result = await prisma.refreshToken.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: new Date() } },
+            { revokedAt: { lt: cutoff } },
+          ],
+        },
+      });
+      if (result.count > 0) logger.info(`Purged ${result.count} stale refresh tokens`);
+    } catch (err) {
+      logger.error('retention:purge-stale-refresh-tokens failed', { err });
+    }
+  });
+
+  // ── retention:anonymize-deleted-users — daily ───────────────────────────────
+  cron.schedule('0 6 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const users = await prisma.user.findMany({
+        where: {
+          deletedAt: { not: null, lte: cutoff },
+          email: { not: { contains: '@anonymized.local' } },
+        },
+        select: { id: true },
+        take: 100,
+      });
+
+      for (const user of users) {
+        await anonymizeUser(user.id);
+      }
+
+      if (users.length > 0) logger.info(`Anonymized ${users.length} soft-deleted users`);
+    } catch (err) {
+      logger.error('retention:anonymize-deleted-users failed', { err });
     }
   });
 

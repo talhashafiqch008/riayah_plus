@@ -53,9 +53,11 @@ describe('permissions matrix (M1 stub)', () => {
     expect(canView('support_worker', 'patient')).toBe(false);
   });
 
-  it('returns empty matrix for unknown legacy roles', () => {
-    expect(hasPermission('driver', 'view', 'booking')).toBe(false);
-    expect(getPermissionsForRole('driver')).toEqual({});
+  it('maps legacy provider roles to proposal matrices (STUB-003)', () => {
+    expect(hasPermission('driver', 'view', 'task')).toBe(true);
+    expect(hasPermission('doctor', 'view', 'patient')).toBe(true);
+    expect(hasPermission('client', 'view', 'profile')).toBe(true);
+    expect(getPermissionsForRole('driver')).toEqual(getPermissionsForRole('support_worker'));
   });
 
   it('super_admin bypasses all checks', () => {

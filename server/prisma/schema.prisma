@@ -221,7 +221,7 @@ model Organization {
 model Clinic {
   id             String       @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   address        String?
   phone          String?
@@ -232,13 +232,15 @@ model Clinic {
   departments    Department[]
   users          User[]
 
+  @@unique([organizationId, name])
+  @@index([organizationId])
   @@map("clinics")
 }
 
 model Department {
   id        String   @id @default(cuid())
   clinicId  String
-  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -246,6 +248,8 @@ model Department {
 
   users     User[]
 
+  @@unique([clinicId, name])
+  @@index([clinicId])
   @@map("departments")
 }
 
@@ -272,8 +276,9 @@ model User {
   isPhoneVerified  Boolean          @default(false)
   emailVerifiedAt  DateTime?
   phoneVerifiedAt  DateTime?
-  isActive         Boolean          @default(true)
-  onboardingStatus OnboardingStatus @default(pending)
+  isActive              Boolean          @default(true)
+  processingRestricted  Boolean          @default(false)
+  onboardingStatus      OnboardingStatus @default(pending)
   twoFactorSecret  String?
   twoFactorEnabled Boolean          @default(false)
   createdAt        DateTime         @default(now())
@@ -366,6 +371,9 @@ model User {
   @@index([email])
   @@index([phone])
   @@index([role])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([departmentId])
   @@map("users")
 }
 
@@ -1499,6 +1507,7 @@ model AuditLog {
 
   @@index([userId])
   @@index([entity, entityId])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 

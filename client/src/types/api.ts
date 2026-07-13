@@ -32,6 +32,8 @@ export interface RegisterPayload {
     lastName: string;
     phone?: string;
     role?: string;
+    /** GDPR: must be true — terms accepted before account creation */
+    consentAccepted?: boolean;
 }
 
 export interface UpdateProfilePayload {

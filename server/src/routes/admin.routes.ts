@@ -36,7 +36,7 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
 });
 
 // Users
-router.get('/users', async (req: Request, res: Response) => {
+router.get('/users', requireView('user'), async (req: Request, res: Response) => {
   const { page = '1', limit = '20', role, search } = req.query as Record<string, string>;
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -55,7 +55,7 @@ router.get('/users', async (req: Request, res: Response) => {
   res.json({ data: users, total });
 });
 
-router.get('/users/:id', async (req: Request, res: Response) => {
+router.get('/users/:id', requireView('user'), async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.params.id },
     include: { providerProfile: true, clientProfile: true },
@@ -63,14 +63,14 @@ router.get('/users/:id', async (req: Request, res: Response) => {
   res.json({ data: user });
 });
 
-router.patch('/users/:id', async (req: Request, res: Response) => {
+router.patch('/users/:id', requireEdit('user'), async (req: Request, res: Response) => {
   const user = await prisma.user.update({ where: { id: req.params.id }, data: req.body });
   await AuditService.log({ userId: req.user!.userId, action: 'admin_user_updated', entity: 'User', entityId: user.id, req });
   res.json({ data: user });
 });
 
 // Bookings
-router.get('/bookings', async (req: Request, res: Response) => {
+router.get('/bookings', requireView('booking'), async (req: Request, res: Response) => {
   const { page = '1', limit = '20' } = req.query as Record<string, string>;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const [bookings, total] = await Promise.all([
@@ -81,7 +81,7 @@ router.get('/bookings', async (req: Request, res: Response) => {
 });
 
 // Payments
-router.get('/payments', async (req: Request, res: Response) => {
+router.get('/payments', requireView('booking'), async (req: Request, res: Response) => {
   const payments = await prisma.payment.findMany({ include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' }, take: 100 });
   res.json({ data: payments });
 });
@@ -112,21 +112,61 @@ router.get('/documents', async (req: Request, res: Response) => {
 });
 
 // Audit logs
-router.get('/audit-logs', async (req: Request, res: Response) => {
-  const { page = '1', limit = '50', entity, action } = req.query as Record<string, string>;
-  const data = await AuditService.getAll({ entity, action, page: parseInt(page), limit: parseInt(limit) });
+router.get('/audit-logs', requireView('user'), async (req: Request, res: Response) => {
+  const { page = '1', limit = '50', entity, action, userId, from, to } = req.query as Record<string, string>;
+  const data = await AuditService.getAll({
+    entity,
+    action,
+    userId,
+    from,
+    to,
+    page: parseInt(page),
+    limit: parseInt(limit),
+  });
   res.json(data);
 });
 
+router.get('/audit-logs/export', requireView('user'), async (req: Request, res: Response) => {
+  const { entity, action, userId, from, to } = req.query as Record<string, string>;
+  const { logs } = await AuditService.getAll({
+    entity,
+    action,
+    userId,
+    from,
+    to,
+    page: 1,
+    limit: 10000,
+  });
+
+  const header = 'id,userId,action,entity,entityId,ipAddress,createdAt\n';
+  const rows = logs.map((log) =>
+    [
+      log.id,
+      log.userId ?? '',
+      log.action,
+      log.entity ?? '',
+      log.entityId ?? '',
+      log.ipAddress ?? '',
+      log.createdAt.toISOString(),
+    ]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(','),
+  );
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="audit-logs.csv"');
+  res.send(header + rows.join('\n'));
+});
+
 // Settings
-router.get('/settings', async (_req: Request, res: Response) => {
+router.get('/settings', requireView('organization'), async (_req: Request, res: Response) => {
   const settings = await prisma.setting.findMany();
   const obj: Record<string, string> = {};
   settings.forEach((s) => { obj[s.key] = s.value; });
   res.json({ data: obj });
 });
 
-router.put('/settings', async (req: Request, res: Response) => {
+router.put('/settings', requireEdit('organization'), async (req: Request, res: Response) => {
   const updates = req.body as Record<string, string>;
   await Promise.all(
     Object.entries(updates).map(([key, value]) =>
@@ -249,7 +289,7 @@ router.get('/reviews', async (req: Request, res: Response, next: NextFunction) =
 });
 
 // ── User soft-delete / restore ─────────────────────────────────────────────────
-router.delete('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/users/:id', requireDelete('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.user.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
     await AuditService.log({ userId: req.user!.userId, action: 'admin_user_delete', entity: 'User', entityId: req.params.id, req });
