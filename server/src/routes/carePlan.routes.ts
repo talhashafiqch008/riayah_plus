@@ -4,10 +4,32 @@ import { authenticate } from '../middleware/auth';
 import { requireCareCoordinator } from '../middleware/rbac';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { assertTenantOrgAccess } from '../middleware/tenantAccess';
 import { z } from 'zod';
 
 const router = Router();
 router.use(authenticate);
+
+const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
+
+async function requirePlanAccess(req: Request, planId: string) {
+  const plan = await prisma.carePlan.findUnique({
+    where: { id: planId },
+    include: {
+      episode: { select: { organizationId: true, patientId: true } },
+    },
+  });
+  if (!plan) throw new AppError('Care plan not found.', 404);
+
+  if (FAMILY_ROLES.includes(req.user!.role)) {
+    if (plan.episode.patientId !== req.user!.userId) {
+      throw new AppError('Forbidden.', 403);
+    }
+  } else {
+    assertTenantOrgAccess(req, plan.episode.organizationId);
+  }
+  return plan;
+}
 
 router.get('/', CarePlanController.index);
 router.post('/', requireCareCoordinator, CarePlanController.store);
@@ -31,8 +53,7 @@ const itemSchema = z.object({
 // GET /care-plans/:id/items
 router.get('/:id/items', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const plan = await prisma.carePlan.findUnique({ where: { id: req.params.id } });
-    if (!plan) throw new AppError('Care plan not found.', 404);
+    await requirePlanAccess(req, req.params.id);
 
     const items = await prisma.carePlanItem.findMany({
       where: { carePlanId: req.params.id },
@@ -45,8 +66,7 @@ router.get('/:id/items', async (req: Request, res: Response, next: NextFunction)
 // POST /care-plans/:id/items
 router.post('/:id/items', requireCareCoordinator, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const plan = await prisma.carePlan.findUnique({ where: { id: req.params.id } });
-    if (!plan) throw new AppError('Care plan not found.', 404);
+    await requirePlanAccess(req, req.params.id);
 
     const data = itemSchema.parse(req.body);
     const item = await prisma.carePlanItem.create({
@@ -59,6 +79,7 @@ router.post('/:id/items', requireCareCoordinator, async (req: Request, res: Resp
 // PATCH /care-plans/:id/items/:itemId
 router.patch('/:id/items/:itemId', requireCareCoordinator, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await requirePlanAccess(req, req.params.id);
     const data = itemSchema.partial().parse(req.body);
     const item = await prisma.carePlanItem.findFirst({
       where: { id: req.params.itemId, carePlanId: req.params.id },
@@ -73,6 +94,7 @@ router.patch('/:id/items/:itemId', requireCareCoordinator, async (req: Request, 
 // DELETE /care-plans/:id/items/:itemId
 router.delete('/:id/items/:itemId', requireCareCoordinator, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await requirePlanAccess(req, req.params.id);
     const item = await prisma.carePlanItem.findFirst({
       where: { id: req.params.itemId, carePlanId: req.params.id },
     });

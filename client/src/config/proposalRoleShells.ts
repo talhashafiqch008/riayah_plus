@@ -11,6 +11,8 @@ import {
   Heart,
   Inbox,
   BookOpen,
+  ClipboardPlus,
+  Activity,
 } from 'lucide-react';
 
 export interface RoleShellNavItem {
@@ -43,6 +45,9 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
     allowedRoles: ['family', 'admin', 'super_admin'],
     navigation: [
       { name: 'Dashboard', href: '/family', icon: LayoutDashboard },
+      { name: 'Onboarding', href: '/family/onboarding', icon: ClipboardPlus },
+      { name: 'Care Unit', href: '/family/care-unit', icon: Users },
+      { name: 'Episodes', href: '/family/episodes', icon: Activity },
       { name: 'Care Plans', href: '/family/care-plans', icon: BookOpen },
       { name: 'Bookings', href: '/family/bookings', icon: Calendar },
       { name: 'Documents', href: '/family/documents', icon: FileText },
@@ -51,14 +56,14 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
     dashboard: {
       title: 'Family Dashboard',
       description:
-        'Manage care for your loved ones — view plans, appointments, and documents in one place.',
+        'Manage care for your loved ones — start clinical intake, then track plans and visits.',
       stats: [
-        { label: 'Active care plans', value: '—' },
+        { label: 'Active episodes', value: '—' },
         { label: 'Upcoming visits', value: '—' },
-        { label: 'Open messages', value: '—' },
+        { label: 'Unread alerts', value: '—' },
       ],
       nextSteps: [
-        'Review your active care plan',
+        'Complete clinical onboarding / intake',
         'Confirm upcoming appointments',
         'Upload or sign required documents',
       ],
@@ -102,6 +107,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Dashboard', href: '/coordinator', icon: LayoutDashboard },
       { name: 'Intake Queue', href: '/coordinator/intake', icon: Inbox },
       { name: 'Patients', href: '/coordinator/patients', icon: Users },
+      { name: 'Episodes', href: '/coordinator/episodes', icon: Activity },
       { name: 'Care Plans', href: '/coordinator/plans', icon: ClipboardList },
       { name: 'Messages', href: '/coordinator/messages', icon: MessageCircle },
     ],

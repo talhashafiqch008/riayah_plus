@@ -5,6 +5,14 @@ import { HealthRoleLayout } from '@/layouts/HealthRoleLayout';
 import { ROLE_SHELLS } from '@/config/proposalRoleShells';
 import RoleShellDashboard from '@/pages/roles/RoleShellDashboard';
 import RoleShellPlaceholder from '@/pages/roles/RoleShellPlaceholder';
+import FamilyOnboardingPage from '@/pages/family/FamilyOnboardingPage';
+import CoordinatorIntakeQueuePage from '@/pages/coordinator/CoordinatorIntakeQueuePage';
+import CareUnitListPage from '@/pages/care/CareUnitListPage';
+import CareUnitDetailPage from '@/pages/care/CareUnitDetailPage';
+import CarePatientDetailPage from '@/pages/care/CarePatientDetailPage';
+import EpisodeListPage from '@/pages/care/EpisodeListPage';
+import EpisodeDetailPage from '@/pages/care/EpisodeDetailPage';
+import AssessmentSchedulePage from '@/pages/care/AssessmentSchedulePage';
 
 const PageSpinner = () => (
   <div className="min-h-[200px] flex items-center justify-center">
@@ -15,7 +23,6 @@ const PageSpinner = () => (
 const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; description?: string }[]> = {
   family: [
     { path: 'care-plans', title: 'Care Plans' },
-    { path: 'bookings', title: 'Bookings' },
     { path: 'documents', title: 'Documents' },
     { path: 'messages', title: 'Messages' },
   ],
@@ -26,17 +33,10 @@ const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; descripti
     { path: 'messages', title: 'Messages' },
   ],
   coordinator: [
-    {
-      path: 'intake',
-      title: 'Intake Queue',
-      description: 'Review and approve new patient intake submissions. Queue API connects in M2.',
-    },
-    { path: 'patients', title: 'Patients' },
     { path: 'plans', title: 'Care Plans' },
     { path: 'messages', title: 'Messages' },
   ],
   clinical: [
-    { path: 'schedule', title: 'Schedule' },
     { path: 'patients', title: 'Patients' },
     { path: 'notes', title: 'Session Notes' },
     { path: 'messages', title: 'Messages' },
@@ -71,6 +71,140 @@ export const proposalRoleRouteElements = (
               path={`${shell.basePath}/dashboard`}
               element={<Navigate to={shell.basePath} replace />}
             />
+            {shellKey === 'coordinator' && (
+              <>
+                <Route
+                  path="/coordinator/intake"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CoordinatorIntakeQueuePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/patients"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CareUnitListPage
+                        basePath="/coordinator/patients"
+                        title="Patients"
+                        description="Browse care units and open patient profiles from intake."
+                      />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/patients/:unitId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CareUnitDetailPage basePath="/coordinator/patients" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/patients/:unitId/:patientId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CarePatientDetailPage basePath="/coordinator/patients" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/episodes"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeListPage basePath="/coordinator/episodes" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/episodes/:episodeId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeDetailPage basePath="/coordinator/episodes" canTransition />
+                    </Suspense>
+                  }
+                />
+              </>
+            )}
+            {shellKey === 'family' && (
+              <>
+                <Route
+                  path="/family/onboarding"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyOnboardingPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/care-unit"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CareUnitListPage
+                        basePath="/family/care-unit"
+                        title="My Care Unit"
+                        description="View and update your care unit and patient profiles."
+                      />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/care-unit/:unitId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CareUnitDetailPage basePath="/family/care-unit" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/care-unit/:unitId/:patientId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CarePatientDetailPage basePath="/family/care-unit" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/episodes"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeListPage
+                        basePath="/family/episodes"
+                        title="Care Episodes"
+                        description="Follow status from intake through active care."
+                      />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/episodes/:episodeId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeDetailPage basePath="/family/episodes" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/bookings"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <AssessmentSchedulePage mode="family" />
+                    </Suspense>
+                  }
+                />
+              </>
+            )}
+            {shellKey === 'clinical' && (
+              <Route
+                path="/clinical/schedule"
+                element={
+                  <Suspense fallback={<PageSpinner />}>
+                    <AssessmentSchedulePage mode="clinical" />
+                  </Suspense>
+                }
+              />
+            )}
             {placeholders.map((page) => (
               <Route
                 key={page.path}

@@ -171,7 +171,14 @@ async function main() {
 
   const clinicalUser = await prisma.user.upsert({
     where: { email: 'clinical@demo.com' },
-    update: { isEmailVerified: true, emailVerifiedAt: new Date(), role: 'clinical_staff' },
+    update: {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      role: 'clinical_staff',
+      organizationId: organization.id,
+      clinicId: mainClinic.id,
+      departmentId: clinicalDept.id,
+    },
     create: {
       id: uuid(),
       name: 'Demo Clinical Staff',
@@ -207,6 +214,196 @@ async function main() {
     where: { id: familyUser.id },
     data: { organizationId: organization.id },
   });
+
+  // ── Second tenant (STUB-001 / Flow L isolation) ─────────────────────────────
+  const organizationB = await prisma.organization.upsert({
+    where: { slug: 'riayah-partner' },
+    update: { name: 'Partner Care Org', isActive: true },
+    create: {
+      id: uuid(),
+      name: 'Partner Care Org',
+      slug: 'riayah-partner',
+      email: 'contact@partner-care.test',
+      phone: '+974 4000 0099',
+      address: 'Lusail, Qatar',
+      isActive: true,
+    },
+  });
+
+  const clinicB = await prisma.clinic.upsert({
+    where: { id: 'seed-clinic-partner' },
+    update: { name: 'Partner Clinic', isActive: true, organizationId: organizationB.id },
+    create: {
+      id: 'seed-clinic-partner',
+      organizationId: organizationB.id,
+      name: 'Partner Clinic',
+      address: 'Lusail, Qatar',
+      phone: '+974 4000 0098',
+      isActive: true,
+    },
+  });
+
+  const coordinatorB = await prisma.user.upsert({
+    where: { email: 'coordinator.b@riayahplus.com' },
+    update: {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      role: 'care_coordinator',
+      organizationId: organizationB.id,
+      clinicId: clinicB.id,
+    },
+    create: {
+      id: uuid(),
+      name: 'Partner Coordinator',
+      email: 'coordinator.b@riayahplus.com',
+      passwordHash,
+      role: 'care_coordinator',
+      isActive: true,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      organizationId: organizationB.id,
+      clinicId: clinicB.id,
+    },
+  });
+
+  const familyB = await prisma.user.upsert({
+    where: { email: 'family.b@demo.com' },
+    update: {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      role: 'family',
+      organizationId: organizationB.id,
+    },
+    create: {
+      id: uuid(),
+      name: 'Partner Family',
+      email: 'family.b@demo.com',
+      passwordHash,
+      role: 'family',
+      isActive: true,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      organizationId: organizationB.id,
+    },
+  });
+
+  let careUnitB = await prisma.careUnit.findFirst({
+    where: { familyUserId: familyB.id, name: 'Partner Family Care Unit' },
+  });
+  if (!careUnitB) {
+    careUnitB = await prisma.careUnit.create({
+      data: {
+        familyUserId: familyB.id,
+        organizationId: organizationB.id,
+        clinicId: clinicB.id,
+        name: 'Partner Family Care Unit',
+        primaryCaregiverName: 'Partner Family',
+        city: 'Lusail',
+        country: 'QA',
+      },
+    });
+  }
+
+  let patientB = await prisma.careRecipient.findFirst({
+    where: { careUnitId: careUnitB.id, name: 'Partner Care Recipient' },
+  });
+  if (!patientB) {
+    patientB = await prisma.careRecipient.create({
+      data: {
+        userId: familyB.id,
+        careUnitId: careUnitB.id,
+        name: 'Partner Care Recipient',
+        relationship: 'parent',
+        externalRef: 'RP-PARTNER-001',
+        diagnosisCodes: ['E11'],
+      },
+    });
+  }
+
+  const episodeB = await prisma.careEpisode.findFirst({
+    where: {
+      organizationId: organizationB.id,
+      title: 'Partner tenant isolation episode',
+    },
+  });
+  if (!episodeB) {
+    await prisma.careEpisode.create({
+      data: {
+        coordinatorId: coordinatorB.id,
+        patientId: familyB.id,
+        careRecipientId: patientB.id,
+        careUnitId: careUnitB.id,
+        organizationId: organizationB.id,
+        title: 'Partner tenant isolation episode',
+        status: 'active',
+        reasonForCare: 'Seed data for STUB-001 / Flow L cross-tenant isolation.',
+        diagnoses: ['E11'],
+        serviceInterests: ['nursing'],
+      },
+    });
+  }
+
+  // ── M2 Care Unit + clinical patient (CareRecipient) for family demo ──────────
+  let familyCareUnit = await prisma.careUnit.findFirst({
+    where: { familyUserId: familyUser.id, name: 'Demo Family Care Unit' },
+  });
+  if (!familyCareUnit) {
+    familyCareUnit = await prisma.careUnit.create({
+      data: {
+        familyUserId: familyUser.id,
+        organizationId: organization.id,
+        clinicId: mainClinic.id,
+        name: 'Demo Family Care Unit',
+        primaryCaregiverName: 'Demo Family',
+        primaryCaregiverPhone: '+97450000001',
+        primaryCaregiverRelation: 'daughter',
+        city: 'Doha',
+        country: 'QA',
+      },
+    });
+  } else {
+    familyCareUnit = await prisma.careUnit.update({
+      where: { id: familyCareUnit.id },
+      data: {
+        organizationId: organization.id,
+        clinicId: mainClinic.id,
+        primaryCaregiverName: 'Demo Family',
+      },
+    });
+  }
+
+  let demoPatient = await prisma.careRecipient.findFirst({
+    where: {
+      OR: [
+        { externalRef: 'RP-DEMO-001' },
+        { careUnitId: familyCareUnit.id, name: 'Demo Care Recipient' },
+      ],
+    },
+  });
+  if (!demoPatient) {
+    demoPatient = await prisma.careRecipient.create({
+      data: {
+        userId: familyUser.id,
+        careUnitId: familyCareUnit.id,
+        name: 'Demo Care Recipient',
+        relationship: 'parent',
+        gender: 'female',
+        externalRef: 'RP-DEMO-001',
+        pocName: 'Demo Family',
+        pocPhone: '+97450000001',
+        diagnosisCodes: ['I10'],
+      },
+    });
+  } else {
+    await prisma.careRecipient.update({
+      where: { id: demoPatient.id },
+      data: {
+        careUnitId: familyCareUnit.id,
+        externalRef: 'RP-DEMO-001',
+        diagnosisCodes: ['I10'],
+      },
+    });
+  }
 
   // ── Clients ──────────────────────────────────────────────────────────────────
   const clients = await Promise.all([
@@ -450,12 +647,17 @@ async function main() {
   console.log('   Super Admin    : superadmin@riayahplus.com');
   console.log('   Admin          : admin@riayahplus.com');
   console.log('   Coordinator    : coordinator@riayahplus.com  → /coordinator');
+  console.log('   Coordinator B  : coordinator.b@riayahplus.com (Partner Care Org)');
   console.log('   Family         : family@demo.com             → /family');
+  console.log('   Family B       : family.b@demo.com           (Partner Care Org)');
+  console.log(`   Care Unit      : ${familyCareUnit.name} (${familyCareUnit.id})`);
+  console.log(`   Patient (CR)   : ${demoPatient.name} / ref ${demoPatient.externalRef}`);
   console.log('   Patient        : patient@demo.com            → /patient');
   console.log('   Clinical Staff : clinical@demo.com           → /clinical');
   console.log('   Support Worker : support@demo.com            → /support');
   console.log('   Client         : fatima@demo.com             → /careseeker');
   console.log('   Provider       : dr.hassan@demo.com          → /provider');
+  console.log('   Tenant test    : Org A episodes must not appear for coordinator.b');
 }
 
 main()

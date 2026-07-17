@@ -2,6 +2,9 @@ import { Router } from 'express';
 import authRoutes from './auth.routes';
 import episodeRoutes from './episode.routes';
 import carePlanRoutes from './carePlan.routes';
+import careUnitRoutes from './careUnit.routes';
+import intakeRoutes from './intake.routes';
+import assessmentRoutes from './assessment.routes';
 import invoiceRoutes from './invoice.routes';
 import chatRoutes from './chat.routes';
 import notificationRoutes from './notification.routes';
@@ -39,6 +42,9 @@ import careSummaryRoutes from './care-summary.routes';
 import tasksRoutes from './tasks.routes';
 import receiptsRoutes from './receipts.routes';
 import { auditMiddleware } from '../middleware/auditMiddleware';
+import { authenticate } from '../middleware/auth';
+import { requireCareCoordinator } from '../middleware/rbac';
+import { IntakeController } from '../controllers/patients/IntakeController';
 
 const router = Router();
 
@@ -59,6 +65,10 @@ router.use('/', authRoutes);
 // Care domain (M2–M3)
 router.use('/episodes', episodeRoutes);
 router.use('/care-plans', carePlanRoutes);
+router.use('/care-units', careUnitRoutes);
+router.use('/intake', intakeRoutes);
+router.use('/assessments', assessmentRoutes);
+router.get('/coordinator/intake-queue', authenticate, requireCareCoordinator, IntakeController.queue);
 
 // Telehealth & GPS (M4–M5)
 router.use('/telehealth', telehealthRoutes);

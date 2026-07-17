@@ -211,6 +211,23 @@ enum ServiceCategory {
   companion_care
 }
 
+enum IntakeStatus {
+  submitted
+  under_review
+  validated
+  episode_created
+  withdrawn
+}
+
+enum IntakeDocumentCategory {
+  referral
+  prior_assessment
+  insurance
+  medical_report
+  consent
+  other
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Organization & Structure
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,6 +247,9 @@ model Organization {
 
   clinics     Clinic[]
   users       User[]
+  careUnits   CareUnit[]
+  careEpisodes CareEpisode[]
+  intakeRecords IntakeRecord[]
 
   @@map("organizations")
 }
@@ -247,6 +267,7 @@ model Clinic {
 
   departments    Department[]
   users          User[]
+  careUnits      CareUnit[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -318,6 +339,10 @@ model User {
 
   // Care relations
   careRecipients     CareRecipient[]
+  careUnitsOwned     CareUnit[]       @relation("FamilyCareUnits")
+  submittedIntakes   IntakeRecord[]   @relation("IntakeSubmitter")
+  reviewedIntakes    IntakeRecord[]   @relation("IntakeReviewer")
+  careRecipientRevisions CareRecipientRevision[]
   managedEpisodes    CareEpisode[]    @relation("CoordinatorEpisodes")
   patientEpisodes    CareEpisode[]    @relation("PatientEpisodes")
   carePlans          CarePlan[]
@@ -497,25 +522,121 @@ model ClientProfile {
 // Care Recipients & Family
 // ─────────────────────────────────────────────────────────────────────────────
 
+model CareUnit {
+  id                       String    @id @default(cuid())
+  familyUserId             String
+  familyUser               User      @relation("FamilyCareUnits", fields: [familyUserId], references: [id], onDelete: Cascade)
+  organizationId           String?
+  organization             Organization? @relation(fields: [organizationId], references: [id])
+  clinicId                 String?
+  clinic                   Clinic?   @relation(fields: [clinicId], references: [id])
+  name                     String
+  primaryCaregiverName     String?
+  primaryCaregiverPhone    String?
+  primaryCaregiverRelation String?
+  address                  String?
+  city                     String?
+  country                  String    @default("QA")
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  deletedAt                DateTime?
+
+  careRecipients CareRecipient[]
+  intakeRecords  IntakeRecord[]
+  careEpisodes   CareEpisode[]
+  documents      Document[]      @relation("CareUnitDocuments")
+
+  @@index([familyUserId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@map("care_units")
+}
+
 model CareRecipient {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  dateOfBirth DateTime?
-  gender      String?
-  relationship String?
-  medicalInfo Json?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  careUnitId     String?
+  careUnit       CareUnit? @relation(fields: [careUnitId], references: [id])
+  name           String
+  dateOfBirth    DateTime?
+  gender         String?
+  relationship   String?
+  medicalInfo    Json?
+  notes          String?
+  externalRef    String?   @unique
+  pocName        String?
+  pocPhone       String?
+  diagnosisCodes String[]  @default([])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
   careEpisodes CareEpisode[]
   careOrders   CareOrder[]
+  intakeRecords IntakeRecord[]
+  revisions    CareRecipientRevision[]
 
   @@index([userId])
+  @@index([careUnitId])
   @@map("care_recipients")
+}
+
+model CareRecipientRevision {
+  id              String        @id @default(cuid())
+  careRecipientId String
+  careRecipient   CareRecipient @relation(fields: [careRecipientId], references: [id], onDelete: Cascade)
+  changedById     String
+  changedBy       User          @relation(fields: [changedById], references: [id])
+  snapshot        Json
+  changeSummary   String?
+  createdAt       DateTime      @default(now())
+
+  @@index([careRecipientId])
+  @@index([changedById])
+  @@map("care_recipient_revisions")
+}
+
+model IntakeRecord {
+  id                       String            @id @default(cuid())
+  careUnitId               String
+  careUnit                 CareUnit          @relation(fields: [careUnitId], references: [id])
+  careRecipientId          String
+  careRecipient            CareRecipient     @relation(fields: [careRecipientId], references: [id])
+  familyUserId             String
+  familyUser               User              @relation("IntakeSubmitter", fields: [familyUserId], references: [id])
+  organizationId           String?
+  organization             Organization?     @relation(fields: [organizationId], references: [id])
+  careEpisodeId            String?           @unique
+  careEpisode              CareEpisode?      @relation(fields: [careEpisodeId], references: [id])
+  status                   IntakeStatus      @default(submitted)
+  urgencyLevel             UrgencyLevel?
+  reasonForCare            String
+  medicalHistory           String?
+  currentMeds              String?
+  diagnoses                String[]          @default([])
+  serviceInterests         ServiceCategory[] @default([])
+  primaryCaregiverName     String?
+  primaryCaregiverPhone    String?
+  primaryCaregiverRelation String?
+  wizardPayload            Json?
+  submittedAt              DateTime          @default(now())
+  reviewedAt               DateTime?
+  reviewerId               String?
+  reviewer                 User?             @relation("IntakeReviewer", fields: [reviewerId], references: [id])
+  reviewSummary            Json?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  documents Document[] @relation("IntakeDocuments")
+
+  @@index([careUnitId])
+  @@index([careRecipientId])
+  @@index([familyUserId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([urgencyLevel])
+  @@map("intake_records")
 }
 
 model FamilyMember {
@@ -547,6 +668,10 @@ model CareEpisode {
   patient          User              @relation("PatientEpisodes", fields: [patientId], references: [id])
   careRecipientId  String?
   careRecipient    CareRecipient?    @relation(fields: [careRecipientId], references: [id])
+  careUnitId       String?
+  careUnit         CareUnit?         @relation(fields: [careUnitId], references: [id])
+  organizationId   String?
+  organization     Organization?     @relation(fields: [organizationId], references: [id])
 
   title                   String
   status                  CareEpisodeStatus @default(intake_submitted)
@@ -580,9 +705,12 @@ model CareEpisode {
   tasks            Task[]            @relation("EpisodeTasks")
   incidents        Incident[]        @relation("EpisodeIncidents")
   aiIntakeSummary  AiIntakeSummary?
+  intakeRecord     IntakeRecord?
 
   @@index([patientId])
   @@index([coordinatorId])
+  @@index([careUnitId])
+  @@index([organizationId])
   @@map("care_episodes")
 }
 
@@ -1041,8 +1169,13 @@ model Document {
   booking        Booking?       @relation("BookingDocuments", fields: [bookingId], references: [id])
   episodeId      String?
   episode        CareEpisode?   @relation("EpisodeDocuments", fields: [episodeId], references: [id])
+  intakeRecordId String?
+  intakeRecord   IntakeRecord?  @relation("IntakeDocuments", fields: [intakeRecordId], references: [id])
+  careUnitId     String?
+  careUnit       CareUnit?      @relation("CareUnitDocuments", fields: [careUnitId], references: [id])
 
   type           String
+  category       IntakeDocumentCategory?
   name           String
   url            String
   mimeType       String?
@@ -1057,6 +1190,8 @@ model Document {
   deletedAt      DateTime?
 
   @@index([userId])
+  @@index([intakeRecordId])
+  @@index([careUnitId])
   @@map("documents")
 }
 

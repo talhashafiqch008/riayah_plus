@@ -83,9 +83,9 @@ All paths below are relative to `mern/`. Server = `mern/server/`, Client = `mern
 **Files:** `server/src/middleware/tenantScope.ts`, `server/src/middleware/auth.ts`  
 **Fix applied:** `attachTenantContext` chained after successful authentication (auth is per-router, not a single global `/api` mount).
 
-### STUB-001 — `tenantWhere()` defined but never used in controllers `[ ]`
-**File:** `server/src/middleware/tenantScope.ts`  
-**Status:** Helper + unit tests exist; **list/get controllers still do not merge `tenantWhere(req)` into Prisma queries.** Multi-tenant filtering incomplete until this is done.
+### STUB-001 — `tenantWhere()` query scoping `[~]`
+**Files:** `server/src/middleware/tenantScope.ts`, `tenantAccess.ts`, M2 clinical controllers  
+**Status:** M2 clinical APIs are tenant-scoped (episodes, care units/patients, assessments, care plans), including direct-ID access checks and second-org smoke tests. Broader legacy admin/marketplace endpoint review remains separate from M2 Flow L.
 
 ### STUB-002 — State machine not enforced on Booking status changes `✅`
 **File:** `server/src/controllers/booking/BookingExtrasController.ts`  
@@ -167,8 +167,8 @@ All paths below are relative to `mern/`. Server = `mern/server/`, Client = `mern
 **File:** `client/src/pages/roles/RoleShellDashboard.tsx`  
 **Still open / M2-acceptable:** Wire live API stats.
 
-### SHELL-003 — No dedicated login pages for proposal roles `[ ]`
-**Still open:** Enhance `ProposalPortalLoginPage` with 2FA (admin/provider already fixed).
+### SHELL-003 — No dedicated login pages for proposal roles `✅`
+**Fix applied:** `ProposalPortalLoginPage` catches `TwoFactorRequiredError`, shows 6-digit TOTP step, calls `complete2faLogin()` (same as admin/provider).
 
 ### SHELL-006 — Admin layout badge count is static `[ ]`
 **Still open:** Live badge counts via API/WebSocket.

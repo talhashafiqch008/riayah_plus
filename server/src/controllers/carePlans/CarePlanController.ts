@@ -2,9 +2,12 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { assertTenantOrgAccess, mergeTenantOrg } from '../../middleware/tenantAccess';
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
 import { assertCarePlanTransition } from '../../utils/stateMachine';
+
+const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
 
 const goalSchema = z.object({
   title: z.string(),
@@ -30,15 +33,42 @@ const createPlanSchema = z.object({
   items: z.array(itemSchema).optional(),
 });
 
+function assertCarePlanAccess(
+  req: Request,
+  episode: { patientId: string; organizationId: string | null },
+): void {
+  if (FAMILY_ROLES.includes(req.user!.role)) {
+    if (episode.patientId !== req.user!.userId) {
+      throw new AppError('Forbidden.', 403);
+    }
+    return;
+  }
+  assertTenantOrgAccess(req, episode.organizationId);
+}
+
 export class CarePlanController {
   static async index(req: Request, res: Response): Promise<void> {
     const { episodeId } = req.query as { episodeId?: string };
     const where: Record<string, unknown> = {};
     if (episodeId) where.episodeId = episodeId;
 
+    const role = req.user!.role;
+    if (FAMILY_ROLES.includes(role)) {
+      where.episode = { patientId: req.user!.userId };
+    } else {
+      const orgFilter: { organizationId?: string } = {};
+      mergeTenantOrg(req, orgFilter);
+      if (orgFilter.organizationId) {
+        where.episode = {
+          ...((where.episode as object) ?? {}),
+          organizationId: orgFilter.organizationId,
+        };
+      }
+    }
+
     const plans = await prisma.carePlan.findMany({
       where,
-      include: { goals: true, items: true },
+      include: { goals: true, items: true, episode: { select: { id: true, organizationId: true, patientId: true } } },
       orderBy: { version: 'desc' },
     });
     res.json({ data: plans });
@@ -46,6 +76,10 @@ export class CarePlanController {
 
   static async store(req: Request, res: Response): Promise<void> {
     const data = createPlanSchema.parse(req.body);
+
+    const episode = await prisma.careEpisode.findUnique({ where: { id: data.episodeId } });
+    if (!episode) throw new AppError('Episode not found.', 404);
+    assertTenantOrgAccess(req, episode.organizationId);
 
     const plan = await prisma.carePlan.create({
       data: {
@@ -76,15 +110,26 @@ export class CarePlanController {
   static async show(req: Request, res: Response): Promise<void> {
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
-      include: { goals: true, items: true, approvalLogs: true },
+      include: {
+        goals: true,
+        items: true,
+        approvalLogs: true,
+        episode: { select: { id: true, organizationId: true, patientId: true } },
+      },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
+
+    assertCarePlanAccess(req, plan.episode);
     res.json({ data: plan });
   }
 
   static async update(req: Request, res: Response): Promise<void> {
-    const plan = await prisma.carePlan.findUnique({ where: { id: req.params.id } });
+    const plan = await prisma.carePlan.findUnique({
+      where: { id: req.params.id },
+      include: { episode: { select: { organizationId: true, patientId: true } } },
+    });
     if (!plan) throw new AppError('Care plan not found.', 404);
+    assertTenantOrgAccess(req, plan.episode.organizationId);
 
     const { title, notes, goals, items } = req.body;
 
@@ -127,6 +172,7 @@ export class CarePlanController {
       include: { episode: true },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
+    assertTenantOrgAccess(req, plan.episode.organizationId);
 
     assertCarePlanTransition(plan.status, 'submitted_for_approval');
 
@@ -157,6 +203,7 @@ export class CarePlanController {
       include: { episode: true },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
+    assertCarePlanAccess(req, plan.episode);
 
     assertCarePlanTransition(plan.status, 'approved');
 
@@ -182,6 +229,7 @@ export class CarePlanController {
     const { notes } = z.object({ notes: z.string() }).parse(req.body);
     const plan = await prisma.carePlan.findUnique({ where: { id: req.params.id }, include: { episode: true } });
     if (!plan) throw new AppError('Care plan not found.', 404);
+    assertCarePlanAccess(req, plan.episode);
 
     assertCarePlanTransition(plan.status, 'revision_requested');
 
@@ -207,6 +255,13 @@ export class CarePlanController {
   }
 
   static async destroy(req: Request, res: Response): Promise<void> {
+    const plan = await prisma.carePlan.findUnique({
+      where: { id: req.params.id },
+      include: { episode: { select: { organizationId: true } } },
+    });
+    if (!plan) throw new AppError('Care plan not found.', 404);
+    assertTenantOrgAccess(req, plan.episode.organizationId);
+
     await prisma.carePlan.delete({ where: { id: req.params.id } });
     res.json({ message: 'Care plan deleted.' });
   }

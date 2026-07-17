@@ -2,6 +2,7 @@ import {
   assertAppointmentTransition,
   assertCareEpisodeTransition,
   assertCarePlanTransition,
+  assertIntakeTransition,
   canTransition,
   getAllowedTransitions,
   assertTransition,
@@ -62,6 +63,45 @@ describe('stateMachine', () => {
     it('blocks completed → pending', () => {
       expect(canTransition('appointment', 'completed', 'pending')).toBe(false);
       expect(() => assertAppointmentTransition('completed', 'in_progress')).toThrow(/Invalid/);
+    });
+  });
+
+  describe('intake', () => {
+    it('allows submitted → under_review → validated → episode_created', () => {
+      expect(canTransition('intake', 'submitted', 'under_review')).toBe(true);
+      expect(canTransition('intake', 'under_review', 'validated')).toBe(true);
+      expect(canTransition('intake', 'validated', 'episode_created')).toBe(true);
+    });
+
+    it('allows withdraw from submitted or under_review', () => {
+      expect(canTransition('intake', 'submitted', 'withdrawn')).toBe(true);
+      expect(canTransition('intake', 'under_review', 'withdrawn')).toBe(true);
+    });
+
+    it('allows send-back under_review → submitted', () => {
+      expect(canTransition('intake', 'under_review', 'submitted')).toBe(true);
+    });
+
+    it('blocks skipping to episode_created from submitted', () => {
+      expect(canTransition('intake', 'submitted', 'episode_created')).toBe(false);
+    });
+
+    it('blocks transitions from episode_created and withdrawn', () => {
+      expect(getAllowedTransitions('intake', 'episode_created')).toEqual([]);
+      expect(getAllowedTransitions('intake', 'withdrawn')).toEqual([]);
+      expect(() => assertIntakeTransition('episode_created', 'validated')).toThrow(/Invalid/);
+    });
+  });
+
+  describe('assessment', () => {
+    it('allows scheduled → completed or cancelled', () => {
+      expect(canTransition('assessment', 'scheduled', 'completed')).toBe(true);
+      expect(canTransition('assessment', 'scheduled', 'cancelled')).toBe(true);
+    });
+
+    it('blocks transitions from completed', () => {
+      expect(getAllowedTransitions('assessment', 'completed')).toEqual([]);
+      expect(canTransition('assessment', 'completed', 'scheduled')).toBe(false);
     });
   });
 

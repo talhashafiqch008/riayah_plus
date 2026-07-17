@@ -7,7 +7,7 @@ export async function getNotifications(unreadOnly: boolean = false) {
 }
 
 export async function getUnreadNotificationCount() {
-    const response = await client.get('/notifications/unread');
+    const response = await client.get<{ count: number }>('/notifications/unread-count');
     return response.data;
 }
 

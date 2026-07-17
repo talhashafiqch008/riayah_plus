@@ -2,14 +2,16 @@ import {
   BookingStatus,
   CareEpisodeStatus,
   CarePlanStatus,
+  IntakeStatus,
 } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 
 /**
- * M1 stub — shared status transition guards for clinical/scheduling entities.
- * Extend matrices in M2–M5 as modules ship.
+ * Shared status transition guards for clinical/scheduling entities.
+ * Intake added in M2 — Care Unit / IntakeRecord design.
+ * Assessment added in M2 Flow G.
  */
-export type StateMachineEntity = 'care_episode' | 'care_plan' | 'appointment';
+export type StateMachineEntity = 'care_episode' | 'care_plan' | 'appointment' | 'intake' | 'assessment';
 
 type TransitionMatrix = Record<string, readonly string[]>;
 
@@ -43,10 +45,27 @@ const APPOINTMENT_TRANSITIONS: TransitionMatrix = {
   no_show: [],
 };
 
+/** Proposal: Submitted → Under Review → Validated → Episode Created */
+const INTAKE_TRANSITIONS: TransitionMatrix = {
+  submitted: ['under_review', 'withdrawn'],
+  under_review: ['validated', 'submitted', 'withdrawn'],
+  validated: ['episode_created'],
+  episode_created: [],
+  withdrawn: [],
+};
+
+const ASSESSMENT_TRANSITIONS: TransitionMatrix = {
+  scheduled: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
+
 const TRANSITIONS: Record<StateMachineEntity, TransitionMatrix> = {
   care_episode: CARE_EPISODE_TRANSITIONS,
   care_plan: CARE_PLAN_TRANSITIONS,
   appointment: APPOINTMENT_TRANSITIONS,
+  intake: INTAKE_TRANSITIONS,
+  assessment: ASSESSMENT_TRANSITIONS,
 };
 
 export function canTransition(
@@ -95,6 +114,14 @@ export function assertCarePlanTransition(from: CarePlanStatus, to: CarePlanStatu
 
 export function assertAppointmentTransition(from: BookingStatus, to: BookingStatus): void {
   assertTransition('appointment', from, to);
+}
+
+export function assertIntakeTransition(from: IntakeStatus, to: IntakeStatus): void {
+  assertTransition('intake', from, to);
+}
+
+export function assertAssessmentTransition(from: string, to: string): void {
+  assertTransition('assessment', from, to);
 }
 
 /** Returns target status after validation (no-op when unchanged). */

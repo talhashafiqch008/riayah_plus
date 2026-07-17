@@ -1,28 +1,46 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { Prisma, CareEpisodeStatus } from '@prisma/client';
+import { Prisma, CareEpisodeStatus, UrgencyLevel, ServiceCategory } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { assertTenantOrgAccess, mergeTenantOrg } from '../../middleware/tenantAccess';
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
 import { assertCareEpisodeTransition } from '../../utils/stateMachine';
 
+const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
+
 const createEpisodeSchema = z.object({
   patientId: z.string(),
   careRecipientId: z.string().optional(),
+  careUnitId: z.string().optional(),
   title: z.string().min(2),
-  urgencyLevel: z.string().optional(),
+  urgencyLevel: z.nativeEnum(UrgencyLevel).optional(),
   reasonForCare: z.string().optional(),
   medicalHistory: z.string().optional(),
   currentMeds: z.string().optional(),
   diagnoses: z.array(z.string()).optional(),
-  serviceInterests: z.array(z.string()).optional(),
+  serviceInterests: z.array(z.nativeEnum(ServiceCategory)).optional(),
 });
 
 const updateIntakeSchema = z.object({
   intakeSummary: z.record(z.unknown()).optional(),
   status: z.string().optional(),
 });
+
+function assertEpisodeAccess(
+  req: Request,
+  episode: { patientId: string; organizationId: string | null },
+): void {
+  const role = req.user!.role;
+  if (FAMILY_ROLES.includes(role)) {
+    if (episode.patientId !== req.user!.userId) {
+      throw new AppError('Forbidden.', 403);
+    }
+    return;
+  }
+  assertTenantOrgAccess(req, episode.organizationId);
+}
 
 export class CareEpisodeController {
   static async index(req: Request, res: Response): Promise<void> {
@@ -32,16 +50,21 @@ export class CareEpisodeController {
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
 
-    // Coordinators see all; clients see their own
     const role = req.user!.role;
-    if (['client', 'consumer', 'family', 'patient'].includes(role)) {
+    if (FAMILY_ROLES.includes(role)) {
       where.patientId = req.user!.userId;
+    } else {
+      mergeTenantOrg(req, where);
     }
 
     const [episodes, total] = await Promise.all([
       prisma.careEpisode.findMany({
         where,
-        include: { patient: { select: { id: true, name: true, email: true } }, coordinator: { select: { id: true, name: true } } },
+        include: {
+          patient: { select: { id: true, name: true, email: true } },
+          coordinator: { select: { id: true, name: true } },
+          careRecipient: { select: { id: true, name: true, externalRef: true } },
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: parseInt(limit),
@@ -55,11 +78,29 @@ export class CareEpisodeController {
   static async store(req: Request, res: Response): Promise<void> {
     const data = createEpisodeSchema.parse(req.body);
 
+    const orgWhere: { organizationId?: string } = {};
+    mergeTenantOrg(req, orgWhere);
+
+    let organizationId = orgWhere.organizationId ?? req.tenant?.organizationId ?? null;
+    let careUnitId = data.careUnitId;
+
+    if (data.careUnitId) {
+      const unit = await prisma.careUnit.findFirst({
+        where: { id: data.careUnitId, deletedAt: null },
+      });
+      if (!unit) throw new AppError('Care unit not found.', 404);
+      assertTenantOrgAccess(req, unit.organizationId);
+      organizationId = unit.organizationId ?? organizationId;
+      careUnitId = unit.id;
+    }
+
     const episode = await prisma.careEpisode.create({
       data: {
         coordinatorId: req.user!.userId,
         patientId: data.patientId,
         careRecipientId: data.careRecipientId,
+        careUnitId,
+        organizationId: organizationId ?? undefined,
         title: data.title,
         urgencyLevel: data.urgencyLevel,
         reasonForCare: data.reasonForCare,
@@ -71,7 +112,13 @@ export class CareEpisodeController {
       },
     });
 
-    await AuditService.log({ userId: req.user!.userId, action: 'episode_created', entity: 'CareEpisode', entityId: episode.id, req });
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'episode_created',
+      entity: 'CareEpisode',
+      entityId: episode.id,
+      req,
+    });
 
     res.status(201).json({ data: episode });
   }
@@ -92,6 +139,7 @@ export class CareEpisodeController {
     });
 
     if (!episode) throw new AppError('Episode not found.', 404);
+    assertEpisodeAccess(req, episode);
     res.json({ data: episode });
   }
 
@@ -100,6 +148,7 @@ export class CareEpisodeController {
 
     const existing = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new AppError('Episode not found.', 404);
+    assertEpisodeAccess(req, existing);
 
     const nextStatus = data.status as CareEpisodeStatus | undefined;
     if (nextStatus && nextStatus !== existing.status) {
@@ -111,13 +160,19 @@ export class CareEpisodeController {
       data: {
         ...data,
         status: nextStatus,
-        intakeSummary: data.intakeSummary as Prisma.InputJsonValue ?? undefined,
+        intakeSummary: (data.intakeSummary as Prisma.InputJsonValue) ?? undefined,
         intakeReviewedAt: nextStatus === 'validated' ? new Date() : undefined,
         intakeReviewerId: nextStatus === 'validated' ? req.user!.userId : undefined,
       },
     });
 
-    await AuditService.log({ userId: req.user!.userId, action: 'episode_updated', entity: 'CareEpisode', entityId: episode.id, req });
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'episode_updated',
+      entity: 'CareEpisode',
+      entityId: episode.id,
+      req,
+    });
     res.json({ data: episode });
   }
 
@@ -126,6 +181,7 @@ export class CareEpisodeController {
 
     const episode = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
     if (!episode) throw new AppError('Episode not found.', 404);
+    assertEpisodeAccess(req, episode);
 
     assertCareEpisodeTransition(episode.status, 'validated');
 
@@ -139,7 +195,6 @@ export class CareEpisodeController {
       },
     });
 
-    // Notify patient
     await NotificationService.create({
       userId: episode.patientId,
       title: 'Your intake has been reviewed',
