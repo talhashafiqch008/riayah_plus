@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, RefreshCw, ClipboardCheck } from 'lucide-react';
+import { Loader2, RefreshCw, ClipboardCheck, HeartHandshake } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import {
@@ -12,6 +12,10 @@ import {
   type ServiceCategory,
   type UrgencyLevel,
 } from '@/lib/api/intake';
+import {
+  PENDING_DIAGNOSIS,
+  parseFamilyWizardSummary,
+} from '@/lib/familyCareseekerIntake';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -389,6 +393,137 @@ export default function CoordinatorIntakeQueuePage() {
                 )}
               </div>
 
+              {(() => {
+                const familySummary = parseFamilyWizardSummary(
+                  detail.wizardPayload as Record<string, unknown> | null | undefined,
+                );
+                if (!familySummary) return null;
+
+                const rows: { label: string; value: string }[] = [
+                  familySummary.accountType
+                    ? { label: 'Account type', value: familySummary.accountType }
+                    : null,
+                  familySummary.country
+                    ? { label: 'Location', value: familySummary.country }
+                    : null,
+                  familySummary.preferredLanguage
+                    ? {
+                        label: 'Preferred language',
+                        value: familySummary.preferredLanguage,
+                      }
+                    : null,
+                  familySummary.supportCategories.length
+                    ? {
+                        label: 'Support needed',
+                        value: familySummary.supportCategories.join(', '),
+                      }
+                    : null,
+                  familySummary.specificNeeds.length
+                    ? {
+                        label: 'Specific needs',
+                        value: familySummary.specificNeeds.join(' · '),
+                      }
+                    : null,
+                  familySummary.practitionerGender
+                    ? {
+                        label: 'Provider gender',
+                        value: familySummary.practitionerGender,
+                      }
+                    : null,
+                  familySummary.providerLanguages.length
+                    ? {
+                        label: 'Provider languages',
+                        value: familySummary.providerLanguages.join(', '),
+                      }
+                    : null,
+                  familySummary.careLocation
+                    ? { label: 'Care location', value: familySummary.careLocation }
+                    : null,
+                  familySummary.address
+                    ? { label: 'Address', value: familySummary.address }
+                    : null,
+                  familySummary.scheduleType
+                    ? { label: 'Schedule', value: familySummary.scheduleType }
+                    : null,
+                  familySummary.preferredDays.length
+                    ? {
+                        label: 'Preferred days',
+                        value: familySummary.preferredDays.join(', '),
+                      }
+                    : null,
+                  familySummary.preferredTimeSlots.length
+                    ? {
+                        label: 'Preferred times',
+                        value: familySummary.preferredTimeSlots.join(', '),
+                      }
+                    : null,
+                  familySummary.startTiming
+                    ? { label: 'Start timing', value: familySummary.startTiming }
+                    : null,
+                  familySummary.ndisPlanType
+                    ? { label: 'NDIS plan', value: familySummary.ndisPlanType }
+                    : null,
+                  familySummary.ndisNumber
+                    ? { label: 'NDIS number', value: familySummary.ndisNumber }
+                    : null,
+                  familySummary.planManagerEmail
+                    ? {
+                        label: 'Plan manager email',
+                        value: familySummary.planManagerEmail,
+                      }
+                    : null,
+                ].filter(Boolean) as { label: string; value: string }[];
+
+                return (
+                  <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="size-9 rounded-xl bg-teal-100 flex items-center justify-center shrink-0">
+                        <HeartHandshake className="size-5 text-teal-700" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-teal-900">
+                          Family request summary
+                        </p>
+                        <p className="text-xs text-teal-800/80 mt-0.5">
+                          From simple family onboarding — complete clinical fields below during
+                          review.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {rows.map((row) => (
+                        <div
+                          key={row.label}
+                          className="rounded-xl bg-white/90 border border-teal-100 px-3 py-2"
+                        >
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">
+                            {row.label}
+                          </p>
+                          <p className="text-sm text-stone-800 mt-0.5 break-words">{row.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {(detail.serviceInterests?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80 mb-1.5">
+                          Mapped service interests
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detail.serviceInterests!.map((s) => (
+                            <span
+                              key={s}
+                              className="rounded-full bg-white border border-teal-200 px-2.5 py-0.5 text-xs font-medium text-teal-900"
+                            >
+                              {s.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="grid gap-3 sm:grid-cols-2 text-sm">
                 <div className="rounded-xl bg-stone-50 p-3">
                   <p className="text-xs font-semibold text-stone-500 mb-1">Reason for care</p>
@@ -396,7 +531,11 @@ export default function CoordinatorIntakeQueuePage() {
                 </div>
                 <div className="rounded-xl bg-stone-50 p-3">
                   <p className="text-xs font-semibold text-stone-500 mb-1">Diagnoses</p>
-                  <p className="text-stone-800">{detail.diagnoses?.join(', ') || '—'}</p>
+                  <p className="text-stone-800">
+                    {detail.diagnoses?.includes(PENDING_DIAGNOSIS)
+                      ? 'Pending clinical review (family simple onboarding)'
+                      : detail.diagnoses?.join(', ') || '—'}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-stone-50 p-3">
                   <p className="text-xs font-semibold text-stone-500 mb-1">Medical history</p>

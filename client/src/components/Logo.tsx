@@ -42,8 +42,8 @@ export function Logo({ size = "md", showText = true, animated = true, className 
  alt="Raiyah Plus Logo"
  width={icon}
  height={icon}
- className="flex-shrink-0"
- style={{ width: 'auto', height: 'auto' }}
+ className="flex-shrink-0 object-contain"
+ style={{ width: icon, height: icon }}
  />
 
  {/* Text */}
@@ -98,7 +98,8 @@ export function LogoLight({ size = "md", showText = true, className = "" }: Logo
  alt="Raiyah Plus Logo"
  width={icon}
  height={icon}
- className="flex-shrink-0"
+ className="flex-shrink-0 object-contain"
+ style={{ width: icon, height: icon }}
  />
 
  {showText && (

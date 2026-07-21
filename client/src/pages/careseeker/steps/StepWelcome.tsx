@@ -130,7 +130,7 @@ export default function StepWelcome({ onNext }: StepWelcomeProps) {
               onClick={handleSignIn}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="px-8 py-4 bg-stone-800 text-stone-700 font-bold text-lg rounded-2xl shadow-lg border-2 ring-1 ring-stone-200/50 hover:border-teal-200 hover:bg-stone-50 transition-transform duration-300 flex items-center justify-center gap-3"
+              className="px-8 py-4 bg-white text-stone-700 font-bold text-lg rounded-2xl shadow-lg border-2 border-stone-200 hover:border-teal-200 hover:bg-stone-50 transition-transform duration-300 flex items-center justify-center gap-3"
             >
               <LogIn className="size-5" />
               Sign In
@@ -150,7 +150,7 @@ export default function StepWelcome({ onNext }: StepWelcomeProps) {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
-                  className="bg-stone-800 rounded-xl p-4 ring-1 ring-stone-100/50"
+                  className="bg-white rounded-xl p-4 border border-stone-200"
                 >
                   <div className="size-10 bg-teal-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <Icon className="size-5 text-teal-600" />

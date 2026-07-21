@@ -14,6 +14,7 @@ interface StepRegistrationProps {
   onBack: () => void;
   isLoggedIn?: boolean;
   onAccountCreated?: () => void;
+  roleLabel?: string;
 }
 
 const fadeIn = {
@@ -21,7 +22,7 @@ const fadeIn = {
   animate: { opacity: 1, y: 0 },
 };
 
-export default function StepRegistration({ data, onUpdate, onNext, onBack, isLoggedIn, onAccountCreated }: StepRegistrationProps) {
+export default function StepRegistration({ data, onUpdate, onNext, onBack, isLoggedIn, onAccountCreated, roleLabel }: StepRegistrationProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -155,7 +156,11 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
               </div>
               <div>
                 <p className="font-bold text-emerald-800 text-sm">Account Verified</p>
-                <p className="text-xs text-emerald-600">You are logged in and ready to proceed.</p>
+                <p className="text-xs text-emerald-600">
+                  {roleLabel
+                    ? `You are signed in as ${roleLabel} and ready to proceed.`
+                    : 'You are logged in and ready to proceed.'}
+                </p>
               </div>
             </div>
           )}
@@ -172,7 +177,7 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                       value={(data.firstName as string) || ''}
                       onChange={(e) => onUpdate({ ...data, firstName: e.target.value })}
                       placeholder="John"
-                      className="w-full pl-10 pr-4 py-3 bg-stone-800 ring-1 ring-stone-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -185,7 +190,7 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                       value={(data.lastName as string) || ''}
                       onChange={(e) => onUpdate({ ...data, lastName: e.target.value })}
                       placeholder="Doe"
-                      className="w-full pl-10 pr-4 py-3 bg-stone-800 ring-1 ring-stone-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -200,7 +205,7 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                     value={(data.email as string) || ''}
                     onChange={(e) => onUpdate({ ...data, email: e.target.value })}
                     placeholder="john@example.com"
-                    className="w-full pl-10 pr-4 py-3 bg-stone-800 ring-1 ring-stone-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -214,7 +219,7 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                     value={(data.phone as string) || ''}
                     onChange={(e) => onUpdate({ ...data, phone: e.target.value })}
                     placeholder="+1 234 567 8900"
-                    className="w-full pl-10 pr-4 py-3 bg-stone-800 ring-1 ring-stone-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -228,7 +233,7 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                     value={(data.password as string) || ''}
                     onChange={(e) => onUpdate({ ...data, password: e.target.value })}
                     placeholder="Min 8 characters"
-                    className="w-full pl-10 pr-12 py-3 bg-stone-800 ring-1 ring-stone-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="w-full pl-10 pr-12 py-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   />
                   <button
                     type="button"

@@ -75,7 +75,9 @@ export default function CareUnitListPage({
           </div>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-stone-500 text-sm">
-            No care units yet. Complete Family Onboarding first.
+            {basePath.startsWith('/family')
+              ? 'No care unit yet. Complete Onboarding to create your household and care request.'
+              : 'No care units yet. Complete Family Onboarding first.'}
           </p>
         ) : (
           rows.map((unit) => {
@@ -104,13 +106,22 @@ export default function CareUnitListPage({
                     {unit._count && (
                       <>
                         <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-amber-800">
-                          {unit._count.intakeRecords} intake
+                          {unit._count.intakeRecords}{' '}
+                          {basePath.startsWith('/family') ? 'request' : 'intake'}
                           {unit._count.intakeRecords === 1 ? '' : 's'}
                         </span>
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-emerald-800">
-                          {unit._count.careEpisodes} episode
-                          {unit._count.careEpisodes === 1 ? '' : 's'}
-                        </span>
+                        {!basePath.startsWith('/family') && (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-emerald-800">
+                            {unit._count.careEpisodes} episode
+                            {unit._count.careEpisodes === 1 ? '' : 's'}
+                          </span>
+                        )}
+                        {basePath.startsWith('/family') && unit._count.careEpisodes > 0 && (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-emerald-800">
+                            {unit._count.careEpisodes} care journey
+                            {unit._count.careEpisodes === 1 ? '' : 's'}
+                          </span>
+                        )}
                       </>
                     )}
                   </div>

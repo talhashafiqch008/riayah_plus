@@ -8,6 +8,8 @@ import {
   updateCareUnit,
   type CareUnit,
 } from '@/lib/api/intake';
+import { FamilyCareRequestPanel } from '@/components/care/FamilyCareRequestPanel';
+import { parseFamilyWizardSummary } from '@/lib/familyCareseekerIntake';
 
 type Props = {
   basePath: string;
@@ -20,6 +22,22 @@ function formatDob(value?: string | null) {
   } catch {
     return value;
   }
+}
+
+const COUNTRY_LABELS: Record<string, string> = {
+  QA: 'Qatar',
+  SA: 'Saudi Arabia',
+  EG: 'Egypt',
+  AU: 'Australia',
+  QAT: 'Qatar',
+  SAU: 'Saudi Arabia',
+  EGY: 'Egypt',
+  AUS: 'Australia',
+};
+
+function formatCountry(code?: string | null) {
+  if (!code) return null;
+  return COUNTRY_LABELS[code] ?? code;
 }
 
 export default function CareUnitDetailPage({ basePath }: Props) {
@@ -100,6 +118,10 @@ export default function CareUnitDetailPage({ basePath }: Props) {
 
   const patients = unit.careRecipients ?? [];
   const episodes = unit.careEpisodes ?? [];
+  const intakes = unit.intakeRecords ?? [];
+  const isFamilyView = basePath.startsWith('/family');
+  const latestIntake = intakes[0];
+  const requestSummary = parseFamilyWizardSummary(latestIntake?.wizardPayload);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -114,8 +136,10 @@ export default function CareUnitDetailPage({ basePath }: Props) {
           <div>
             <h2 className="text-2xl font-semibold text-stone-900">{unit.name}</h2>
             <p className="mt-1 text-sm text-stone-500">
-              {patients.length} patient{patients.length === 1 ? '' : 's'} · {episodes.length}{' '}
-              episode{episodes.length === 1 ? '' : 's'}
+              {patients.length} patient{patients.length === 1 ? '' : 's'}
+              {isFamilyView
+                ? ` · ${intakes.length} care request${intakes.length === 1 ? '' : 's'}`
+                : ` · ${episodes.length} episode${episodes.length === 1 ? '' : 's'}`}
             </p>
           </div>
           {!editing ? (
@@ -152,8 +176,12 @@ export default function CareUnitDetailPage({ basePath }: Props) {
         </div>
       </div>
 
+      {isFamilyView && <FamilyCareRequestPanel intakes={intakes} variant="family" />}
+
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-stone-900">Care unit details</h3>
+        <h3 className="text-sm font-semibold text-stone-900">
+          {isFamilyView ? 'Household details' : 'Care unit details'}
+        </h3>
         {editing ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="sm:col-span-2 text-sm">
@@ -208,7 +236,9 @@ export default function CareUnitDetailPage({ basePath }: Props) {
         ) : (
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Primary caregiver</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? 'Account holder' : 'Primary caregiver'}
+              </dt>
               <dd className="mt-0.5 text-stone-900">{unit.primaryCaregiverName || '—'}</dd>
             </div>
             <div>
@@ -217,12 +247,20 @@ export default function CareUnitDetailPage({ basePath }: Props) {
             </div>
             <div>
               <dt className="text-xs font-semibold text-stone-500">Relation</dt>
-              <dd className="mt-0.5 text-stone-900">{unit.primaryCaregiverRelation || '—'}</dd>
+              <dd className="mt-0.5 text-stone-900">
+                {unit.primaryCaregiverRelation || requestSummary?.accountType || '—'}
+              </dd>
             </div>
             <div>
               <dt className="text-xs font-semibold text-stone-500">Location</dt>
               <dd className="mt-0.5 text-stone-900">
-                {[unit.address, unit.city, unit.country].filter(Boolean).join(', ') || '—'}
+                {[
+                  unit.address || requestSummary?.address,
+                  unit.city,
+                  formatCountry(unit.country) || requestSummary?.country,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || '—'}
               </dd>
             </div>
           </dl>
@@ -231,51 +269,88 @@ export default function CareUnitDetailPage({ basePath }: Props) {
 
       <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b">
-          <h3 className="text-sm font-semibold text-stone-900">Patients</h3>
+          <h3 className="text-sm font-semibold text-stone-900">
+            {isFamilyView ? 'Who needs care' : 'Patients'}
+          </h3>
         </div>
         {patients.length === 0 ? (
-          <p className="p-6 text-sm text-stone-500">No patients on this care unit yet.</p>
+          <p className="p-6 text-sm text-stone-500">
+            {isFamilyView
+              ? 'No care recipient yet. Submit a care request from Onboarding.'
+              : 'No patients on this care unit yet.'}
+          </p>
         ) : (
           <ul className="divide-y">
-            {patients.map((patient) => (
-              <li key={patient.id}>
-                <Link
-                  to={`${basePath}/${unitId}/${patient.id}`}
-                  className="flex items-start gap-3 p-4 hover:bg-teal-50/40 transition-colors"
-                >
-                  <div className="mt-0.5 rounded-xl bg-stone-100 p-2 text-stone-600">
-                    <UserRound className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-stone-900">{patient.name}</p>
-                    <p className="mt-0.5 text-sm text-stone-500">
-                      DOB {formatDob(patient.dateOfBirth)}
-                      {patient.relationship ? ` · ${patient.relationship}` : ''}
-                      {patient.externalRef ? ` · ${patient.externalRef}` : ''}
-                    </p>
-                    {patient.diagnosisCodes && patient.diagnosisCodes.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {patient.diagnosisCodes.map((code) => (
-                          <span
-                            key={code}
-                            className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900"
-                          >
-                            {code}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {patients.map((patient) => {
+              const patientIntake = intakes.find((i) => i.careRecipientId === patient.id);
+              const patientSummary = parseFamilyWizardSummary(patientIntake?.wizardPayload);
+              return (
+                <li key={patient.id}>
+                  <Link
+                    to={`${basePath}/${unitId}/${patient.id}`}
+                    className="flex items-start gap-3 p-4 hover:bg-teal-50/40 transition-colors"
+                  >
+                    <div className="mt-0.5 rounded-xl bg-stone-100 p-2 text-stone-600">
+                      <UserRound className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-stone-900">{patient.name}</p>
+                      <p className="mt-0.5 text-sm text-stone-500">
+                        {[
+                          patient.relationship,
+                          patient.dateOfBirth ? `DOB ${formatDob(patient.dateOfBirth)}` : null,
+                          patientSummary?.supportCategories?.length
+                            ? patientSummary.supportCategories.join(', ')
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || (isFamilyView ? 'Care recipient' : '—')}
+                      </p>
+                      {!isFamilyView &&
+                        patient.diagnosisCodes &&
+                        patient.diagnosisCodes.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {patient.diagnosisCodes.map((code) => (
+                              <span
+                                key={code}
+                                className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900"
+                              >
+                                {code}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
 
-      {episodes.length > 0 && (
+      {!isFamilyView && episodes.length > 0 && (
         <div className="rounded-2xl border bg-white shadow-sm p-5">
           <h3 className="text-sm font-semibold text-stone-900 mb-3">Linked episodes (unit)</h3>
+          <ul className="space-y-2">
+            {episodes.map((ep) => (
+              <li
+                key={ep.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-stone-50 px-3 py-2 text-sm"
+              >
+                <span className="font-medium text-stone-900">{ep.title}</span>
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                  {ep.status.replace(/_/g, ' ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {isFamilyView && episodes.length > 0 && (
+        <div className="rounded-2xl border bg-white shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-stone-900 mb-3">Care journeys</h3>
           <ul className="space-y-2">
             {episodes.map((ep) => (
               <li

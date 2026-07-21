@@ -71,6 +71,16 @@ export const proposalRoleRouteElements = (
               path={`${shell.basePath}/dashboard`}
               element={<Navigate to={shell.basePath} replace />}
             />
+            {shellKey === 'family' && (
+              <Route
+                path="/family/onboarding"
+                element={
+                  <Suspense fallback={<PageSpinner />}>
+                    <FamilyOnboardingPage />
+                  </Suspense>
+                }
+              />
+            )}
             {shellKey === 'coordinator' && (
               <>
                 <Route
@@ -130,21 +140,13 @@ export const proposalRoleRouteElements = (
             {shellKey === 'family' && (
               <>
                 <Route
-                  path="/family/onboarding"
-                  element={
-                    <Suspense fallback={<PageSpinner />}>
-                      <FamilyOnboardingPage />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path="/family/care-unit"
                   element={
                     <Suspense fallback={<PageSpinner />}>
                       <CareUnitListPage
                         basePath="/family/care-unit"
                         title="My Care Unit"
-                        description="View and update your care unit and patient profiles."
+                        description="Your household, care recipient, and the request you submitted during onboarding."
                       />
                     </Suspense>
                   }

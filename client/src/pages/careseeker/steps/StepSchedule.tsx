@@ -85,7 +85,7 @@ function TimePicker({ value, onChange }: { value: string, onChange: (val: string
  <div className="flex gap-2">
  <div className="relative flex-1">
  <select
- className="w-full p-3 rounded-xl ring-1 ring-stone-200/50 bg-stone-800 appearance-none font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
+ className="w-full p-3 rounded-xl border border-stone-200 bg-white appearance-none font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
  value={hour}
  onChange={(e) => updateTime(e.target.value, minute, period)}
  >
@@ -99,7 +99,7 @@ function TimePicker({ value, onChange }: { value: string, onChange: (val: string
  </div>
  <div className="relative flex-1">
  <select
- className="w-full p-3 rounded-xl ring-1 ring-stone-200/50 bg-stone-800 appearance-none font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
+ className="w-full p-3 rounded-xl border border-stone-200 bg-white appearance-none font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
  value={minute}
  onChange={(e) => updateTime(hour, e.target.value, period)}
  >
@@ -114,7 +114,7 @@ function TimePicker({ value, onChange }: { value: string, onChange: (val: string
  </div>
  <div className="relative flex-1">
  <select
- className="w-full p-3 rounded-xl ring-1 ring-stone-200/50 bg-stone-800 appearance-none font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
+ className="w-full p-3 rounded-xl border border-stone-200 bg-white appearance-none font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
  value={period}
  onChange={(e) => updateTime(hour, minute, e.target.value)}
  >
@@ -192,7 +192,7 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  onClick={() => onUpdate({ scheduleType: option.id })}
  whileHover={{ scale: 1.02 }}
  whileTap={{ scale: 0.98 }}
- className={`group p-5 rounded-[24px] border-2 text-left transition-transform duration-300 relative overflow-hidden ${isSelected ? 'border-teal-500 bg-teal-600 text-white shadow-lg' : 'ring-1 ring-stone-100/50 bg-stone-800 hover:border-stone-300 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)]' }`}
+ className={`group p-5 rounded-[24px] border-2 text-left transition-transform duration-300 relative overflow-hidden ${isSelected ? 'border-teal-500 bg-teal-600 text-white shadow-lg' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)]' }`}
  >
  <div className="flex items-center gap-4 relative z-10">
  <div className={`size-12 rounded-2xl flex items-center justify-center transition-colors ${isSelected ? 'bg-white/20 text-white' : 'bg-stone-50 text-stone-500 group-hover:bg-stone-100'}`}>
@@ -242,7 +242,7 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  >
  <span className="text-[10px] font-normal opacity-70 block sm:hidden">{day.label.charAt(0)}</span>
  <span className="text-[10px] font-normal opacity-70 hidden sm:block">{day.label}</span>
- {isSelected && <div className="size-1 bg-stone-800 rounded-full mt-0.5" />}
+ {isSelected && <div className="size-1 bg-white rounded-full mt-0.5" />}
  </m.button>
  );
  })}
@@ -270,7 +270,7 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  onClick={() => toggleTimeSlot(slot.id)}
  whileHover={{ scale: 1.02 }}
  whileTap={{ scale: 0.98 }}
- className={`p-4 rounded-2xl border-2 text-left transition-transform duration-300 flex items-center gap-3 ${isSelected && !Boolean(data.isCustomTime) ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'ring-1 ring-stone-100/50 hover:border-stone-300 bg-stone-800' }`}
+ className={`p-4 rounded-2xl border-2 text-left transition-transform duration-300 flex items-center gap-3 ${isSelected && !Boolean(data.isCustomTime) ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50' }`}
  >
  <Icon className={`size-5 ${isSelected && !Boolean(data.isCustomTime) ? 'text-white' : 'text-stone-400'}`} />
  <div>
@@ -299,7 +299,7 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  }}
  whileHover={{ scale: 1.01 }}
  whileTap={{ scale: 0.99 }}
- className={`w-full p-4 rounded-2xl border-2 text-left transition-transform duration-300 flex items-center justify-between ${(data.isCustomTime as boolean) ? 'border-stone-900 bg-stone-50' : 'ring-1 ring-stone-100/50 hover:border-stone-300 bg-stone-800' }`}
+ className={`w-full p-4 rounded-2xl border-2 text-left transition-transform duration-300 flex items-center justify-between ${(data.isCustomTime as boolean) ? 'border-stone-900 bg-stone-50' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50' }`}
  >
  <div className="flex items-center gap-3">
  <div className={`size-10 rounded-xl flex items-center justify-center ${(data.isCustomTime as boolean) ? 'bg-teal-600 text-white' : 'bg-stone-100 text-stone-500' }`}>

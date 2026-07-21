@@ -9,6 +9,7 @@ interface StepConsentProps {
   onBack: () => void;
   isSubmitting?: boolean;
   isLoggedIn?: boolean;
+  variant?: 'careseeker' | 'family';
 }
 
 const fadeIn = {
@@ -16,8 +17,28 @@ const fadeIn = {
   animate: { opacity: 1, y: 0 },
 };
 
-export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmitting, isLoggedIn }: StepConsentProps) {
+export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmitting, isLoggedIn, variant = 'careseeker' }: StepConsentProps) {
   const isValid = data.independentProviderAcknowledged && data.termsAccepted;
+  const isFamily = variant === 'family';
+
+  const categoryLabels: Record<string, string> = {
+    aged_care: 'Home Care',
+    disability_support: 'Disability',
+    child_family: 'Babysitting',
+    allied_health: 'Therapy',
+    home_support: 'Home Visit',
+  };
+  const categories = Array.isArray(data.careCategories)
+    ? (data.careCategories as string[]).map((c) => categoryLabels[c] ?? c)
+    : [];
+  const roleLabel =
+    data.careRecipientType === 'family_member'
+      ? 'Family Guardian'
+      : data.careRecipientType === 'myself'
+        ? 'Individual'
+        : data.careRecipientType === 'support_coordinator'
+          ? 'Support Coordinator'
+          : null;
 
   const consents = [
     {
@@ -53,10 +74,35 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
           </div>
           <div>
             <h2 className="text-2xl font-semibold text-stone-900 leading-none">Review & Confirm</h2>
-            <p className="text-stone-500 mt-1">Please review and accept the terms to finish.</p>
+            <p className="text-stone-500 mt-1">
+              {isFamily
+                ? 'Review your request, then accept the terms to finish.'
+                : 'Please review and accept the terms to finish.'}
+            </p>
           </div>
         </div>
       </m.div>
+
+      {isFamily && (
+        <m.div {...fadeIn} transition={{ delay: 0.05 }} className="p-5 rounded-[24px] bg-teal-50/80 border border-teal-100">
+          <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-2">Your request summary</p>
+          <ul className="text-sm text-stone-700 space-y-1">
+            {roleLabel && <li>Account: <span className="font-semibold">{roleLabel}</span></li>}
+            {typeof data.country === 'string' && data.country && (
+              <li>Location: <span className="font-semibold">{String(data.country)}</span></li>
+            )}
+            {categories.length > 0 && (
+              <li>Support: <span className="font-semibold">{categories.join(', ')}</span></li>
+            )}
+            {typeof data.scheduleType === 'string' && data.scheduleType && (
+              <li>Schedule: <span className="font-semibold">{String(data.scheduleType).replace(/_/g, ' ')}</span></li>
+            )}
+          </ul>
+          <p className="text-xs text-teal-800 mt-3">
+            After you submit, our care team will review your request before your consultation.
+          </p>
+        </m.div>
+      )}
 
       {/* Consents */}
       <m.div {...fadeIn} transition={{ delay: 0.1 }} className="space-y-4">
@@ -67,7 +113,7 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 + index * 0.05 }}
             onClick={() => onUpdate({ [consent.id]: !data[consent.id] })}
-            className={`group p-5 rounded-[24px] border-2 cursor-pointer transition-transform duration-300 flex items-start gap-4 ${data[consent.id] ? 'border-stone-900 bg-stone-50 shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'ring-1 ring-stone-100/50 bg-stone-800 hover:border-stone-300 hover:shadow-lg'}`}
+            className={`group p-5 rounded-[24px] border-2 cursor-pointer transition-transform duration-300 flex items-start gap-4 ${data[consent.id] ? 'border-stone-900 bg-stone-50 shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 hover:shadow-lg'}`}
           >
             <div className={`mt-0.5 transition-colors ${data[consent.id] ? 'text-stone-900' : 'text-stone-300 group-hover:text-stone-400'}`}>
               {data[consent.id] ? (
@@ -107,7 +153,7 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
               { text: 'You control access', icon: '👁️' },
               { text: 'PDPL compliant', icon: '🛡️' },
             ].map((item) => (
-              <div key={item.text} className="flex items-center gap-2 p-2 bg-stone-800 rounded-xl ring-1 ring-stone-100/50">
+              <div key={item.text} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-stone-200">
                 <span>{item.icon}</span>
                 <span>{item.text}</span>
               </div>
@@ -155,7 +201,7 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
           ) : (
             <>
               <CheckCircle className="size-5" />
-              Finish & Submit
+              {isFamily ? 'Finish & Submit Request' : 'Finish & Submit'}
             </>
           )}
         </m.button>

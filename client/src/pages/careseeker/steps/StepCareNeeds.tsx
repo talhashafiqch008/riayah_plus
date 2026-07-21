@@ -219,7 +219,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  toggleCategory(category.id);
  }
  }}
- className={`relative flex flex-col items-center p-5 rounded-[24px] border-2 text-center transition-transform duration-300 cursor-pointer ${isSelected ? 'border-stone-900 bg-stone-50 ring-2 ring-stone-100' : 'ring-1 ring-stone-100/50 bg-stone-800 hover:border-stone-300 hover:shadow-lg' }`}
+ className={`relative flex flex-col items-center p-5 rounded-[24px] border-2 text-center transition-transform duration-300 cursor-pointer ${isSelected ? 'border-stone-900 bg-stone-50 ring-2 ring-stone-100' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 hover:shadow-lg' }`}
  >
  <div className={`size-14 rounded-full flex items-center justify-center mb-3 transition-colors ${isSelected ? 'bg-teal-600 text-white' : category.color }`}>
  <Icon className="size-7" />
@@ -239,7 +239,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  e.stopPropagation(); // Prevent opening details
  toggleCategory(category.id); // Deselect
  }}
- className="absolute top-3 right-3 size-7 bg-stone-800 hover:bg-stone-100 text-stone-400 hover:text-red-500 rounded-full flex items-center justify-center  ring-1 ring-stone-200/50 transition-colors z-10 group/close"
+ className="absolute top-3 right-3 size-7 bg-white hover:bg-stone-100 text-stone-400 hover:text-red-500 rounded-full flex items-center justify-center border border-stone-200 transition-colors z-10 group/close"
  >
  <div className="group-hover/close:hidden">
  <Check className="size-4 text-stone-900" strokeWidth={3} />
@@ -290,7 +290,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  onClick={() => toggleNeed(activeDetailId, option.id)}
  whileHover={{ scale: 1.01 }}
  whileTap={{ scale: 0.99 }}
- className={`p-3 rounded-xl border text-left transition-transform duration-300 relative overflow-hidden ${isNeedSelected ? 'bg-stone-800 border-stone-900 shadow-[0_4px_20px_rgba(0,0,0,0.04)] ring-1 ring-stone-900' : 'bg-stone-800 ring-1 ring-stone-200/50 hover:border-stone-400' }`}
+ className={`p-3 rounded-xl border text-left transition-transform duration-300 relative overflow-hidden ${isNeedSelected ? 'bg-teal-50 border-teal-600 shadow-sm ring-1 ring-teal-100' : 'bg-white border border-stone-200 hover:border-stone-400' }`}
  >
  {isNeedSelected && (
  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-teal-600" />
@@ -321,7 +321,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  initial={{ opacity: 0, height: 0 }}
  animate={{ opacity: 1, height: 'auto' }}
  exit={{ opacity: 0, height: 0 }}
- className="bg-stone-800 rounded-[24px] p-6 border-2 border-purple-100 shadow-xl shadow-purple-900/5 overflow-hidden mt-6"
+ className="bg-purple-50/50 rounded-[24px] p-6 border-2 border-purple-100 shadow-sm overflow-hidden mt-6"
  >
  <div className="flex items-center gap-3 mb-6">
  <div className="size-10 bg-purple-100 rounded-full flex items-center justify-center">
@@ -342,7 +342,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  <button
  key={plan.id}
  onClick={() => onUpdate({ supportPlanType: plan.id })}
- className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-transform duration-300 ${isPlanSelected ? 'bg-stone-800 text-purple-700  ring-1 ring-black/5' : 'text-stone-500 hover:text-stone-700 hover:bg-stone-200/50' }`}
+ className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-transform duration-300 ${isPlanSelected ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100' : 'text-stone-500 hover:text-stone-700 hover:bg-stone-200/50' }`}
  >
  {plan.label}
  </button>
@@ -366,7 +366,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  </span>
  <input
  type="text"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-stone-800 text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
+ className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
  value={(data.ndisNumber as string) || ''}
  onChange={(e) => onUpdate({ ndisNumber: e.target.value })}
  placeholder="e.g. 430xxxxxx"
@@ -381,7 +381,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  </label>
  <input
  type="email"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-stone-800 text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
+ className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
  value={(data.planManagerEmail as string) || ''}
  onChange={(e) => onUpdate({ planManagerEmail: e.target.value })}
  placeholder="manager@example.com"
@@ -402,7 +402,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  </span>
  <input
  type="date"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-stone-800 text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
+ className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
  value={(data.dateOfBirth as string) || ''}
  onChange={(e) => onUpdate({ dateOfBirth: e.target.value })}
  />
@@ -420,7 +420,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider ml-1">Start Date</span>
  <input
  type="date"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-stone-800 text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
+ className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
  value={(data.planStartDate as string) || ''}
  onChange={(e) => onUpdate({ planStartDate: e.target.value })}
  />
@@ -429,7 +429,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider ml-1">End Date</span>
  <input
  type="date"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-stone-800 text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
+ className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
  value={(data.planEndDate as string) || ''}
  onChange={(e) => onUpdate({ planEndDate: e.target.value })}
  />
@@ -455,7 +455,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  {/* Self Managed Info */}
  {data.supportPlanType === 'self_managed' && (
  <div className="bg-stone-50 p-4 rounded-xl ring-1 ring-stone-200/50 text-sm text-stone-600 flex items-center gap-3">
- <div className="size-8 bg-stone-800 rounded-full ring-1 ring-stone-200/50 flex items-center justify-center flex-shrink-0 ">
+ <div className="size-8 bg-white rounded-full border border-stone-200 flex items-center justify-center flex-shrink-0 ">
  <Info className="size-4 text-stone-400" />
  </div>
  Payment via Credit Card / Direct Debit. Invoices sent to your email.

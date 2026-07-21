@@ -26,6 +26,7 @@ const ACCOUNT_TYPES = [
  title: 'Individual Account',
  subtitle: 'For Myself',
  description: 'I am looking for care or support for my own needs.',
+ details: [] as string[],
  icon: User,
  color: 'bg-teal-100 text-teal-600'
  },
@@ -34,6 +35,11 @@ const ACCOUNT_TYPES = [
  title: 'Family Guardian',
  subtitle: 'For My Family',
  description: 'I want to manage care for my parents, children, or relatives.',
+ details: [
+ 'Request support and upload documents',
+ 'Stay informed about the care journey',
+ 'Cannot edit clinical records or care plans alone',
+ ],
  icon: Users,
  color: 'bg-blue-100 text-blue-600'
  },
@@ -42,6 +48,7 @@ const ACCOUNT_TYPES = [
  title: 'Support Coordinator',
  subtitle: 'For Clients',
  description: 'I coordinate support for NDIS participants and clients.',
+ details: [] as string[],
  icon: Briefcase,
  color: 'bg-purple-100 text-purple-600'
  }
@@ -57,9 +64,11 @@ interface StepCountryLanguageProps {
  onUpdate: (data: Record<string, unknown>) => void;
  onNext: () => void;
  onBack?: () => void;
+ variant?: 'careseeker' | 'family';
 }
 
-export default function StepCountryLanguage({ data, onUpdate, onNext }: StepCountryLanguageProps) {
+export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 'careseeker' }: StepCountryLanguageProps) {
+ const showRoleDetails = variant === 'family';
  const isValid = data.country && data.preferredLanguage && data.careRecipientType;
 
  // Filter account types based on country
@@ -103,7 +112,7 @@ export default function StepCountryLanguage({ data, onUpdate, onNext }: StepCoun
  <button
  key={country.code}
  onClick={() => handleCountrySelect(country.code)}
- className={`relative p-4 rounded-2xl border-2 transition-transform duration-300 text-center group ${data.country === country.code ? 'border-teal-500 bg-teal-600 text-white shadow-lg' : 'ring-1 ring-stone-100/50 hover:border-stone-300 bg-stone-800' }`}
+ className={`relative p-4 rounded-2xl border-2 transition-transform duration-300 text-center group ${data.country === country.code ? 'border-teal-500 bg-teal-600 text-white shadow-lg' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50' }`}
  >
  <span className="text-2xl block mb-1">{country.flag}</span>
  <span className={`text-sm font-bold uppercase tracking-wide ${data.country === country.code ? 'text-white' : 'text-stone-600'}`}>
@@ -131,7 +140,7 @@ export default function StepCountryLanguage({ data, onUpdate, onNext }: StepCoun
  <button
  key={lang.code}
  onClick={() => onUpdate({ preferredLanguage: lang.code })}
- className={`px-4 py-2 rounded-xl border-2 transition-transform duration-300 text-sm font-bold ${data.preferredLanguage === lang.code ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'ring-1 ring-stone-100/50 text-stone-600 hover:border-stone-300 bg-stone-800' }`}
+ className={`px-4 py-2 rounded-xl border-2 transition-transform duration-300 text-sm font-bold ${data.preferredLanguage === lang.code ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50' }`}
  >
  {lang.label}
  </button>
@@ -168,7 +177,7 @@ export default function StepCountryLanguage({ data, onUpdate, onNext }: StepCoun
  onClick={() => onUpdate({ careRecipientType: type.id })}
  whileHover={{ scale: 1.02, y: -2 }}
  whileTap={{ scale: 0.98 }}
- className={`relative flex flex-col items-start p-6 rounded-[24px] border-2 text-left transition-transform duration-300 h-full ${isSelected ? 'border-stone-900 bg-stone-50 ring-2 ring-stone-100' : 'ring-1 ring-stone-100/50 bg-stone-800 hover:border-stone-300 hover:shadow-lg' }`}
+ className={`relative flex flex-col items-start p-6 rounded-[24px] border-2 text-left transition-transform duration-300 h-full ${isSelected ? 'border-stone-900 bg-stone-50 ring-2 ring-stone-100' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 hover:shadow-lg' }`}
  >
  <div className={`size-14 rounded-2xl mb-4 flex items-center justify-center transition-colors ${isSelected ? 'bg-teal-600 text-white' : type.color }`}>
  <Icon className="size-7" />
@@ -188,6 +197,16 @@ export default function StepCountryLanguage({ data, onUpdate, onNext }: StepCoun
  <p className="text-sm text-stone-500 leading-relaxed">
  {type.description}
  </p>
+ {showRoleDetails && type.details.length > 0 && (
+ <ul className="mt-3 space-y-1.5">
+ {type.details.map((line) => (
+ <li key={line} className="text-xs text-stone-500 flex items-start gap-1.5">
+ <span className="mt-1 size-1 rounded-full bg-teal-500 shrink-0" />
+ <span>{line}</span>
+ </li>
+ ))}
+ </ul>
+ )}
  </div>
  </m.button>
  );

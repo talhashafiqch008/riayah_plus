@@ -21,7 +21,17 @@ export interface CareUnit {
   country?: string;
   organizationId?: string | null;
   careRecipients?: CarePatient[];
-  intakeRecords?: { id: string; status: string; careRecipientId: string; submittedAt?: string }[];
+  intakeRecords?: {
+    id: string;
+    status: string;
+    careRecipientId: string;
+    submittedAt?: string;
+    reasonForCare?: string;
+    diagnoses?: string[];
+    serviceInterests?: ServiceCategory[];
+    urgencyLevel?: UrgencyLevel | null;
+    wizardPayload?: Record<string, unknown> | null;
+  }[];
   careEpisodes?: {
     id: string;
     title: string;

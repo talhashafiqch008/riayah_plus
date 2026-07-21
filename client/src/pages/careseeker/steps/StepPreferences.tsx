@@ -135,7 +135,7 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  transition={{ delay: index * 0.05 }}
  className={`relative p-5 rounded-[24px] border-2 text-center transition-transform duration-300 flex flex-col items-center ${isSelected
  ? `border-stone-900 bg-stone-50 ring-2 ring-offset-1 ${option.ringColor}`
- : 'ring-1 ring-stone-100/50 bg-white hover:border-stone-300 hover:shadow-lg'
+ : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 hover:shadow-lg'
  }`}
  >
  <div className={`size-14 rounded-full flex items-center justify-center mb-3 transition-colors ${isSelected ? 'bg-teal-600 text-white' : option.color }`}>
@@ -173,7 +173,7 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  onClick={() => toggleLanguage(lang.code)}
  whileHover={{ scale: 1.05 }}
  whileTap={{ scale: 0.95 }}
- className={`group px-5 py-3 rounded-2xl border-2 text-sm font-medium transition-transform duration-300 flex items-center gap-3 ${isSelected ? 'border-teal-500 bg-teal-600 text-white shadow-lg shadow-stone-200' : 'ring-1 ring-stone-100/50 bg-stone-800 text-stone-600 hover:border-stone-300'}`}
+ className={`group px-5 py-3 rounded-2xl border-2 text-sm font-medium transition-transform duration-300 flex items-center gap-3 ${isSelected ? 'border-teal-500 bg-teal-600 text-white shadow-lg shadow-stone-200' : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50'}`}
  >
  <span className="text-xl leading-none grayscale group-hover:grayscale-0 transition-transform duration-300">{lang.flag}</span>
  <div className="flex flex-col items-start -gap-0.5">
@@ -209,7 +209,7 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  onClick={() => onUpdate({ careLocation: option.id })}
  whileHover={{ scale: 1.02, y: -2 }}
  whileTap={{ scale: 0.98 }}
- className={`relative p-5 rounded-[24px] border-2 text-left transition-transform duration-300 ${isSelected ? 'border-stone-900 bg-stone-50 ring-2 ring-stone-100' : 'ring-1 ring-stone-100/50 bg-stone-800 hover:border-stone-300 hover:shadow-lg' }`}
+ className={`relative p-5 rounded-[24px] border-2 text-left transition-transform duration-300 ${isSelected ? 'border-stone-900 bg-stone-50 ring-2 ring-stone-100' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 hover:shadow-lg' }`}
  >
  <div className={`size-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${isSelected ? 'bg-teal-600 text-white' : option.color }`}>
  <Icon className="size-6" />
@@ -248,7 +248,7 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  value={(data.address as string) || ''}
  onChange={(e) => onUpdate({ address: e.target.value })}
  placeholder="e.g. West Bay, Doha..."
- className="w-full p-4 pl-12 border-2 ring-1 ring-stone-200/50 rounded-2xl focus:border-stone-900 focus:outline-none focus:ring-4 focus:ring-stone-100 transition-transform duration-300 bg-stone-800"
+ className="w-full p-4 pl-12 border-2 border-stone-200 rounded-2xl focus:border-stone-900 focus:outline-none focus:ring-4 focus:ring-stone-100 transition-transform duration-300 bg-white"
  />
  </div>
  </div>

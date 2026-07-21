@@ -81,13 +81,22 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
             ))}
           </ul>
           {shellKey === 'family' && (
-            <Link
-              to="/family/onboarding"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
-            >
-              Start clinical onboarding
-              <ArrowRight className="size-4" />
-            </Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                to="/family/onboarding"
+                className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+              >
+                Start care request
+                <ArrowRight className="size-4" />
+              </Link>
+              <Link
+                to="/family/care-unit"
+                className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100"
+              >
+                View my care unit
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
           )}
           {shellKey === 'coordinator' && (
             <Link
