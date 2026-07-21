@@ -312,10 +312,21 @@ export default function AssessmentSchedulePage({
               </dl>
               {selected.findings && (
                 <div>
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Findings</p>
-                  <pre className="rounded-xl bg-stone-50 border p-3 text-xs overflow-auto">
-                    {JSON.stringify(selected.findings, null, 2)}
-                  </pre>
+                  <p className="text-xs font-semibold text-stone-500 mb-2">Findings</p>
+                  <dl className="grid gap-3 sm:grid-cols-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                    {Object.entries(selected.findings)
+                      .filter(([, value]) => value != null && String(value).trim() !== '')
+                      .map(([key, value]) => (
+                        <div key={key}>
+                          <dt className="text-xs font-semibold text-stone-500 capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </dt>
+                          <dd className="mt-0.5 text-sm text-stone-900 whitespace-pre-wrap">
+                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
                 </div>
               )}
               {selected.recommendations && (

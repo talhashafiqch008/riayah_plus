@@ -293,3 +293,89 @@ export function deriveCareUnitName(userName: string, careRecipientType: unknown)
   }
   return userName ? `${userName}'s Care` : 'Care Unit';
 }
+
+/** Editable draft values stored inside intake.wizardPayload. */
+export type FamilyWizardDraft = {
+  careRecipientType: string;
+  country: string;
+  preferredLanguage: string;
+  careCategories: string[];
+  practitionerGender: string;
+  languages: string[];
+  careLocation: string;
+  address: string;
+  scheduleType: string;
+  preferredDays: string[];
+  preferredTimeSlots: string[];
+  startTiming: string;
+};
+
+export function emptyFamilyWizardDraft(): FamilyWizardDraft {
+  return {
+    careRecipientType: 'family_member',
+    country: 'QAT',
+    preferredLanguage: 'ENGLISH',
+    careCategories: [],
+    practitionerGender: 'no_preference',
+    languages: [],
+    careLocation: 'home',
+    address: '',
+    scheduleType: 'flexible',
+    preferredDays: [],
+    preferredTimeSlots: [],
+    startTiming: '',
+  };
+}
+
+export function getFamilyWizardDraft(
+  wizardPayload: Record<string, unknown> | null | undefined,
+): FamilyWizardDraft {
+  const base = emptyFamilyWizardDraft();
+  if (!wizardPayload || typeof wizardPayload !== 'object') return base;
+
+  const languages = asStringArray(
+    wizardPayload.languages ?? wizardPayload.providerLanguages,
+  );
+
+  return {
+    careRecipientType: asString(wizardPayload.careRecipientType) ?? base.careRecipientType,
+    country: asString(wizardPayload.country) ?? base.country,
+    preferredLanguage: asString(wizardPayload.preferredLanguage) ?? base.preferredLanguage,
+    careCategories: asStringArray(wizardPayload.careCategories),
+    practitionerGender: asString(wizardPayload.practitionerGender) ?? base.practitionerGender,
+    languages,
+    careLocation: asString(wizardPayload.careLocation) ?? base.careLocation,
+    address: asString(wizardPayload.address) ?? '',
+    scheduleType: asString(wizardPayload.scheduleType) ?? base.scheduleType,
+    preferredDays: asStringArray(wizardPayload.preferredDays),
+    preferredTimeSlots: asStringArray(wizardPayload.preferredTimeSlots),
+    startTiming: asString(wizardPayload.startTiming) ?? '',
+  };
+}
+
+export function mergeFamilyWizardPayload(
+  existing: Record<string, unknown> | null | undefined,
+  draft: FamilyWizardDraft,
+): Record<string, unknown> {
+  return {
+    ...(existing ?? {}),
+    source: 'family_careseeker_onboarding',
+    careRecipientType: draft.careRecipientType,
+    country: draft.country,
+    preferredLanguage: draft.preferredLanguage,
+    careCategories: draft.careCategories,
+    careNeeds:
+      existing && typeof existing.careNeeds === 'object' && existing.careNeeds
+        ? existing.careNeeds
+        : {},
+    practitionerGender: draft.practitionerGender,
+    languages: draft.languages,
+    providerLanguages: draft.languages,
+    careLocation: draft.careLocation,
+    address: draft.address,
+    scheduleType: draft.scheduleType,
+    preferredDays: draft.preferredDays,
+    preferredTimeSlots: draft.preferredTimeSlots,
+    startTiming: draft.startTiming || undefined,
+  };
+}

@@ -24,7 +24,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
   const pageTitle = getShellNavLabel(config, pathname);
 
   return (
-    <div className="min-h-screen bg-stone-50 flex font-sans">
+    <div className="h-dvh overflow-hidden bg-stone-50 flex font-sans">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-stone-900/50 z-40 lg:hidden"
@@ -33,11 +33,11 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-stone-100 flex flex-col transform transition-transform duration-300 lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-stone-100 flex flex-col transform transition-transform duration-300 lg:static lg:translate-x-0 lg:shrink-0 h-dvh ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="px-5 pt-6 pb-4 border-b border-stone-100">
+        <div className="px-5 pt-6 pb-4 border-b border-stone-100 shrink-0">
           <Link to={config.basePath} className="flex items-center gap-3">
             <div className="size-9 bg-teal-600 rounded-lg flex items-center justify-center text-white">
               <Heart className="size-4" />
@@ -51,7 +51,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5 min-h-0">
           {config.navigation.map((item) => {
             const active = isActive(item.href);
             return (
@@ -70,7 +70,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
           })}
         </nav>
 
-        <div className="p-3 border-t border-stone-100 space-y-2">
+        <div className="p-3 border-t border-stone-100 space-y-2 shrink-0">
           <div className="px-3 py-2">
             <p className="text-sm font-semibold text-stone-900">{user?.firstName ?? 'User'}</p>
             <p className="text-xs text-stone-400 capitalize">{user?.role?.replace(/_/g, ' ')}</p>
@@ -86,8 +86,8 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b border-stone-100 flex items-center px-4 lg:px-6 sticky top-0 z-30">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <header className="h-14 shrink-0 bg-white border-b border-stone-100 flex items-center px-4 lg:px-6 z-30">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -106,7 +106,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
           </button>
           <h1 className="font-semibold text-stone-900">{pageTitle}</h1>
         </header>
-        <main id="main-content" className="flex-1 overflow-auto p-4 lg:p-8">
+        <main id="main-content" className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8">
           <Outlet />
         </main>
       </div>

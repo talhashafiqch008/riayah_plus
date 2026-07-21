@@ -183,7 +183,7 @@ export const proposalRoleRouteElements = (
                   path="/family/episodes/:episodeId"
                   element={
                     <Suspense fallback={<PageSpinner />}>
-                      <EpisodeDetailPage basePath="/family/episodes" />
+                      <EpisodeDetailPage basePath="/family/episodes" canSchedule />
                     </Suspense>
                   }
                 />

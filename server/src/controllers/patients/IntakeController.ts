@@ -63,6 +63,22 @@ const statusSchema = z.object({
   status: z.nativeEnum(IntakeStatus),
 });
 
+const updateFamilyRequestSchema = z.object({
+  wizardPayload: z.record(z.unknown()),
+  reasonForCare: optionalSanitizedString(),
+  serviceInterests: z.array(serviceEnum).optional(),
+  primaryCaregiverName: optionalSanitizedString(),
+  primaryCaregiverPhone: optionalSanitizedString(),
+  primaryCaregiverRelation: optionalSanitizedString(),
+  syncCareUnit: z
+    .object({
+      address: optionalSanitizedString(),
+      country: optionalSanitizedString(),
+      primaryCaregiverName: optionalSanitizedString(),
+    })
+    .optional(),
+});
+
 function isAdmin(role: string): boolean {
   return ADMIN_ROLES.includes(role);
 }
@@ -381,6 +397,96 @@ export class IntakeController {
     }
 
     res.json({ data: { ...intake, consents } });
+  }
+
+  /**
+   * Family (or coordinator) updates the care-request details stored on an intake
+   * (wizard answers + mapped reason/services). Used by Care Unit "Edit".
+   */
+  static async updateRequest(req: Request, res: Response): Promise<void> {
+    const intake = await loadIntakeOrThrow(req.params.id);
+    assertIntakeAccess(req, intake);
+
+    if (intake.status === 'withdrawn') {
+      throw new AppError('Withdrawn intakes cannot be edited.', 422);
+    }
+
+    const body = updateFamilyRequestSchema.parse(req.body);
+    const existingPayload =
+      (intake.wizardPayload as Record<string, unknown> | null) ?? {};
+
+    const wizardPayload = {
+      ...existingPayload,
+      ...body.wizardPayload,
+      source:
+        (body.wizardPayload.source as string | undefined) ||
+        (existingPayload.source as string | undefined) ||
+        'family_careseeker_onboarding',
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.user!.userId,
+    };
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.intakeRecord.update({
+        where: { id: intake.id },
+        data: {
+          wizardPayload: wizardPayload as Prisma.InputJsonValue,
+          ...(body.reasonForCare
+            ? { reasonForCare: body.reasonForCare }
+            : {}),
+          ...(body.serviceInterests
+            ? { serviceInterests: body.serviceInterests }
+            : {}),
+          ...(body.primaryCaregiverName !== undefined
+            ? { primaryCaregiverName: body.primaryCaregiverName || null }
+            : {}),
+          ...(body.primaryCaregiverPhone !== undefined
+            ? { primaryCaregiverPhone: body.primaryCaregiverPhone || null }
+            : {}),
+          ...(body.primaryCaregiverRelation !== undefined
+            ? { primaryCaregiverRelation: body.primaryCaregiverRelation || null }
+            : {}),
+        },
+        include: {
+          careUnit: true,
+          careRecipient: { select: { id: true, name: true, externalRef: true } },
+          documents: true,
+        },
+      });
+
+      if (body.syncCareUnit) {
+        const unitData: Prisma.CareUnitUpdateInput = {};
+        if (body.syncCareUnit.address !== undefined) {
+          unitData.address = body.syncCareUnit.address || null;
+        }
+        if (body.syncCareUnit.country) {
+          unitData.country = body.syncCareUnit.country;
+        }
+        if (body.syncCareUnit.primaryCaregiverName !== undefined) {
+          unitData.primaryCaregiverName = body.syncCareUnit.primaryCaregiverName || null;
+        }
+        if (Object.keys(unitData).length > 0) {
+          await tx.careUnit.update({
+            where: { id: intake.careUnitId },
+            data: unitData,
+          });
+        }
+      }
+
+      return row;
+    });
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'intake_request_updated',
+      entity: 'IntakeRecord',
+      entityId: intake.id,
+      before: { wizardPayload: intake.wizardPayload },
+      after: { wizardPayload: updated.wizardPayload },
+      req,
+    });
+
+    res.json({ data: updated });
   }
 
   /** Coordinator queue with status / urgency filters + tenant scope. */

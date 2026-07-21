@@ -125,7 +125,9 @@ async function bootstrap(): Promise<void> {
       logger.info(`Riayah Plus API running on port ${env.PORT} [${env.NODE_ENV}]`);
     });
   } catch (err) {
-    logger.error('Bootstrap failed', { err });
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    logger.error('Bootstrap failed', { message, stack });
     process.exit(1);
   }
 }

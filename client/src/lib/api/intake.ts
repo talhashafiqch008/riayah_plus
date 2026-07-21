@@ -263,6 +263,26 @@ export async function listPatientRevisions(careUnitId: string, patientId: string
   return data.data;
 }
 
+export async function updateIntakeRequest(
+  id: string,
+  payload: {
+    wizardPayload: Record<string, unknown>;
+    reasonForCare?: string;
+    serviceInterests?: ServiceCategory[];
+    primaryCaregiverName?: string;
+    primaryCaregiverPhone?: string;
+    primaryCaregiverRelation?: string;
+    syncCareUnit?: {
+      address?: string;
+      country?: string;
+      primaryCaregiverName?: string;
+    };
+  },
+) {
+  const { data } = await client.patch<{ data: IntakeRecord }>(`/intake/${id}`, payload);
+  return data.data;
+}
+
 export async function submitIntake(payload: {
   careUnitId: string;
   careRecipientId: string;

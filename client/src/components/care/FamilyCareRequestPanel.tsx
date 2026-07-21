@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
 import { HeartHandshake } from 'lucide-react';
 import {
   parseFamilyWizardSummary,
+  type FamilyWizardDraft,
   type FamilyWizardSummary,
 } from '@/lib/familyCareseekerIntake';
 
@@ -11,6 +13,68 @@ const FAMILY_STATUS: Record<string, string> = {
   episode_created: 'Care journey started',
   withdrawn: 'Withdrawn',
 };
+
+const ACCOUNT_OPTIONS = [
+  { id: 'myself', label: 'Individual (for myself)' },
+  { id: 'family_member', label: 'Family Guardian' },
+  { id: 'support_coordinator', label: 'Support Coordinator' },
+];
+
+const COUNTRY_OPTIONS = [
+  { id: 'QAT', label: 'Qatar' },
+  { id: 'SAU', label: 'Saudi Arabia' },
+  { id: 'EGY', label: 'Egypt' },
+  { id: 'AUS', label: 'Australia' },
+];
+
+const LANGUAGE_OPTIONS = ['ENGLISH', 'ARABIC', 'FRENCH', 'URDU', 'HINDI'];
+
+const SUPPORT_OPTIONS = [
+  { id: 'aged_care', label: 'Home Care' },
+  { id: 'disability_support', label: 'Disability' },
+  { id: 'child_family', label: 'Babysitting' },
+  { id: 'allied_health', label: 'Therapy' },
+  { id: 'home_support', label: 'Home Visit' },
+];
+
+const GENDER_OPTIONS = [
+  { id: 'female', label: 'Female only' },
+  { id: 'male', label: 'Male only' },
+  { id: 'no_preference', label: 'No preference' },
+];
+
+const PROVIDER_LANG_OPTIONS = ['Arabic', 'English', 'French', 'Urdu', 'Hindi'];
+
+const CARE_LOCATION_OPTIONS = [
+  { id: 'home', label: 'In-person / at home' },
+  { id: 'clinic', label: 'Clinic' },
+  { id: 'telehealth', label: 'Virtual' },
+  { id: 'flexible', label: 'Flexible' },
+];
+
+const SCHEDULE_OPTIONS = [
+  { id: 'one_time', label: 'One-time' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'daily', label: 'Daily' },
+  { id: 'flexible', label: 'As needed' },
+];
+
+const DAY_OPTIONS = [
+  { id: 'sun', label: 'Sun' },
+  { id: 'mon', label: 'Mon' },
+  { id: 'tue', label: 'Tue' },
+  { id: 'wed', label: 'Wed' },
+  { id: 'thu', label: 'Thu' },
+  { id: 'fri', label: 'Fri' },
+  { id: 'sat', label: 'Sat' },
+];
+
+const TIME_OPTIONS = [
+  { id: 'morning', label: 'Morning' },
+  { id: 'afternoon', label: 'Afternoon' },
+  { id: 'evening', label: 'Evening' },
+  { id: 'overnight', label: 'Overnight' },
+];
 
 function SummaryGrid({ summary }: { summary: FamilyWizardSummary }) {
   const rows: { label: string; value: string }[] = [
@@ -63,6 +127,218 @@ function SummaryGrid({ summary }: { summary: FamilyWizardSummary }) {
   );
 }
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">
+      {children}
+    </span>
+  );
+}
+
+function ChipToggle({
+  selected,
+  label,
+  onClick,
+}: {
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${
+        selected
+          ? 'bg-teal-600 text-white border-teal-600'
+          : 'bg-white text-teal-900 border-teal-200 hover:border-teal-400'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function RequestEditForm({
+  draft,
+  onChange,
+}: {
+  draft: FamilyWizardDraft;
+  onChange: (next: FamilyWizardDraft) => void;
+}) {
+  const set = <K extends keyof FamilyWizardDraft>(key: K, value: FamilyWizardDraft[K]) => {
+    onChange({ ...draft, [key]: value });
+  };
+
+  const toggleIn = (key: 'careCategories' | 'languages' | 'preferredDays' | 'preferredTimeSlots', id: string) => {
+    const list = draft[key];
+    set(
+      key,
+      list.includes(id) ? list.filter((x) => x !== id) : [...list, id],
+    );
+  };
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="text-sm space-y-1">
+        <FieldLabel>Account type</FieldLabel>
+        <select
+          value={draft.careRecipientType}
+          onChange={(e) => set('careRecipientType', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+        >
+          {ACCOUNT_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="text-sm space-y-1">
+        <FieldLabel>Location</FieldLabel>
+        <select
+          value={draft.country}
+          onChange={(e) => set('country', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+        >
+          {COUNTRY_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="text-sm space-y-1">
+        <FieldLabel>Language</FieldLabel>
+        <select
+          value={draft.preferredLanguage}
+          onChange={(e) => set('preferredLanguage', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+        >
+          {LANGUAGE_OPTIONS.map((lang) => (
+            <option key={lang} value={lang}>
+              {lang}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="text-sm space-y-1">
+        <FieldLabel>Provider gender</FieldLabel>
+        <select
+          value={draft.practitionerGender}
+          onChange={(e) => set('practitionerGender', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+        >
+          {GENDER_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="sm:col-span-2 space-y-1.5">
+        <FieldLabel>Support needed</FieldLabel>
+        <div className="flex flex-wrap gap-1.5">
+          {SUPPORT_OPTIONS.map((o) => (
+            <ChipToggle
+              key={o.id}
+              label={o.label}
+              selected={draft.careCategories.includes(o.id)}
+              onClick={() => toggleIn('careCategories', o.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="sm:col-span-2 space-y-1.5">
+        <FieldLabel>Provider languages</FieldLabel>
+        <div className="flex flex-wrap gap-1.5">
+          {PROVIDER_LANG_OPTIONS.map((lang) => (
+            <ChipToggle
+              key={lang}
+              label={lang}
+              selected={draft.languages.includes(lang)}
+              onClick={() => toggleIn('languages', lang)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <label className="text-sm space-y-1">
+        <FieldLabel>Care location</FieldLabel>
+        <select
+          value={draft.careLocation}
+          onChange={(e) => set('careLocation', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+        >
+          {CARE_LOCATION_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="text-sm space-y-1">
+        <FieldLabel>Schedule</FieldLabel>
+        <select
+          value={draft.scheduleType}
+          onChange={(e) => set('scheduleType', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+        >
+          {SCHEDULE_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="sm:col-span-2 text-sm space-y-1">
+        <FieldLabel>Address</FieldLabel>
+        <input
+          value={draft.address}
+          onChange={(e) => set('address', e.target.value)}
+          className="w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm"
+          placeholder="Street, home number"
+        />
+      </label>
+
+      <div className="sm:col-span-2 space-y-1.5">
+        <FieldLabel>Preferred days</FieldLabel>
+        <div className="flex flex-wrap gap-1.5">
+          {DAY_OPTIONS.map((o) => (
+            <ChipToggle
+              key={o.id}
+              label={o.label}
+              selected={draft.preferredDays.includes(o.id)}
+              onClick={() => toggleIn('preferredDays', o.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="sm:col-span-2 space-y-1.5">
+        <FieldLabel>Preferred times</FieldLabel>
+        <div className="flex flex-wrap gap-1.5">
+          {TIME_OPTIONS.map((o) => (
+            <ChipToggle
+              key={o.id}
+              label={o.label}
+              selected={draft.preferredTimeSlots.includes(o.id)}
+              onClick={() => toggleIn('preferredTimeSlots', o.id)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type IntakeLike = {
   id: string;
   status: string;
@@ -76,9 +352,17 @@ type IntakeLike = {
 export function FamilyCareRequestPanel({
   intakes,
   variant = 'family',
+  editing = false,
+  draft,
+  onDraftChange,
+  actions,
 }: {
   intakes?: IntakeLike[] | null;
   variant?: 'family' | 'staff';
+  editing?: boolean;
+  draft?: FamilyWizardDraft;
+  onDraftChange?: (draft: FamilyWizardDraft) => void;
+  actions?: ReactNode;
 }) {
   const latest = intakes?.[0];
   if (!latest) return null;
@@ -90,35 +374,42 @@ export function FamilyCareRequestPanel({
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4 sm:p-5 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="size-9 rounded-xl bg-teal-100 flex items-center justify-center shrink-0">
-            <HeartHandshake className="size-5 text-teal-700" />
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="size-9 rounded-xl bg-teal-100 flex items-center justify-center shrink-0">
+              <HeartHandshake className="size-5 text-teal-700" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-teal-900">
+                {isFamily ? 'Your care request' : 'Family request summary'}
+              </p>
+              <p className="text-xs text-teal-800/80 mt-0.5">
+                {editing
+                  ? 'Update your request details, then Save.'
+                  : isFamily
+                    ? 'Details from your onboarding — our care team will follow up.'
+                    : 'From simple family onboarding'}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-teal-900">
-              {isFamily ? 'Your care request' : 'Family request summary'}
-            </p>
-            <p className="text-xs text-teal-800/80 mt-0.5">
-              {isFamily
-                ? 'Details from your onboarding — our care team will follow up.'
-                : 'From simple family onboarding'}
-            </p>
+          <div className="flex flex-col items-start sm:items-end gap-2">
+            {actions}
+            <div className="flex flex-col items-start sm:items-end gap-1">
+              <span className="rounded-full bg-white border border-teal-200 px-2.5 py-0.5 text-xs font-semibold text-teal-900">
+                {statusLabel}
+              </span>
+              {latest.submittedAt && (
+                <span className="text-[11px] text-teal-800/70">
+                  Submitted {new Date(latest.submittedAt).toLocaleString()}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex flex-col items-start sm:items-end gap-1">
-          <span className="rounded-full bg-white border border-teal-200 px-2.5 py-0.5 text-xs font-semibold text-teal-900">
-            {statusLabel}
-          </span>
-          {latest.submittedAt && (
-            <span className="text-[11px] text-teal-800/70">
-              Submitted {new Date(latest.submittedAt).toLocaleString()}
-            </span>
-          )}
-        </div>
-      </div>
 
-      {summary ? (
+      {editing && draft && onDraftChange ? (
+        <RequestEditForm draft={draft} onChange={onDraftChange} />
+      ) : summary ? (
         <SummaryGrid summary={summary} />
       ) : (
         latest.reasonForCare && (
@@ -131,7 +422,7 @@ export function FamilyCareRequestPanel({
         )
       )}
 
-      {(latest.serviceInterests?.length ?? 0) > 0 && (
+      {!editing && (latest.serviceInterests?.length ?? 0) > 0 && (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80 mb-1.5">
             {isFamily ? 'Services requested' : 'Mapped service interests'}

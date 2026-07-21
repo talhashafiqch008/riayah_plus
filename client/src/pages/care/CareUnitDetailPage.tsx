@@ -8,7 +8,6 @@ import {
   updateCareUnit,
   type CareUnit,
 } from '@/lib/api/intake';
-import { FamilyCareRequestPanel } from '@/components/care/FamilyCareRequestPanel';
 import { parseFamilyWizardSummary } from '@/lib/familyCareseekerIntake';
 
 type Props = {
@@ -35,6 +34,14 @@ const COUNTRY_LABELS: Record<string, string> = {
   AUS: 'Australia',
 };
 
+const FAMILY_INTAKE_STATUS: Record<string, string> = {
+  submitted: 'Request received',
+  under_review: 'Care team reviewing',
+  validated: 'Care journey ready',
+  episode_created: 'Care journey started',
+  withdrawn: 'Withdrawn',
+};
+
 function formatCountry(code?: string | null) {
   if (!code) return null;
   return COUNTRY_LABELS[code] ?? code;
@@ -54,18 +61,22 @@ export default function CareUnitDetailPage({ basePath }: Props) {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
 
+  const applyUnitToForm = (data: CareUnit) => {
+    setName(data.name ?? '');
+    setCaregiverName(data.primaryCaregiverName ?? '');
+    setCaregiverPhone(data.primaryCaregiverPhone ?? '');
+    setCaregiverRelation(data.primaryCaregiverRelation ?? '');
+    setAddress(data.address ?? '');
+    setCity(data.city ?? '');
+  };
+
   const load = useCallback(async () => {
     if (!unitId) return;
     setLoading(true);
     try {
       const data = await getCareUnit(unitId);
       setUnit(data);
-      setName(data.name ?? '');
-      setCaregiverName(data.primaryCaregiverName ?? '');
-      setCaregiverPhone(data.primaryCaregiverPhone ?? '');
-      setCaregiverRelation(data.primaryCaregiverRelation ?? '');
-      setAddress(data.address ?? '');
-      setCity(data.city ?? '');
+      applyUnitToForm(data);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
       else toast.error('Failed to load care unit');
@@ -94,6 +105,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
         city: city.trim() || undefined,
       });
       setUnit((prev) => (prev ? { ...prev, ...updated } : updated));
+      applyUnitToForm({ ...(unit ?? updated), ...updated });
       setEditing(false);
       toast.success('Care unit updated');
     } catch (error: unknown) {
@@ -120,8 +132,6 @@ export default function CareUnitDetailPage({ basePath }: Props) {
   const episodes = unit.careEpisodes ?? [];
   const intakes = unit.intakeRecords ?? [];
   const isFamilyView = basePath.startsWith('/family');
-  const latestIntake = intakes[0];
-  const requestSummary = parseFamilyWizardSummary(latestIntake?.wizardPayload);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -136,16 +146,20 @@ export default function CareUnitDetailPage({ basePath }: Props) {
           <div>
             <h2 className="text-2xl font-semibold text-stone-900">{unit.name}</h2>
             <p className="mt-1 text-sm text-stone-500">
-              {patients.length} patient{patients.length === 1 ? '' : 's'}
+              {patients.length} {isFamilyView ? 'person' : 'patient'}
+              {patients.length === 1 ? '' : 's'} needing care
               {isFamilyView
-                ? ` · ${intakes.length} care request${intakes.length === 1 ? '' : 's'}`
+                ? ` · open a person below to see their care request`
                 : ` · ${episodes.length} episode${episodes.length === 1 ? '' : 's'}`}
             </p>
           </div>
           {!editing ? (
             <button
               type="button"
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                applyUnitToForm(unit);
+                setEditing(true);
+              }}
               className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
             >
               Edit care unit
@@ -176,8 +190,6 @@ export default function CareUnitDetailPage({ basePath }: Props) {
         </div>
       </div>
 
-      {isFamilyView && <FamilyCareRequestPanel intakes={intakes} variant="family" />}
-
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
         <h3 className="text-sm font-semibold text-stone-900">
           {isFamilyView ? 'Household details' : 'Care unit details'}
@@ -193,7 +205,9 @@ export default function CareUnitDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Primary caregiver</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? 'Account holder' : 'Primary caregiver'}
+              </span>
               <input
                 value={caregiverName}
                 onChange={(e) => setCaregiverName(e.target.value)}
@@ -247,20 +261,13 @@ export default function CareUnitDetailPage({ basePath }: Props) {
             </div>
             <div>
               <dt className="text-xs font-semibold text-stone-500">Relation</dt>
-              <dd className="mt-0.5 text-stone-900">
-                {unit.primaryCaregiverRelation || requestSummary?.accountType || '—'}
-              </dd>
+              <dd className="mt-0.5 text-stone-900">{unit.primaryCaregiverRelation || '—'}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold text-stone-500">Location</dt>
               <dd className="mt-0.5 text-stone-900">
-                {[
-                  unit.address || requestSummary?.address,
-                  unit.city,
-                  formatCountry(unit.country) || requestSummary?.country,
-                ]
-                  .filter(Boolean)
-                  .join(', ') || '—'}
+                {[unit.address, unit.city, formatCountry(unit.country)].filter(Boolean).join(', ') ||
+                  '—'}
               </dd>
             </div>
           </dl>
@@ -272,6 +279,11 @@ export default function CareUnitDetailPage({ basePath }: Props) {
           <h3 className="text-sm font-semibold text-stone-900">
             {isFamilyView ? 'Who needs care' : 'Patients'}
           </h3>
+          {isFamilyView && (
+            <p className="mt-1 text-xs text-stone-500">
+              Open a person to view and edit their individual care request.
+            </p>
+          )}
         </div>
         {patients.length === 0 ? (
           <p className="p-6 text-sm text-stone-500">
@@ -284,6 +296,10 @@ export default function CareUnitDetailPage({ basePath }: Props) {
             {patients.map((patient) => {
               const patientIntake = intakes.find((i) => i.careRecipientId === patient.id);
               const patientSummary = parseFamilyWizardSummary(patientIntake?.wizardPayload);
+              const statusLabel = patientIntake
+                ? FAMILY_INTAKE_STATUS[patientIntake.status] ??
+                  patientIntake.status.replace(/_/g, ' ')
+                : null;
               return (
                 <li key={patient.id}>
                   <Link
@@ -294,7 +310,14 @@ export default function CareUnitDetailPage({ basePath }: Props) {
                       <UserRound className="size-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-stone-900">{patient.name}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-stone-900">{patient.name}</p>
+                        {statusLabel && (
+                          <span className="rounded-full bg-teal-50 border border-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+                            {statusLabel}
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 text-sm text-stone-500">
                         {[
                           patient.relationship,
@@ -304,7 +327,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
                             : null,
                         ]
                           .filter(Boolean)
-                          .join(' · ') || (isFamilyView ? 'Care recipient' : '—')}
+                          .join(' · ') || (isFamilyView ? 'Open to view care request' : '—')}
                       </p>
                       {!isFamilyView &&
                         patient.diagnosisCodes &&

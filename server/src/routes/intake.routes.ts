@@ -33,6 +33,7 @@ router.get('/documents/:id/download', (req, res, next) => {
 });
 
 router.get('/:id', IntakeController.show);
+router.patch('/:id', IntakeController.updateRequest);
 router.patch('/:id/status', IntakeController.updateStatus);
 router.post('/:id/review', requireCareCoordinator, IntakeController.review);
 

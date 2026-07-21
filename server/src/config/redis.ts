@@ -19,6 +19,15 @@ redis.on('connect', () => console.log('Redis connected'));
 redis.on('error', (err) => console.error('Redis error:', err.message));
 
 export async function connectRedis(): Promise<void> {
-  if (redis.status === 'ready' || redis.status === 'connecting') return;
-  await redis.connect();
+  try {
+    // ioredis can already be mid-connect after a nodemon reload / hot import
+    if (['ready', 'connecting', 'connect', 'wait'].includes(redis.status)) return;
+    await redis.connect();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('already connecting') || message.includes('already connected')) {
+      return;
+    }
+    throw err;
+  }
 }

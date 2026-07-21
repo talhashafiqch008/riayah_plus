@@ -18,9 +18,14 @@ import {
 
 type Props = {
   basePath: string;
-  /** Coordinator can advance status; family is read-only. */
+  /** Coordinator can advance episode status. */
   canTransition?: boolean;
+  /** Family (or staff) can book a consultation/assessment on this episode. */
+  canSchedule?: boolean;
 };
+
+/** Step 4 only reflects coordinator active / on hold. */
+const LIFECYCLE_STATUS_STATUSES = new Set(['active', 'on_hold']);
 
 function statusBadgeClass(status: string) {
   switch (status) {
@@ -41,6 +46,83 @@ function statusBadgeClass(status: string) {
   }
 }
 
+/** Filled circle colors aligned with status badges. */
+function statusStepCircleClass(status: string) {
+  switch (status) {
+    case 'intake_submitted':
+      return 'bg-amber-500 text-white';
+    case 'under_review':
+      return 'bg-blue-500 text-white';
+    case 'validated':
+      return 'bg-teal-600 text-white';
+    case 'active':
+      return 'bg-emerald-600 text-white';
+    case 'on_hold':
+      return 'bg-orange-500 text-white';
+    case 'closed':
+      return 'bg-stone-500 text-white';
+    default:
+      return 'bg-stone-400 text-white';
+  }
+}
+
+function statusStepTextClass(status: string) {
+  switch (status) {
+    case 'intake_submitted':
+      return 'text-amber-800';
+    case 'under_review':
+      return 'text-blue-800';
+    case 'validated':
+      return 'text-teal-800';
+    case 'active':
+      return 'text-emerald-800';
+    case 'on_hold':
+      return 'text-orange-800';
+    case 'closed':
+      return 'text-stone-600';
+    default:
+      return 'text-stone-700';
+  }
+}
+
+function statusStepDoneCircleClass(status: string) {
+  switch (status) {
+    case 'intake_submitted':
+      return 'bg-amber-100 text-amber-800';
+    case 'under_review':
+      return 'bg-blue-100 text-blue-800';
+    case 'validated':
+      return 'bg-teal-100 text-teal-800';
+    case 'active':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'on_hold':
+      return 'bg-orange-100 text-orange-800';
+    case 'closed':
+      return 'bg-stone-200 text-stone-600';
+    default:
+      return 'bg-stone-100 text-stone-500';
+  }
+}
+
+function statusConnectorClass(status: string) {
+  switch (status) {
+    case 'intake_submitted':
+      return 'bg-amber-300';
+    case 'under_review':
+      return 'bg-blue-300';
+    case 'validated':
+      return 'bg-teal-300';
+    case 'active':
+      return 'bg-emerald-300';
+    case 'on_hold':
+      return 'bg-orange-300';
+    case 'closed':
+      return 'bg-stone-300';
+    default:
+      return 'bg-stone-200';
+  }
+}
+
 function formatLabel(status: string) {
   return status.replace(/_/g, ' ');
 }
@@ -48,12 +130,24 @@ function formatLabel(status: string) {
 function stepIndex(status: string) {
   const idx = EPISODE_STATUS_STEPS.indexOf(status as (typeof EPISODE_STATUS_STEPS)[number]);
   if (idx >= 0) return idx;
-  if (status === 'on_hold') return EPISODE_STATUS_STEPS.indexOf('active');
-  if (status === 'closed') return EPISODE_STATUS_STEPS.length;
+  // active / on_hold sit on step 4; closed is past the status step
+  if (LIFECYCLE_STATUS_STATUSES.has(status) || status === 'closed') {
+    return EPISODE_STATUS_STEPS.length - 1;
+  }
   return 0;
 }
 
-export default function EpisodeDetailPage({ basePath, canTransition = false }: Props) {
+/** Step 4 only shows active or on hold (coordinator status). */
+function stepFourLabel(status: string) {
+  if (LIFECYCLE_STATUS_STATUSES.has(status)) return formatLabel(status);
+  return 'Status';
+}
+
+export default function EpisodeDetailPage({
+  basePath,
+  canTransition = false,
+  canSchedule = false,
+}: Props) {
   const { episodeId = '' } = useParams();
   const [episode, setEpisode] = useState<CareEpisode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +158,9 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
   const [assessmentType, setAssessmentType] = useState('initial');
   const [scheduledAt, setScheduledAt] = useState('');
   const [scheduling, setScheduling] = useState(false);
+
+  const showScheduleForm = canSchedule || canTransition;
+  const familyFacing = canSchedule && !canTransition;
 
   const load = useCallback(async () => {
     if (!episodeId) return;
@@ -84,14 +181,14 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
   }, [load]);
 
   useEffect(() => {
-    if (!canTransition) return;
+    if (!showScheduleForm) return;
     void listClinicians()
       .then((list) => {
         setClinicians(list);
         if (list[0]) setAssessorId(list[0].id);
       })
       .catch(() => undefined);
-  }, [canTransition]);
+  }, [showScheduleForm]);
 
   const nextStatuses = useMemo(
     () => (episode ? allowedEpisodeTransitions(episode.status) : []),
@@ -126,12 +223,12 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
         type: assessmentType,
         scheduledAt: new Date(scheduledAt).toISOString(),
       });
-      toast.success('Assessment scheduled');
+      toast.success(familyFacing ? 'Consultation booked' : 'Assessment scheduled');
       setScheduledAt('');
       await load();
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Schedule failed');
+      else toast.error(familyFacing ? 'Booking failed' : 'Schedule failed');
     } finally {
       setScheduling(false);
     }
@@ -182,17 +279,29 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
         <h3 className="text-sm font-semibold text-stone-900 mb-4">Lifecycle</h3>
         <ol className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0">
           {EPISODE_STATUS_STEPS.map((step, i) => {
-            const done = i <= currentStep && episode.status !== 'closed';
-            const isCurrent = step === episode.status;
+            const isLastStep = i === EPISODE_STATUS_STEPS.length - 1;
+            const isCurrent = isLastStep
+              ? LIFECYCLE_STATUS_STATUSES.has(episode.status)
+              : step === episode.status;
+            const done = isLastStep
+              ? LIFECYCLE_STATUS_STATUSES.has(episode.status) || episode.status === 'closed'
+              : i < currentStep || step === episode.status;
+            const colorKey = isLastStep
+              ? LIFECYCLE_STATUS_STATUSES.has(episode.status)
+                ? episode.status
+                : 'pending'
+              : step;
+            const label = isLastStep ? stepFourLabel(episode.status) : formatLabel(step);
+
             return (
               <li key={step} className="flex sm:flex-1 items-center gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
                     className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                       isCurrent
-                        ? 'bg-teal-600 text-white'
+                        ? statusStepCircleClass(colorKey)
                         : done
-                          ? 'bg-teal-100 text-teal-800'
+                          ? statusStepDoneCircleClass(colorKey)
                           : 'bg-stone-100 text-stone-400'
                     }`}
                   >
@@ -200,16 +309,24 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
                   </span>
                   <span
                     className={`text-xs font-medium truncate ${
-                      isCurrent ? 'text-teal-800' : done ? 'text-stone-700' : 'text-stone-400'
+                      isCurrent
+                        ? statusStepTextClass(colorKey)
+                        : done
+                          ? 'text-stone-700'
+                          : 'text-stone-400'
                     }`}
                   >
-                    {formatLabel(step)}
+                    {label}
                   </span>
                 </div>
                 {i < EPISODE_STATUS_STEPS.length - 1 && (
                   <div
                     className={`hidden sm:block flex-1 h-0.5 mx-2 ${
-                      i < currentStep ? 'bg-teal-300' : 'bg-stone-200'
+                      i < currentStep
+                        ? statusConnectorClass(
+                            EPISODE_STATUS_STEPS[Math.min(i + 1, currentStep)] ?? step,
+                          )
+                        : 'bg-stone-200'
                     }`}
                   />
                 )}
@@ -217,11 +334,6 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
             );
           })}
         </ol>
-        {(episode.status === 'on_hold' || episode.status === 'closed') && (
-          <p className="mt-3 text-sm text-stone-500">
-            Current branch status: <span className="font-medium">{formatLabel(episode.status)}</span>
-          </p>
-        )}
 
         {canTransition && nextStatuses.length > 0 && (
           <div className="mt-5 pt-4 border-t">
@@ -388,9 +500,11 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
           </ul>
         )}
 
-        {canTransition && episode.status !== 'closed' && (
+        {showScheduleForm && episode.status !== 'closed' && (
           <div className="pt-3 border-t space-y-3">
-            <p className="text-xs font-semibold text-stone-500">Schedule assessment</p>
+            <p className="text-xs font-semibold text-stone-500">
+              {familyFacing ? 'Book a consultation' : 'Schedule assessment'}
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 <span className="text-xs font-semibold text-stone-500">Clinician</span>
@@ -436,7 +550,7 @@ export default function EpisodeDetailPage({ basePath, canTransition = false }: P
               className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-2"
             >
               {scheduling && <Loader2 className="size-4 animate-spin" />}
-              Schedule assessment
+              {familyFacing ? 'Book consultation' : 'Schedule assessment'}
             </button>
           </div>
         )}

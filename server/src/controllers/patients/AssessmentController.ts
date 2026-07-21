@@ -92,19 +92,45 @@ function assertAccess(
 }
 
 export class AssessmentController {
-  /** Clinical staff list for coordinator scheduling. */
+  /** Clinical staff list for coordinator or family scheduling. */
   static async clinicians(req: Request, res: Response): Promise<void> {
-    if (!isCoordinator(req.user!.role) && !isAdmin(req.user!.role)) {
-      throw new AppError('Care coordinator access required.', 403);
+    const role = req.user!.role;
+    if (!isCoordinator(role) && !isAdmin(role) && !isFamily(role)) {
+      throw new AppError('Forbidden.', 403);
     }
 
     const where: Prisma.UserWhereInput = {
-      role: { in: ['clinical_staff', 'doctor', 'nurse', 'physiotherapist', 'occupational_therapist', 'speech_therapist', 'psychologist', 'dietitian', 'therapist'] },
+      role: {
+        in: [
+          'clinical_staff',
+          'doctor',
+          'nurse',
+          'physiotherapist',
+          'occupational_therapist',
+          'speech_therapist',
+          'psychologist',
+          'dietitian',
+          'therapist',
+        ],
+      },
       isActive: true,
       deletedAt: null,
     };
-    if (req.tenant?.organizationId) {
-      where.organizationId = req.tenant.organizationId;
+
+    // Coordinators are tenant-scoped; family picks from org on their care unit when available
+    if (isCoordinator(role) || isAdmin(role)) {
+      if (req.tenant?.organizationId) {
+        where.organizationId = req.tenant.organizationId;
+      }
+    } else if (isFamily(role)) {
+      const unit = await prisma.careUnit.findFirst({
+        where: { familyUserId: req.user!.userId },
+        select: { organizationId: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (unit?.organizationId) {
+        where.organizationId = unit.organizationId;
+      }
     }
 
     const data = await prisma.user.findMany({
@@ -165,14 +191,23 @@ export class AssessmentController {
   }
 
   static async store(req: Request, res: Response): Promise<void> {
-    if (!isCoordinator(req.user!.role) && !isAdmin(req.user!.role)) {
-      throw new AppError('Care coordinator access required.', 403);
+    const role = req.user!.role;
+    const isStaffScheduler = isCoordinator(role) || isAdmin(role);
+    const isFamilyScheduler = isFamily(role);
+
+    if (!isStaffScheduler && !isFamilyScheduler) {
+      throw new AppError('Forbidden.', 403);
     }
 
     const body = createSchema.parse(req.body);
     const episode = await prisma.careEpisode.findUnique({ where: { id: body.episodeId } });
     if (!episode) throw new AppError('Episode not found.', 404);
-    assertTenantOrgAccess(req, episode.organizationId);
+
+    if (isStaffScheduler) {
+      assertTenantOrgAccess(req, episode.organizationId);
+    } else if (episode.patientId !== req.user!.userId) {
+      throw new AppError('You can only book consultations on your own care journey.', 403);
+    }
 
     if (!['validated', 'active', 'under_review', 'intake_submitted', 'on_hold'].includes(episode.status)) {
       throw new AppError('Cannot schedule assessment on a closed episode.', 422);
@@ -234,12 +269,21 @@ export class AssessmentController {
       type: 'assessment_scheduled',
     }).catch(() => undefined);
 
-    await NotificationService.create({
-      userId: episode.patientId,
-      title: 'Assessment booked',
-      body: `An assessment (${assessment.type}) was scheduled for your care episode.`,
-      type: 'assessment_scheduled',
-    }).catch(() => undefined);
+    if (isFamilyScheduler) {
+      await NotificationService.create({
+        userId: episode.coordinatorId,
+        title: 'Consultation booked by family',
+        body: `Family scheduled a ${assessment.type} consultation for ${episode.title}.`,
+        type: 'assessment_scheduled',
+      }).catch(() => undefined);
+    } else {
+      await NotificationService.create({
+        userId: episode.patientId,
+        title: 'Assessment booked',
+        body: `An assessment (${assessment.type}) was scheduled for your care episode.`,
+        type: 'assessment_scheduled',
+      }).catch(() => undefined);
+    }
 
     res.status(201).json({ data: assessment });
   }
