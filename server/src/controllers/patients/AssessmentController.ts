@@ -73,8 +73,8 @@ const ASSESSMENT_INCLUDE = {
       careUnit: { select: { familyUserId: true } },
     },
   },
-  assessor: { select: { id: true, name: true, email: true } },
-  patient: { select: { id: true, name: true, email: true } },
+  assessor: { select: { id: true, name: true } },
+  patient: { select: { id: true, name: true } },
 } as const;
 
 function parseScheduledAt(raw: string): Date {

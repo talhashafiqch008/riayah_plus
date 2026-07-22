@@ -12,6 +12,7 @@ router.post('/privacy/data-export', PrivacyController.requestDataExport);
 router.post('/privacy/delete-account', PrivacyController.requestAccountDeletion);
 router.post('/privacy/restrict-processing', PrivacyController.restrictProcessing);
 router.get('/privacy/consents', PrivacyController.listConsents);
+router.get('/privacy/requests', PrivacyController.listRequests);
 
 // Document requests
 router.post('/document-requests', DocumentRequestController.create);

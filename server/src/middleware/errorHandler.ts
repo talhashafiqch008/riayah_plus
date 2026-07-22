@@ -36,12 +36,17 @@ export function errorHandler(
 
   if (err instanceof AppError) {
     if (err.statusCode >= 500) {
-      logger.error(err.message, { stack: err.stack });
+      logger.error(err.message, { errorId: err.name, statusCode: err.statusCode });
     }
     res.status(err.statusCode).json({ message: err.message });
     return;
   }
 
-  logger.error('Unhandled error', { message: err.message, stack: err.stack });
+  // G-24: do not write stack traces into application logs
+  logger.error('Unhandled error', { message: err.message, name: err.name });
+  if (process.env.NODE_ENV !== 'production') {
+    // Dev-only console for debugging — not persisted as structured app log PII
+    console.error(err);
+  }
   res.status(500).json({ message: 'Internal server error.' });
 }

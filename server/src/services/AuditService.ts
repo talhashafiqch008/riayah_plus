@@ -51,9 +51,9 @@ export class AuditService {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
         deviceInfo: ctx.deviceInfo,
-        before: opts.before ? (opts.before as object) : undefined,
-        after: opts.after ? (opts.after as object) : undefined,
-        metadata: opts.metadata as object | undefined,
+        before: opts.before ? (redactForAudit(opts.before) as object) : undefined,
+        after: opts.after ? (redactForAudit(opts.after) as object) : undefined,
+        metadata: opts.metadata ? (redactForAudit(opts.metadata) as object) : undefined,
       },
     });
   }

@@ -374,5 +374,55 @@ export function startScheduler(): void {
     }
   });
 
+  // ── retention:emergency-requests — daily (G-16: 90 days post-resolution) ───
+  cron.schedule('15 6 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const result = await prisma.emergencyRequest.updateMany({
+        where: {
+          OR: [
+            { resolvedAt: { lte: cutoff } },
+            { status: 'resolved', updatedAt: { lte: cutoff } },
+            { createdAt: { lte: cutoff }, status: { in: ['cancelled', 'closed'] } },
+          ],
+          NOT: { description: '[redacted]' },
+        },
+        data: {
+          description: '[redacted]',
+          latitude: null,
+          longitude: null,
+          address: null,
+          location: null,
+          notes: null,
+        },
+      });
+      if (result.count > 0) logger.info(`Redacted ${result.count} aged emergency requests`);
+    } catch (err) {
+      logger.error('retention:emergency-requests failed', { err });
+    }
+  });
+
+  // ── retention:gps-logs — daily (G-20: 90 days) ────────────────────────────
+  cron.schedule('20 6 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const result = await prisma.gpsLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+      if (result.count > 0) logger.info(`Purged ${result.count} GPS logs older than 90 days`);
+    } catch (err) {
+      logger.error('retention:gps-logs failed', { err });
+    }
+  });
+
+  // ── retention:notifications — daily (1 year) ──────────────────────────────
+  cron.schedule('25 6 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const result = await prisma.notification.deleteMany({ where: { createdAt: { lt: cutoff } } });
+      if (result.count > 0) logger.info(`Purged ${result.count} notifications older than 1 year`);
+    } catch (err) {
+      logger.error('retention:notifications failed', { err });
+    }
+  });
+
   logger.info('All cron jobs scheduled');
 }

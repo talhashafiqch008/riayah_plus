@@ -8,6 +8,7 @@ import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
 import { anonymizeUser } from '../../utils/anonymizeUser';
+import { performAccountDeletion } from '../../services/AccountDeletionService';
 import { recordLogoutAll } from '../../middleware/auth';
 import { clearAuthCookies } from '../../utils/authCookies';
 
@@ -160,16 +161,28 @@ export class UserProfileController {
   }
 
   static async destroy(req: Request, res: Response): Promise<void> {
-    await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: {
-        deletedAt: new Date(),
-        isActive: false,
-        deletionReason: 'User-requested deletion; PII will be anonymized after 30 days',
-      },
-    });
-    await AuditService.log({ userId: req.user!.userId, action: 'account_deleted', req });
-    res.json({ message: 'Account deleted. Personal data will be anonymized after a 30-day grace period.' });
+    // G-14: same obligation-checked path as POST /privacy/delete-account
+    try {
+      const { requestId } = await performAccountDeletion({
+        userId: req.user!.userId,
+        reason: 'User-requested deletion via DELETE /api/user',
+        req,
+        res,
+      });
+      res.json({
+        message: 'Account deleted. Personal data will be anonymized after a 30-day grace period.',
+        requestId,
+      });
+    } catch (err) {
+      if (err instanceof AppError && (err as AppError & { blockers?: unknown }).blockers) {
+        res.status(400).json({
+          message: err.message,
+          blockers: (err as AppError & { blockers: unknown }).blockers,
+        });
+        return;
+      }
+      throw err;
+    }
   }
 
   /** Called by retention cron — anonymizes a soft-deleted user after grace period. */

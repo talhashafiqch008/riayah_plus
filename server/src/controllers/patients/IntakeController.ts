@@ -287,6 +287,16 @@ export class IntakeController {
       );
     }
 
+    // G-15: record health-data consent on behalf of the care recipient (guardian/family basis)
+    consentRecords.push(
+      await recordIntakeConsent(
+        req,
+        familyUserId,
+        `care_recipient_health:${recipient.id}`,
+        `Special-category health data consent on behalf of care recipient ${recipient.name} (legal basis: family/guardian care arrangement)`,
+      ),
+    );
+
     const wizardPayload = {
       ...(data.wizardPayload ?? {}),
       privacyConsent: true,

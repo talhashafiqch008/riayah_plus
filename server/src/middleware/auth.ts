@@ -19,6 +19,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthPayload;
+      processingRestricted?: boolean;
     }
   }
 }
@@ -91,6 +92,40 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
         return;
       }
       req.user = payload;
+
+      // G-1: attach processing restriction and block mutating processing
+      const restrictedUser = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { processingRestricted: true },
+      });
+      req.processingRestricted = Boolean(restrictedUser?.processingRestricted);
+      if (
+        req.processingRestricted &&
+        ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase())
+      ) {
+        const path = (req.originalUrl || req.url || '').split('?')[0];
+        const allowed = [
+          '/api/privacy/',
+          '/api/consents',
+          '/api/consent/',
+          '/api/logout',
+          '/api/auth/logout',
+          '/api/auth/logout-all',
+          '/api/logout-all',
+          '/api/me',
+          '/api/auth/session',
+          '/api/auth/refresh',
+        ].some((p) => path === p || path.startsWith(p));
+        if (!allowed) {
+          res.status(409).json({
+            message:
+              'Processing of your personal data is currently restricted. You may still manage privacy settings, export data, or request erasure.',
+            code: 'PROCESSING_RESTRICTED',
+          });
+          return;
+        }
+      }
+
       await new Promise<void>((resolve, reject) => {
         attachTenantContext(req, res, (err?: unknown) => {
           if (err) reject(err);

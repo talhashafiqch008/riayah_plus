@@ -21,7 +21,10 @@ export class WhatsAppService {
         }
       );
     } catch (err) {
-      logger.error('WhatsApp send failed', { phone, error: err });
+      logger.error('WhatsApp send failed', {
+        phoneLast4: phone.slice(-4),
+        error: err instanceof Error ? err.message : 'unknown',
+      });
     }
   }
 

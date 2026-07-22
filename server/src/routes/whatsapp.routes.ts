@@ -128,14 +128,26 @@ router.get('/admin/conversations', authenticate, requireAdmin, async (req: Reque
   }
 });
 
-// GET /api/whatsapp/admin/messages/:phone — all messages for a phone number
-router.get('/admin/messages/:phone', authenticate, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/whatsapp/admin/messages/search — lookup by phone in body (G-23: no PII in URL)
+router.post('/admin/messages/search', authenticate, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { phone } = z.object({ phone: z.string().min(5) }).parse(req.body);
     const messages = await prisma.whatsAppMessage.findMany({
-      where: { phone: req.params.phone },
+      where: { phone },
       orderBy: { createdAt: 'asc' },
     });
     res.json({ success: true, messages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Legacy path kept temporarily — redirects clients to body-based search without echoing phone in new APIs
+router.get('/admin/messages/:phone', authenticate, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.status(410).json({
+      message: 'This endpoint is deprecated because phone numbers must not appear in URLs. Use POST /api/whatsapp/admin/messages/search with { phone }.',
+    });
   } catch (err) {
     next(err);
   }

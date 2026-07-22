@@ -20,10 +20,24 @@ router.get('/access-status', bookingExtrasController.getAccessStatus.bind(bookin
 router.get('/bookings/upcoming', bookingExtrasController.getUpcoming.bind(bookingExtrasController));
 
 router.get('/privacy-policy', (_req, res) =>
-  res.json({ data: { content: 'Raiyah Privacy Policy', version: '1.0', updatedAt: '2025-01-01' } })
+  res.json({
+    data: {
+      content:
+        'Riayah Plus Privacy Policy v2.0 (M2). See /api/privacy-policy for the full summary covering retention, DPO contact, cookies, and data-subject rights.',
+      version: '2.0.0-m2',
+      updatedAt: '2026-07-22',
+      dpoEmail: 'privacy@riayahplus.com',
+    },
+  }),
 );
 router.get('/terms-of-service', (_req, res) =>
-  res.json({ data: { content: 'Raiyah Terms of Service', version: '1.0', updatedAt: '2025-01-01' } })
+  res.json({
+    data: {
+      content: 'Riayah Plus Terms of Service v2.0 (M2). See /api/terms-of-service for details.',
+      version: '2.0.0-m2',
+      updatedAt: '2026-07-22',
+    },
+  }),
 );
 
 export default router;
