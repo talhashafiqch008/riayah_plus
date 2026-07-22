@@ -64,10 +64,16 @@ export class CareSummaryPDFService {
       doc.fillColor('#000').moveDown(2);
 
       // Patient info
+      const safeName = String(episode.patient.name || '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .slice(0, 120);
+      const safeEmail = String(episode.patient.email || '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .slice(0, 160);
       doc.fontSize(14).font('Helvetica-Bold').text('Patient Information', 50, 100);
       doc.fontSize(11).font('Helvetica')
-        .text(`Name: ${episode.patient.name}`, 50, 122)
-        .text(`Email: ${episode.patient.email}`, 50, 140)
+        .text(`Name: ${safeName}`, 50, 122)
+        .text(`Email: ${safeEmail}`, 50, 140)
         .text(`Episode Status: ${episode.status}`, 50, 158)
         .text(`Created: ${episode.createdAt.toLocaleDateString('en-QA')}`, 50, 176);
 

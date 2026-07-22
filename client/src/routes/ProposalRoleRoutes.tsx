@@ -22,9 +22,22 @@ const PageSpinner = () => (
 
 const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; description?: string }[]> = {
   family: [
-    { path: 'care-plans', title: 'Care Plans' },
-    { path: 'documents', title: 'Documents' },
-    { path: 'messages', title: 'Messages' },
+    {
+      path: 'care-plans',
+      title: 'Care Plans',
+      description:
+        'Family care-plan review and approval arrives in Milestone 3. For now, follow your Care Journey and Appointments.',
+    },
+    {
+      path: 'documents',
+      title: 'Documents',
+      description: 'Document upload is available from your care request and care unit. A dedicated documents hub expands in a later release.',
+    },
+    {
+      path: 'messages',
+      title: 'Messages',
+      description: 'Secure family messaging ships in Milestone 4. Your care team will contact you about appointments and next steps.',
+    },
   ],
   patient: [
     { path: 'care-plan', title: 'My Care Plan' },
@@ -131,7 +144,11 @@ export const proposalRoleRouteElements = (
                   path="/coordinator/episodes/:episodeId"
                   element={
                     <Suspense fallback={<PageSpinner />}>
-                      <EpisodeDetailPage basePath="/coordinator/episodes" canTransition />
+                      <EpisodeDetailPage
+                        basePath="/coordinator/episodes"
+                        canTransition
+                        canSchedule
+                      />
                     </Suspense>
                   }
                 />
@@ -173,8 +190,8 @@ export const proposalRoleRouteElements = (
                     <Suspense fallback={<PageSpinner />}>
                       <EpisodeListPage
                         basePath="/family/episodes"
-                        title="Care Episodes"
-                        description="Follow status from intake through active care."
+                        title="Care Journey"
+                        description="Follow your care journey from request received through active care."
                       />
                     </Suspense>
                   }

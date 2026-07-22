@@ -5,14 +5,7 @@ import {
   type FamilyWizardDraft,
   type FamilyWizardSummary,
 } from '@/lib/familyCareseekerIntake';
-
-const FAMILY_STATUS: Record<string, string> = {
-  submitted: 'Request received',
-  under_review: 'Care team reviewing',
-  validated: 'Care journey ready',
-  episode_created: 'Care journey started',
-  withdrawn: 'Withdrawn',
-};
+import { familyIntakeStatusLabel } from '@/lib/familyLanguage';
 
 const ACCOUNT_OPTIONS = [
   { id: 'myself', label: 'Individual (for myself)' },
@@ -368,8 +361,7 @@ export function FamilyCareRequestPanel({
   if (!latest) return null;
 
   const summary = parseFamilyWizardSummary(latest.wizardPayload);
-  const statusLabel =
-    FAMILY_STATUS[latest.status] ?? latest.status.replace(/_/g, ' ');
+  const statusLabel = familyIntakeStatusLabel(latest.status);
   const isFamily = variant === 'family';
 
   return (

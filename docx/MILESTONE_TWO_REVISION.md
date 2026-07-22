@@ -1,11 +1,12 @@
 # Milestone 2 Revision — Family Experience Simplification
 
-**Status:** 🟡 In progress — **R3 shipped** (family onboarding = careseeker UX); R1/R2/R4+ pending  
+**Status:** 🟡 In progress — **R1–R6 done** · polish logged · **optional next: R7–R8**  
 **Estimate:** 4–6 working days (P0 + P1) · 3–4 days minimum (P0 only)  
-**Last updated:** 2026-07-21  
+**Last updated:** 2026-07-22  
 **Companion test doc:** `MILESTONE_TWO_REVISION_TEST.md`  
 **Scope audit:** `M2_FAMILY_EXPERIENCE_AUDIT.md`  
-**Client feedback:** `Family Experience.pdf` + careseeker onboarding video/screenshots
+**Client feedback:** `Family Experience.pdf` + careseeker onboarding video/screenshots  
+**Handoffs:** `CHAT_CONTEXT_FAMILY_ONBOARDING_R3.md` · `CHAT_CONTEXT_M2_POLISH_2026-07-21.md`
 
 > Signed M2 clinical deliverables are **done**.  
 > This revision improves the **Family App** so it stays simple, while staff keep the detailed clinical workflows already built.
@@ -47,8 +48,9 @@ Make the Family App feel like a modern care service:
 | Client demo of M2 | ✅ Done |
 | Client feedback — Family Experience PDF | 📥 Received |
 | Client clarification — family onboarding = careseeker UX | 📥 Confirmed 2026-07-21 |
-| M2 Revision (this doc) | 🟡 In progress — R3 done |
-| Milestone 3 (care plans, scheduling, notes) | ⏸ After revision |
+| M2 Revision (this doc) | 🟡 In progress — R1–R6 + polish done; R7–R8 optional |
+| **M2 Security remediation** | 🔴 Open — see `M2_SECURITY_REMEDIATION.md` (**gate before M3**) |
+| Milestone 3 (care plans, scheduling, notes) | ⏸ After revision **and** security Wave A |
 
 ---
 
@@ -56,12 +58,12 @@ Make the Family App feel like a modern care service:
 
 | # | Item | Priority | Status | Notes |
 |---|---|---|---|---|
-| R1 | Family language rename | **P0** | ⏳ | Episodes → Care Journey · Assessments → Consultation |
-| R2 | Hide internal IDs / workflow noise from family | **P0** | ⏳ | No episode IDs, no raw status codes |
+| R1 | Family language rename | **P0** | ✅ Done | Nav + pages: Care Journey / Appointments / Consultation |
+| R2 | Hide internal IDs / workflow noise from family | **P0** | ✅ Done | Status map via `familyLanguage.ts`; no IDs; diagnoses hidden on family episode |
 | R3 | **Replace** family clinical wizard with careseeker 6-step UX | **P0** | ✅ Done | `/family/onboarding` = careseeker UX → `submitIntake` |
-| R4 | Family dashboard cleanup | **P0** | ⏳ | Only useful family sections |
-| R5 | Care Journey milestone view | **P1** | ⏳ | Simple visual milestones for family |
-| R6 | Coordinator next-action polish | **P1** | ⏳ | Clearer intake next steps (still M2 queue) |
+| R4 | Family dashboard cleanup | **P0** | ✅ Done | Family Home primary actions + Coming later; Care Plans/Messages de-emphasized |
+| R5 | Care Journey milestone view | **P1** | ✅ Done | Family milestones via `familyJourneyMilestones.ts` (Care Plan locked M3) |
+| R6 | Coordinator next-action polish | **P1** | ✅ Done | Next actions card + doc request + urgency PATCH + schedule from intake |
 | R7 | “Talk to Us” / help request | **P2** | ⏳ | Lightweight follow-up entry |
 | R8 | Role blurbs in staff portals | **P2** | ⏳ | Coordinator / Clinical / Family / Support copy |
 
@@ -118,15 +120,16 @@ Enhancements on top of reuse:
 ### Suggested coding order next
 
 1. ~~**R3 first**~~ ✅  
-2. Then R1 + R2 (language + hide IDs) on family portal  
-3. Then R4 / R5  
-4. Optional R6–R8  
+2. ~~**R1 + R2** (language + hide IDs)~~ ✅  
+3. ~~**R4 / R5**~~ ✅  
+4. ~~**R6**~~ ✅  
+5. Optional R7–R8  
 
 ---
 
 ## Build Details
 
-### R1 — Family language rename
+### R1 — Family language rename ✅ Done
 
 | Internal (staff) | Family App label |
 |---|---|
@@ -137,10 +140,10 @@ Enhancements on top of reuse:
 | Goal | Care Goal |
 | Outcome report | Progress Summary |
 
-**Where to change:** Family nav, family dashboard cards, family episode/assessment pages, toasts/copy on family routes only.  
+**Shipped:** Family nav (`proposalRoleShells`), episode list/detail, appointments page, dashboard stats labels, patient care-journey links. Shared helpers in `client/src/lib/familyLanguage.ts`.  
 **Do not rename** staff portal clinical terms unless copy is clearly family-facing.
 
-### R2 — Hide internal complexity from family
+### R2 — Hide internal complexity from family ✅ Done
 
 Family must **not** see:
 
@@ -148,6 +151,7 @@ Family must **not** see:
 - Raw statuses like `under_review`, `episode_created`
 - State-machine advance buttons
 - Internal approval / audit technical detail
+- Diagnoses / medical history / meds on family episode detail (staff-only)
 
 Map statuses to simple family text:
 
@@ -158,6 +162,8 @@ Map statuses to simple family text:
 | Episode created / validated | Care journey started |
 | Assessment scheduled | Consultation booked |
 | Assessment completed | Consultation completed |
+
+**Shipped:** Status badges/filters use `familyLanguage` maps; family episode detail hides clinical fields + intake chip noise; no episode IDs shown as primary UI.
 
 ### R3 — Replace family clinical wizard with careseeker 6-step UX
 
@@ -217,7 +223,7 @@ Request received
   → (Care Plan Ready — M3, show as upcoming / locked)
 ```
 
-### R6 — Coordinator polish
+### R6 — Coordinator polish ✅ Done
 
 Keep `/coordinator/intake` as the main queue. Improve clarity of next actions:
 
@@ -225,6 +231,8 @@ Keep `/coordinator/intake` as the main queue. Improve clarity of next actions:
 - Request missing documents
 - Schedule consultation
 - Escalate urgency
+
+**Shipped:** Next-actions card + queue hints (`coordinatorIntakeNextActions.ts`); `PATCH /intake/:id/urgency`; coordinator document request via `POST /document-requests`; schedule CTA + `canSchedule` on coordinator episodes.
 
 Do **not** build Care Plan Management, AI draft, or Communication Hub here.
 
@@ -334,10 +342,13 @@ Same as M2 (`Password123!`):
 |---|---|
 | `M2_FAMILY_EXPERIENCE_AUDIT.md` | Scope vs client feedback |
 | `MILESTONE_TWO_REVISION_TEST.md` | Visual test flows for this revision |
+| `M2_SECURITY_REVIEW.md` | Source-code security audit (Karim, 2026-07-20) |
+| `M2_SECURITY_REMEDIATION.md` | **Security fix tracker + auditor reply draft** |
+| `M2_SECURITY_REMEDIATION_TEST.md` | Security retest flows by wave |
 | `MILESTONE_TWO.md` | Original signed M2 tracker (clinical done) |
 | `MILESTONE_TWO_TEST.md` | Original M2 clinical test guide |
 | `Family Experience.pdf` | Client design feedback |
-| `MILESTONE_SPECS.md` § M3 | Next milestone after revision |
+| `MILESTONE_SPECS.md` § M3 | Next milestone after revision + security Wave A |
 
 ---
 
@@ -349,3 +360,9 @@ Same as M2 (`Password123!`):
 | 2026-07-20 | Client shared careseeker onboarding screenshots — R3 redefined around that UX. |
 | 2026-07-21 | Client confirmed: **family onboarding must be the same careseeker onboarding** (replace clinical 8-step as primary). Approach documented; implementation pending approval. |
 | 2026-07-21 | **R3 shipped:** `/family/onboarding` = careseeker 6-step → M2 intake. Clinical wizard preserved as `FamilyClinicalOnboardingPage.tsx`. |
+| 2026-07-21 | Evening polish: separate profile/request edits, lifecycle step-4, bookings findings UI, shell scroll — see `CHAT_CONTEXT_M2_POLISH_2026-07-21.md`. |
+| 2026-07-22 | Docs synced after polish. **Next:** finish R1 + R2 (family language + hide IDs/statuses). |
+| 2026-07-22 | **R1 + R2 shipped:** family language + status maps on journey/appointments/patient pages. **Next:** R4 dashboard cleanup + R5 milestones. |
+| 2026-07-22 | **R4 + R5 shipped:** Family Home cleanup + care-journey milestones (Care Plan locked). **Next:** optional R6–R8. |
+| 2026-07-22 | **R6 shipped:** coordinator next-actions on intake (review / docs / schedule / escalate). **Next:** optional R7–R8. |
+| 2026-07-22 | Security audit intake: `M2_SECURITY_REMEDIATION.md` opened. **M3 gated on security Wave A** (not on R7–R8). |

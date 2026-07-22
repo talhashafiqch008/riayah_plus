@@ -1,8 +1,8 @@
 # Milestone 2 — Family Experience Feedback Audit
 
 **Created:** 2026-07-20  
-**Updated:** 2026-07-20 — incorporated client careseeker onboarding screenshots as the UX baseline for R3  
-**Source of feedback:** `docx/Family Experience.pdf` (client, after M2 demo) + careseeker onboarding video/screenshots  
+**Updated:** 2026-07-22 — R1–R6 shipped; polish logged; optional R7–R8 next  
+**Source of feedback:** `docx/Family Experience.pdf` (client, after M2 demo) + careseeker onboarding video/screenshots + polish session `CHAT_CONTEXT_M2_POLISH_2026-07-21.md`  
 **Compared against:** Signed M2 proposal + what we delivered locally  
 **Purpose:** Separate **M2 revision** (simple family UX with current implementation) from **later milestones / out of scope**.
 
@@ -21,7 +21,7 @@ It is a **product design direction**:
 | Area | Verdict |
 |---|---|
 | Signed M2 clinical backend + staff flows | ✅ Delivered |
-| Family App simplicity / language / guided journey | 🟡 Partial — this is the main M2 revision opportunity |
+| Family App simplicity / language / guided journey | ✅ Core revision done (R1–R5); optional R6–R8 remain |
 | Care plans, scheduling engine, telehealth, payments, AI, messaging hub | ❌ Not M2 — M3 / M4 / excluded |
 
 **Bottom line:**  
@@ -158,20 +158,24 @@ Family should **not** fill long clinical forms.
 
 | Client expectation | Current M2 reality | Verdict |
 |---|---|---|
-| Short, simple family onboarding (careseeker-style) | 8-step clinical wizard is primary family path; careseeker UX exists but not wired as M2 family intake | 🟡 M2 revision — enhance careseeker flow + wire to intake |
-| Family language (“Care Journey”, “Consultation”) | Staff terms shown to family (“Episode”, “Assessment”) | 🟡 M2 revision |
-| Hide internal IDs / workflow states from family | Family can see episode statuses / technical labels | 🟡 M2 revision |
-| Backend auto-creates Care Unit / Patient / Intake / Episode after simple submit | Family fills clinical detail; coordinator creates episode on review | 🟡 Partial — can simplify family path in revision |
-| Book consultation from availability | Coordinator schedules assessment; no family self-booking slots | ❌ M3 (scheduling engine) |
+| Short, simple family onboarding (careseeker-style) | ✅ `/family/onboarding` = careseeker 6-step → M2 intake (R3) | ✅ Done |
+| Family language (“Care Journey”, “Consultation”) | ✅ Nav + journey/appointments pages + `familyLanguage.ts` | ✅ Done (R1) |
+| Hide internal IDs / workflow states from family | ✅ Status maps; no IDs; diagnoses/clinical fields hidden on family episode | ✅ Done (R2) |
+| Backend auto-creates Care Unit / Patient / Intake after simple submit | ✅ Wired; episode still on coordinator review | ✅ Done (episode gate kept) |
+| Book consultation from availability | Coordinator / family book on episode — not live roster engine | ❌ M3 (scheduling engine) |
 | Family Care Plan view / approval | Placeholder / empty | ❌ M3 |
 | Progress / goals tracking | Not built | ❌ M3 |
 | Telehealth join | Not M2 product | ❌ M4 |
 | Messages hub | Placeholder | ❌ M4 |
 | Quotations & payments | Not M2 | ❌ M4 |
-| “Talk to Us” / callback help | Not present | 🟡 Small M2 revision possible |
+| “Talk to Us” / callback help | Not present | 🟡 Small M2 revision possible (R7) |
 | AI care-plan draft for coordinator | Explicitly excluded | ❌ Out of scope |
 | Full coordinator Action Center / Care Plan Management / Communication Hub | Intake queue + patients + episodes only | ❌ Mostly M3 / M4 |
-| Role definitions documented | Roles exist in shells; family UX still feels clinical | 🟡 M2 revision (copy + role help) |
+| Role definitions documented | Family Guardian blurbs on onboarding; staff blurbs still open | 🟡 R8 still open |
+| Family Care Unit shows request summary | ✅ `FamilyCareRequestPanel` on care unit + coordinator | ✅ Done |
+| Separate edit request vs profile | ✅ Polish session | ✅ Done |
+| Family dashboard only useful sections | ✅ Family Home primary actions + Coming later | ✅ Done (R4) |
+| Care Journey milestones on home | ✅ Detail milestones + Care Plan locked (M3) | ✅ Done (R5) |
 
 ---
 
@@ -315,12 +319,13 @@ Do **not** build full Care Plan Management / AI draft / Communication Hub in M2 
 
 | Priority | Item | Effort | Impact |
 |---|---|---|---|
-| P0 | Family language rename + hide internal IDs/statuses | Small | High |
-| P0 | Enhance careseeker-style family onboarding + wire to M2 intake | Medium | High |
-| P1 | Family Care Journey milestone view | Small–Medium | High |
-| P1 | Family dashboard cleanup (remove staff-like clutter) | Small | High |
-| P2 | “Talk to Us” / help request | Small | Medium |
-| P2 | Role blurbs in staff portals | Small | Medium |
+| P0 | ~~Family language rename + hide internal IDs/statuses~~ | Small | High | ✅ Done (R1/R2) |
+| P0 | ~~Enhance careseeker-style family onboarding + wire to M2 intake~~ | Medium | High | ✅ Done (R3) |
+| P1 | ~~Family Care Journey milestone view~~ | Small–Medium | High | ✅ Done (R5) |
+| P1 | ~~Family dashboard cleanup (remove staff-like clutter)~~ | Small | High | ✅ Done (R4) |
+| P2 | “Talk to Us” / help request | Small | Medium | ⏳ |
+| P2 | Role blurbs in staff portals | Small | Medium | ⏳ |
+| P1 | Coordinator next-action polish | Small | Medium | ✅ Done (R6) |
 
 ---
 

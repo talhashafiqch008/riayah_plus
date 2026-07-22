@@ -2,10 +2,11 @@
 
 Use this document to visually verify **M2 Family Experience revision** work as it ships.
 
-**Last updated:** 2026-07-21 (family onboarding = careseeker UX replace)  
+**Last updated:** 2026-07-22 (R1–R6 done · polish logged · R7–R8 optional)  
 **Companion tracker:** `MILESTONE_TWO_REVISION.md`  
 **Scope audit:** `M2_FAMILY_EXPERIENCE_AUDIT.md`  
-**Original M2 clinical tests:** `MILESTONE_TWO_TEST.md` (still valid for staff flows)
+**Original M2 clinical tests:** `MILESTONE_TWO_TEST.md` (still valid for staff flows)  
+**Handoffs:** `CHAT_CONTEXT_FAMILY_ONBOARDING_R3.md` · `CHAT_CONTEXT_M2_POLISH_2026-07-21.md`
 
 > **Client decision:** `/family/onboarding` must show the **same careseeker 6-step UI**, not the clinical 8-step wizard. Backend intake → coordinator remains.
 
@@ -17,17 +18,17 @@ Use this document to visually verify **M2 Family Experience revision** work as i
 
 | Revision item (tracker) | Test flow below | Status |
 |---|---|---|
-| R1 Family language rename | **Flow R1** | ⏳ NOT READY |
-| R2 Hide internal IDs / statuses | **Flow R2** | ⏳ NOT READY |
+| R1 Family language rename | **Flow R1** | ✅ READY |
+| R2 Hide internal IDs / statuses | **Flow R2** | ✅ READY |
 | R3 **Replace** family wizard with careseeker 6-step | **Flow R3** | ✅ READY |
-| R4 Family dashboard cleanup | **Flow R4** | ⏳ NOT READY |
-| R5 Care Journey milestones | **Flow R5** | ⏳ NOT READY |
-| R6 Coordinator next-action polish | **Flow R6** | ⏳ NOT READY |
+| R4 Family dashboard cleanup | **Flow R4** | ✅ READY |
+| R5 Care Journey milestones | **Flow R5** | ✅ READY |
+| R6 Coordinator next-action polish | **Flow R6** | ✅ READY |
 | R7 Talk to Us | **Flow R7** | ⏳ NOT READY |
 | R8 Role blurbs | **Flow R8** | ⏳ NOT READY |
 | Regression — staff M2 path still works | **Flow REG** | ✅ READY (existing M2) |
 
-**Ready to test today:** Flow REG + **Flow R3**. Unlock R1/R2/R4–R8 as each item ships.
+**Ready to test today:** Flow REG + **Flows R1–R6**.
 
 ---
 
@@ -59,7 +60,7 @@ All passwords: **`Password123!`**
 
 | Role | Email | Path |
 |---|---|---|
-| Family | `family@demo.com` | `/family` |
+| Family | `family@demo.com` or `family2@demo.com` | `/family` |
 | Coordinator | `coordinator@riayahplus.com` | `/coordinator/intake` |
 | Clinical | `clinical@demo.com` | `/clinical/schedule` |
 
@@ -83,9 +84,9 @@ All passwords: **`Password123!`**
 
 ---
 
-### Flow R1 — Family language rename ⏳ NOT READY
+### Flow R1 — Family language rename ✅ READY
 
-> **Unlock when:** Family nav and family pages use Care Journey / Consultation wording.
+> Family nav and family pages use Care Journey / Consultation wording.
 
 **Goal:** Families see simple language; staff can keep clinical terms.
 
@@ -94,15 +95,16 @@ All passwords: **`Password123!`**
    - Prefer **Care Journey** (not “Episodes”)  
    - Prefer **Appointments** or **Consultations** (not raw “Assessments” if shown to family)  
 3. Open Care Journey list/detail — headings use family language  
-4. Login coordinator — staff screens may still say Episode / Assessment  
+4. Open Appointments (`/family/bookings`) — title says Appointments; statuses say Consultation booked/completed  
+5. Login coordinator — staff screens may still say Episode / Assessment  
 
 **Pass if:** Family UI uses the language map; staff clinical terms remain clear.
 
 ---
 
-### Flow R2 — Hide internal IDs / statuses ⏳ NOT READY
+### Flow R2 — Hide internal IDs / statuses ✅ READY
 
-> **Unlock when:** Family screens hide episode IDs and raw status codes.
+> Family screens hide episode IDs and raw status codes.
 
 **Goal:** No hospital-system noise for families.
 
@@ -110,6 +112,7 @@ All passwords: **`Password123!`**
 2. Confirm you do **not** see:
    - Long Care Episode IDs as primary UI
    - Raw values like `under_review`, `episode_created`
+   - Diagnoses / medical history / meds on family care-journey detail
 3. Confirm you **do** see simple wording, for example:
    - Request received
    - Care team reviewing
@@ -158,21 +161,19 @@ All passwords: **`Password123!`**
 
 ---
 
-### Flow R4 — Family dashboard cleanup ⏳ NOT READY
+### Flow R4 — Family dashboard cleanup ✅ READY
 
-> **Unlock when:** Family dashboard/nav shows only useful family sections.
+> Family dashboard/nav shows only useful family sections.
 
 **Goal:** Family Home feels like a care service, not a staff console.
 
 1. Login family → `/family`  
 2. Confirm useful sections exist:
-   - Home / dashboard
-   - Care Journey
-   - Appointments / Consultations
-   - Documents
-   - Messages (placeholder OK)
-   - Request support / Talk to Us (if shipped)
-3. Confirm family does **not** see:
+   - Home / dashboard with **What you can do** (request, journey, appointments, documents)
+   - Care Journey / Appointments in nav (before Care Plans)
+   - Documents / Messages placeholders OK
+3. Confirm **Coming later** lists Care Plans + Messages (not presented as live builders)
+4. Confirm family does **not** see:
    - Staff advance-status controls
    - Care Plan builder tools
    - Internal approval workflows  
@@ -181,40 +182,43 @@ All passwords: **`Password123!`**
 
 ---
 
-### Flow R5 — Care Journey milestones ⏳ NOT READY
+### Flow R5 — Care Journey milestones ✅ READY
 
-> **Unlock when:** Family Care Journey shows simple milestone progress.
+> Family Care Journey shows simple milestone progress.
 
 **Goal:** Family understands where they are in the journey.
 
 1. Have a request that progressed at least to consultation scheduled/completed  
 2. Login family → Care Journey detail  
-3. Confirm a simple milestone list/timeline is visible, for example:
+3. Confirm a simple milestone list is visible:
    - Request received
    - Care team reviewing
    - Care journey started
    - Consultation booked
    - Consultation completed
-4. Optional: later milestones like “Care Plan Ready” can show locked / coming soon (M3)  
+   - Care plan ready (**Coming soon** / locked)  
+4. Confirm staff coordinator episode detail still shows Lifecycle + advance controls  
 
 **Pass if:** Milestones match real progress and are understandable without training.
 
 ---
 
-### Flow R6 — Coordinator next-action polish ⏳ NOT READY
+### Flow R6 — Coordinator next-action polish ✅ READY
 
-> **Unlock when:** Intake queue / detail shows clearer next actions.
+> Intake queue / detail shows clearer next actions.
 
 **Goal:** Coordinator still owns clinical power, with clearer next steps.
 
 1. Login coordinator → `/coordinator/intake`  
 2. Open a new family request  
-3. Confirm next actions are clear, for example:
+3. Confirm **Next actions** card shows relevant items, for example:
    - Review new request
    - Request missing documents
-   - Schedule consultation
+   - Schedule consultation (after episode exists)
    - Escalate urgency  
-4. Complete structured review → journey/episode created  
+4. Try escalate → urgency badge rises; try request docs → family notified  
+5. After structured review → **Schedule consultation** opens episode (coordinator can book)  
+6. Complete structured review → journey/episode created  
 
 **Pass if:** Actions are understandable; structured review still required (not free-text-only).
 
@@ -301,19 +305,15 @@ Run this full story for client re-demo once R1–R5 (and ideally R3) are Done:
 
 ## 6. Suggested Test Order
 
-### After R1 + R2 ship (~10 min)
+### Ready now (~20 min)
 
 1. Flow R1  
 2. Flow R2  
-3. Flow REG  
-
-### After R3 + R4 + R5 ship (~20 min)
-
-1. Flow R3  
-2. Flow R4  
-3. Flow R5  
-4. Happy path §3  
-5. Flow REG  
+3. Flow R3  
+4. Flow R4  
+5. Flow R5  
+6. Flow R6  
+7. Flow REG  
 
 ### Optional P2
 
@@ -327,12 +327,12 @@ Run this full story for client re-demo once R1–R5 (and ideally R3) are Done:
 | # | Flow | Ready? | Pass | Fail | Notes |
 |---|---|---|---|---|---|
 | REG | Staff M2 regression | ✅ | | | |
-| R1 | Family language | ⏳ | | | |
-| R2 | Hide IDs / statuses | ⏳ | | | |
+| R1 | Family language | ✅ | | | |
+| R2 | Hide IDs / statuses | ✅ | | | |
 | R3 | Replace family onboarding with careseeker UX | ✅ | | | |
-| R4 | Family dashboard cleanup | ⏳ | | | |
-| R5 | Care Journey milestones | ⏳ | | | |
-| R6 | Coordinator polish | ⏳ | | | |
+| R4 | Family dashboard cleanup | ✅ | | | |
+| R5 | Care Journey milestones | ✅ | | | |
+| R6 | Coordinator polish | ✅ | | | |
 | R7 | Talk to Us | ⏳ | | | |
 | R8 | Role blurbs | ⏳ | | | |
 | E2E | Revision happy path §3 | ⏳ | | | |

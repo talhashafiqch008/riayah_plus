@@ -290,11 +290,36 @@ export class AuthController {
       },
     });
 
-    if (!record) throw new AppError('Invalid or expired reset token.', 422);
+    if (!record?.userId) throw new AppError('Invalid or expired reset token.', 422);
 
+    const userId = record.userId;
     const hashed = await bcrypt.hash(password, env.BCRYPT_ROUNDS);
-    await prisma.user.update({ where: { id: record.userId! }, data: { passwordHash: hashed } });
-    await prisma.otpVerification.update({ where: { id: record.id }, data: { verifiedAt: new Date() } });
+
+    // M-39/M-40: single-use reset + revoke all sessions/tokens for the user
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { passwordHash: hashed } }),
+      prisma.otpVerification.deleteMany({
+        where: { userId, type: 'password_reset' },
+      }),
+      prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+    await recordLogoutAll(userId);
+    clearAuthCookies(res);
+
+    await AuditService.log({
+      userId,
+      action: 'password_reset',
+      entity: 'User',
+      entityId: userId,
+      req,
+    });
 
     res.json({ message: 'Password reset successfully.' });
   }
@@ -332,13 +357,25 @@ export class AuthController {
   }
 
   static async disable2fa(req: Request, res: Response): Promise<void> {
-    const { password } = z.object({ password: z.string() }).parse(req.body);
+    const { password, code } = z
+      .object({ password: z.string(), code: z.string().min(6).max(8) })
+      .parse(req.body);
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) throw new AppError('User not found.', 404);
 
     if (!(await bcrypt.compare(password, user.passwordHash))) {
       throw new AppError('Invalid password.', 401);
     }
+
+    // M-41: require fresh TOTP before disabling 2FA
+    if (!user.twoFactorSecret) throw new AppError('2FA is not configured.', 400);
+    const valid = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: 'base32',
+      token: code,
+      window: 1,
+    });
+    if (!valid) throw new AppError('Invalid authentication code.', 422);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -496,7 +533,9 @@ export class AuthController {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!record) {
+    // M-50: token must be bound to the user for this email
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (!record || !user || !record.userId || record.userId !== user.id) {
       res.status(400).send(`
         <html>
           <body style="font-family: sans-serif; padding: 24px;">
@@ -508,13 +547,12 @@ export class AuthController {
       return;
     }
 
-    await prisma.otpVerification.update({
-      where: { id: record.id },
-      data: { verifiedAt: new Date() },
+    await prisma.otpVerification.deleteMany({
+      where: { userId: user.id, type: 'email_verification' },
     });
 
     await prisma.user.update({
-      where: { email },
+      where: { id: user.id },
       data: { isEmailVerified: true, emailVerifiedAt: new Date() },
     });
 

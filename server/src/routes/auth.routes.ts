@@ -14,18 +14,40 @@ import { setAuthCookies } from '../utils/authCookies';
 
 const router = Router();
 
-// Admin secret login — issues a token for an admin user using a shared secret
+// Admin secret login — disabled by default (M-48). Enable only with ALLOW_ADMIN_SECRET_LOGIN=true.
 router.post('/admin/login', adminLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (process.env.ALLOW_ADMIN_SECRET_LOGIN !== 'true') {
+      throw new AppError('Admin secret login is disabled.', 403);
+    }
     const { secret, email } = req.body;
-    if (!secret || secret !== env.ADMIN_SECRET) throw new AppError('Invalid admin secret.', 401);
+    if (!secret || !env.ADMIN_SECRET || secret !== env.ADMIN_SECRET) {
+      throw new AppError('Invalid admin secret.', 401);
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !['admin', 'super_admin'].includes(user.role)) throw new AppError('Admin user not found.', 404);
+    if (!user || !['admin', 'super_admin'].includes(user.role)) {
+      throw new AppError('Admin user not found.', 404);
+    }
 
     const token = generateAccessToken({ userId: user.id, role: user.role, email: user.email });
     setAuthCookies(res, token);
-    res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+
+    const { AuditService } = await import('../services/AuditService');
+    await AuditService.log({
+      userId: user.id,
+      action: 'admin_secret_login',
+      entity: 'User',
+      entityId: user.id,
+      after: { method: 'ADMIN_SECRET', email: user.email },
+      req,
+    });
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
   } catch (err) {
     next(err);
   }

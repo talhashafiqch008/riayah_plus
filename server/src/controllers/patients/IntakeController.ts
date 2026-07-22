@@ -14,6 +14,8 @@ import { tenantWhere } from '../../middleware/tenantScope';
 import { assertIntakeTransition } from '../../utils/stateMachine';
 import { sanitizedString, optionalSanitizedString } from '../../utils/sanitize';
 import { NotificationService } from '../../services/NotificationService';
+import { assertTenantOrgAccess } from '../../middleware/tenantAccess';
+import { resolveEpisodePartyIds } from '../../utils/careAccess';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -50,10 +52,10 @@ const submitIntakeSchema = z.object({
 });
 
 const reviewSchema = z.object({
-  keyConcerns: z.array(z.string().min(1)).min(1),
-  urgencyIndicators: z.array(z.string().min(1)).min(1),
+  keyConcerns: z.array(sanitizedString(z.string().min(1))).min(1),
+  urgencyIndicators: z.array(sanitizedString(z.string().min(1))).min(1),
   suggestedServiceCategories: z.array(serviceEnum).min(1),
-  riskFlags: z.array(z.string().min(1)).default([]),
+  riskFlags: z.array(sanitizedString(z.string().min(1))).default([]),
   createEpisode: z.boolean().optional().default(true),
   episodeTitle: optionalSanitizedString(),
   notes: optionalSanitizedString(),
@@ -179,19 +181,22 @@ function assertIntakeAccess(
 ): void {
   const role = req.user!.role;
   if (isFamily(role) && intake.familyUserId === req.user!.userId) return;
-  if (isCoordinator(role) || isAdmin(role)) {
+
+  // Platform admins may access any intake.
+  if (isAdmin(role)) return;
+
+  if (role === 'care_coordinator') {
     const tw = tenantWhere(req);
-    if (tw.organizationId === '__no_tenant__') {
+    if (!tw.organizationId || tw.organizationId === '__no_tenant__') {
       throw new AppError('No organization assigned to this account.', 403);
     }
-    if (
-      tw.organizationId &&
-      intake.organizationId !== tw.organizationId
-    ) {
+    // M-1 / M-13: reject null-org intakes for coordinators
+    if (!intake.organizationId || intake.organizationId !== tw.organizationId) {
       throw new AppError('Forbidden.', 403);
     }
     return;
   }
+
   throw new AppError('Forbidden.', 403);
 }
 
@@ -212,6 +217,9 @@ export class IntakeController {
 
     if (isFamily(role) && unit.familyUserId !== req.user!.userId) {
       throw new AppError('Forbidden.', 403);
+    }
+    if (isCoordinator(role) || isAdmin(role)) {
+      assertTenantOrgAccess(req, unit.organizationId);
     }
 
     const recipient = await prisma.careRecipient.findFirst({
@@ -568,6 +576,14 @@ export class IntakeController {
       );
     }
 
+    // M-22: block withdrawal once an episode exists
+    if (status === 'withdrawn' && intake.careEpisodeId) {
+      throw new AppError(
+        'Cannot withdraw an intake that already has a care episode. Contact your coordinator.',
+        422,
+      );
+    }
+
     const updated = await prisma.intakeRecord.update({
       where: { id: intake.id },
       data: { status },
@@ -580,6 +596,55 @@ export class IntakeController {
       entityId: intake.id,
       before: { status: intake.status },
       after: { status: updated.status },
+      req,
+    });
+
+    if (status === 'withdrawn' && intake.reviewerId) {
+      try {
+        await NotificationService.create({
+          userId: intake.reviewerId,
+          title: 'Intake withdrawn',
+          body: 'A family withdrew an intake that was under review.',
+          type: 'intake_withdrawn',
+          data: { intakeId: intake.id },
+        });
+      } catch (err) {
+        console.error('intake_withdrawn notification failed', err);
+      }
+    }
+
+    res.json({ data: updated });
+  }
+
+  /** Coordinator raises intake urgency for queue priority (R6). */
+  static async updateUrgency(req: Request, res: Response): Promise<void> {
+    if (!isCoordinator(req.user!.role)) {
+      throw new AppError('Care coordinator access required.', 403);
+    }
+
+    const intake = await loadIntakeOrThrow(req.params.id);
+    assertIntakeAccess(req, intake);
+
+    const { urgencyLevel } = z
+      .object({ urgencyLevel: urgencyEnum })
+      .parse(req.body);
+
+    if (intake.status === 'withdrawn') {
+      throw new AppError('Cannot change urgency on a withdrawn intake.', 422);
+    }
+
+    const updated = await prisma.intakeRecord.update({
+      where: { id: intake.id },
+      data: { urgencyLevel },
+    });
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'intake_urgency_changed',
+      entity: 'IntakeRecord',
+      entityId: intake.id,
+      before: { urgencyLevel: intake.urgencyLevel },
+      after: { urgencyLevel: updated.urgencyLevel },
       req,
     });
 
@@ -639,11 +704,30 @@ export class IntakeController {
       });
 
       if (review.createEpisode) {
+        // Re-check inside transaction to prevent duplicate episodes (H-2).
+        const locked = await tx.intakeRecord.findUnique({
+          where: { id: intake.id },
+          select: { id: true, status: true, careEpisodeId: true },
+        });
+        if (!locked || locked.careEpisodeId) {
+          throw new AppError('Intake already has a care episode.', 409);
+        }
+        if (!['submitted', 'under_review', 'validated'].includes(locked.status)) {
+          throw new AppError('Intake is not open for episode creation.', 422);
+        }
+
+        const party = await resolveEpisodePartyIds({
+          careUnitId: intake.careUnitId,
+          careRecipientId: intake.careRecipientId,
+          patientId: intake.familyUserId,
+        });
+
         const episode = await tx.careEpisode.create({
           data: {
             coordinatorId: req.user!.userId,
-            patientId: intake.familyUserId,
-            careRecipientId: intake.careRecipientId,
+            // Account party = CareRecipient.userId (family guardian in M2). Clinical patient = careRecipientId (C-1).
+            patientId: party.patientId,
+            careRecipientId: party.careRecipientId,
             careUnitId: intake.careUnitId,
             organizationId: intake.organizationId ?? undefined,
             title:
@@ -662,12 +746,19 @@ export class IntakeController {
           },
         });
 
-        const linked = await tx.intakeRecord.update({
-          where: { id: intake.id },
+        const linkedResult = await tx.intakeRecord.updateMany({
+          where: { id: intake.id, careEpisodeId: null },
           data: {
             status: 'episode_created',
             careEpisodeId: episode.id,
           },
+        });
+        if (linkedResult.count !== 1) {
+          throw new AppError('Intake already has a care episode.', 409);
+        }
+
+        const linked = await tx.intakeRecord.findUniqueOrThrow({
+          where: { id: intake.id },
           include: {
             careEpisode: true,
             careRecipient: true,

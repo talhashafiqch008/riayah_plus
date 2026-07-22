@@ -22,6 +22,7 @@ import {
   mergeFamilyWizardPayload,
   type FamilyWizardDraft,
 } from '@/lib/familyCareseekerIntake';
+import { familyEpisodeStatusLabel, familyIntakeStatusLabel } from '@/lib/familyLanguage';
 
 type Props = {
   basePath: string;
@@ -42,14 +43,6 @@ function formatWhen(value?: string) {
     return value;
   }
 }
-
-const FAMILY_INTAKE_STATUS: Record<string, string> = {
-  submitted: 'Request received',
-  under_review: 'Care team reviewing',
-  validated: 'Care journey ready',
-  episode_created: 'Care journey started',
-  withdrawn: 'Withdrawn',
-};
 
 /** Same options as careseeker onboarding gender preference. */
 const GENDER_OPTIONS = [
@@ -511,7 +504,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
                   >
                     <span className="font-medium text-stone-900">{ep.title}</span>
                     <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                      {ep.status.replace(/_/g, ' ')}
+                      {isFamilyView
+                        ? familyEpisodeStatusLabel(ep.status)
+                        : ep.status.replace(/_/g, ' ')}
                     </span>
                   </Link>
                 </li>
@@ -544,7 +539,7 @@ export default function CarePatientDetailPage({ basePath }: Props) {
                   </span>
                   <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
                     {isFamilyView
-                      ? FAMILY_INTAKE_STATUS[intake.status] ?? intake.status.replace(/_/g, ' ')
+                      ? familyIntakeStatusLabel(intake.status)
                       : intake.status.replace(/_/g, ' ')}
                   </span>
                 </li>

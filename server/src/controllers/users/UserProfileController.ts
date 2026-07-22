@@ -1,17 +1,36 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import speakeasy from 'speakeasy';
 import { z } from 'zod';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
 import { anonymizeUser } from '../../utils/anonymizeUser';
+import { recordLogoutAll } from '../../middleware/auth';
+import { clearAuthCookies } from '../../utils/authCookies';
 
 const updatePasswordSchema = z.object({
   current_password: z.string(),
   password: z.string().min(8),
   password_confirmation: z.string(),
+  code: z.string().min(6).max(8).optional(),
+  totp: z.string().min(6).max(8).optional(),
 });
+
+const MIGRATE_ROLE_ALLOWLIST = [
+  'client',
+  'consumer',
+  'family',
+  'patient',
+  'provider',
+  'clinical_staff',
+  'care_coordinator',
+  'support_worker',
+  'doctor',
+  'nurse',
+] as const;
 
 const updateProfileSchema = z.object({
   name: z.string().min(2).optional(),
@@ -44,11 +63,38 @@ export class UserProfileController {
       throw new AppError('Current password is incorrect.', 422);
     }
 
+    // M-45: require TOTP when 2FA is enabled
+    if (user.twoFactorEnabled) {
+      const totpCode = data.code ?? data.totp;
+      if (!totpCode || !user.twoFactorSecret) {
+        throw new AppError('Two-factor authentication code is required.', 422);
+      }
+      const valid = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: 'base32',
+        token: totpCode,
+        window: 1,
+      });
+      if (!valid) throw new AppError('Invalid authentication code.', 422);
+    }
+
     const hashed = await bcrypt.hash(data.password, env.BCRYPT_ROUNDS);
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: hashed } });
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: user.id }, data: { passwordHash: hashed } }),
+      prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+    await recordLogoutAll(user.id);
+    clearAuthCookies(res);
     await AuditService.log({ userId: user.id, action: 'password_changed', req });
 
-    res.json({ message: 'Password updated.' });
+    res.json({ message: 'Password updated. Please sign in again.' });
   }
 
   static async updateProfile(req: Request, res: Response): Promise<void> {
@@ -132,11 +178,45 @@ export class UserProfileController {
   }
 
   static async migrateRole(req: Request, res: Response): Promise<void> {
+    // M-46: internal guard even if route middleware is misconfigured later
+    const adminRoles = ['admin', 'super_admin', 'support_admin'];
+    if (!req.user || !adminRoles.includes(req.user.role)) {
+      throw new AppError('Admin access required.', 403);
+    }
+
     const { userId, role } = z
-      .object({ userId: z.string(), role: z.string() })
+      .object({
+        userId: z.string().uuid().or(z.string().min(1)),
+        role: z.enum(MIGRATE_ROLE_ALLOWLIST),
+      })
       .parse(req.body);
 
-    await prisma.user.update({ where: { id: userId }, data: { role: role as any } });
+    // Never allow elevating to platform admin via this endpoint
+    if (adminRoles.includes(role)) {
+      throw new AppError('Cannot assign admin roles via migrateRole.', 403);
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, email: true },
+    });
+    if (!existing) throw new AppError('User not found.', 404);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: role as UserRole },
+    });
+
+    await AuditService.log({
+      userId: req.user.userId,
+      action: 'role_migrated',
+      entity: 'User',
+      entityId: userId,
+      before: { role: existing.role },
+      after: { role },
+      req,
+    });
+
     res.json({ message: 'Role updated.' });
   }
 }

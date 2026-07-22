@@ -16,13 +16,22 @@ async function requirePlanAccess(req: Request, planId: string) {
   const plan = await prisma.carePlan.findUnique({
     where: { id: planId },
     include: {
-      episode: { select: { organizationId: true, patientId: true } },
+      episode: {
+        select: {
+          organizationId: true,
+          patientId: true,
+          careUnit: { select: { familyUserId: true } },
+        },
+      },
     },
   });
   if (!plan) throw new AppError('Care plan not found.', 404);
 
   if (FAMILY_ROLES.includes(req.user!.role)) {
-    if (plan.episode.patientId !== req.user!.userId) {
+    const owns =
+      plan.episode.patientId === req.user!.userId ||
+      plan.episode.careUnit?.familyUserId === req.user!.userId;
+    if (!owns) {
       throw new AppError('Forbidden.', 403);
     }
   } else {

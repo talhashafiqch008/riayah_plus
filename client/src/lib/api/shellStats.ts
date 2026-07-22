@@ -101,8 +101,8 @@ async function fetchFamilyStats(): Promise<ShellStat[]> {
   ]);
 
   return [
-    { label: 'Active episodes', value: String(activeEpisodes) },
-    { label: 'Upcoming visits', value: String(upcomingVisits) },
+    { label: 'Active care journeys', value: String(activeEpisodes) },
+    { label: 'Upcoming appointments', value: String(upcomingVisits) },
     { label: 'Unread alerts', value: String(unread) },
   ];
 }

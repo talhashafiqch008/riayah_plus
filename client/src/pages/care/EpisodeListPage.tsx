@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
+import { familyEpisodeStatusLabel } from '@/lib/familyLanguage';
 
 type Props = {
   basePath: string;
@@ -11,12 +12,22 @@ type Props = {
   description?: string;
 };
 
-const STATUS_FILTERS = [
+const STAFF_STATUS_FILTERS = [
   { value: '', label: 'All statuses' },
   { value: 'intake_submitted', label: 'Intake submitted' },
   { value: 'under_review', label: 'Under review' },
   { value: 'validated', label: 'Validated' },
   { value: 'active', label: 'Active' },
+  { value: 'on_hold', label: 'On hold' },
+  { value: 'closed', label: 'Closed' },
+];
+
+const FAMILY_STATUS_FILTERS = [
+  { value: '', label: 'All statuses' },
+  { value: 'intake_submitted', label: 'Request received' },
+  { value: 'under_review', label: 'Care team reviewing' },
+  { value: 'validated', label: 'Care journey started' },
+  { value: 'active', label: 'Active care' },
   { value: 'on_hold', label: 'On hold' },
   { value: 'closed', label: 'Closed' },
 ];
@@ -45,6 +56,8 @@ export default function EpisodeListPage({
   title = 'Care Episodes',
   description = 'Track episode status from intake through active care.',
 }: Props) {
+  const familyFacing = basePath.startsWith('/family');
+  const statusFilters = familyFacing ? FAMILY_STATUS_FILTERS : STAFF_STATUS_FILTERS;
   const [rows, setRows] = useState<CareEpisode[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,11 +74,11 @@ export default function EpisodeListPage({
       setTotal(result.total);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load episodes');
+      else toast.error(familyFacing ? 'Failed to load care journeys' : 'Failed to load episodes');
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, familyFacing]);
 
   useEffect(() => {
     void load();
@@ -93,13 +106,16 @@ export default function EpisodeListPage({
           onChange={(e) => setStatus(e.target.value)}
           className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
         >
-          {STATUS_FILTERS.map((o) => (
+          {statusFilters.map((o) => (
             <option key={o.value || 'all'} value={o.value}>
               {o.label}
             </option>
           ))}
         </select>
-        <span className="text-sm text-stone-500">{total} episode{total === 1 ? '' : 's'}</span>
+        <span className="text-sm text-stone-500">
+          {total} {familyFacing ? 'journey' : 'episode'}
+          {total === 1 ? '' : 's'}
+        </span>
       </div>
 
       <div className="rounded-2xl border bg-white shadow-sm overflow-hidden divide-y">
@@ -109,7 +125,9 @@ export default function EpisodeListPage({
           </div>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-stone-500 text-sm">
-            No episodes yet. Complete intake review to create one.
+            {familyFacing
+              ? 'No care journeys yet. After you submit a care request, your care team will start one.'
+              : 'No episodes yet. Complete intake review to create one.'}
           </p>
         ) : (
           rows.map((ep) => (
@@ -127,12 +145,14 @@ export default function EpisodeListPage({
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(ep.status)}`}
                   >
-                    {ep.status.replace(/_/g, ' ')}
+                    {familyFacing
+                      ? familyEpisodeStatusLabel(ep.status)
+                      : ep.status.replace(/_/g, ' ')}
                   </span>
                 </div>
                 <p className="mt-0.5 text-sm text-stone-500">
                   {ep.careRecipient?.name || ep.patient?.name || 'Patient'}
-                  {ep.urgencyLevel ? ` · ${ep.urgencyLevel}` : ''}
+                  {!familyFacing && ep.urgencyLevel ? ` · ${ep.urgencyLevel}` : ''}
                   {ep.createdAt ? ` · ${new Date(ep.createdAt).toLocaleDateString()}` : ''}
                 </p>
                 {ep.reasonForCare && (

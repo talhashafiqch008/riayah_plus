@@ -23,9 +23,13 @@ export class DeviceTokenController {
 
     let record;
     if (existing) {
+      // M-42: do not re-bind a push token owned by another account
+      if (existing.userId !== userId) {
+        throw new AppError('Device token is already registered to another account.', 403);
+      }
       record = await prisma.pushNotificationToken.update({
         where: { id: existing.id },
-        data: { userId, platform, isActive: true },
+        data: { platform, isActive: true },
       });
     } else {
       record = await prisma.pushNotificationToken.create({

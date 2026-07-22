@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { CareUnitController } from '../controllers/patients/CareUnitController';
 import { authenticate } from '../middleware/auth';
+import { requireFamilyOrCoordinator } from '../middleware/rbac';
 
 const router = Router();
 router.use(authenticate);
+router.use(requireFamilyOrCoordinator);
 
 router.get('/', CareUnitController.index);
 router.post('/', CareUnitController.store);

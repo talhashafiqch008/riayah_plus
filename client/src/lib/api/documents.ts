@@ -172,6 +172,21 @@ async function getSignedUrl(key: string) {
 //     }
 // }
 
+export async function createCoordinatorDocumentRequest(payload: {
+  targetUserId: string;
+  documentType: string;
+  description?: string;
+  dueDate?: string;
+}) {
+  try {
+    const response = await client.post('/document-requests', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to createCoordinatorDocumentRequest', error);
+    throw extractDomainError(error);
+  }
+}
+
 export async function submitDocumentRequest(file: File, documentType: string, title?: string, description?: string) {
     try {
         const formData = new FormData();

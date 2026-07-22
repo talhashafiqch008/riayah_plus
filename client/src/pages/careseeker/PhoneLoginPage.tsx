@@ -79,6 +79,13 @@ export default function PhoneLoginPage() {
  return;
  }
 
+ // M-43: OTP no longer issues a full session — continue with password login
+ if (result.loginRequired || result.verified) {
+ toast.success(result.message || 'Phone verified. Please sign in with your password.');
+ navigate('/careseeker/login', { state: { phone: fullPhoneNumber, verified: true } });
+ return;
+ }
+
  if (result.accessToken) {
  toast.success('Phone verified successfully!');
  localStorage.setItem(STORAGE_KEYS.token, result.accessToken);

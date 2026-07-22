@@ -12,6 +12,12 @@ import { DisputeController } from '../controllers/disputes/DisputeController';
 import { NoShowPenaltyService } from '../services/NoShowPenaltyService';
 import extrasController from '../controllers/booking/BookingExtrasController';
 import { assertAppointmentTransition } from '../utils/stateMachine';
+import {
+  assertBookingAccess,
+  assertBookingClient,
+  assertBookingProvider,
+  loadBookingOrThrow,
+} from '../utils/bookingAccess';
 
 const router = Router();
 router.use(authenticate);
@@ -74,6 +80,9 @@ router.get('/', async (req: Request, res: Response) => {
   res.json({ bookings, total });
 });
 
+// Upcoming (must be before /:id)
+router.get('/upcoming', extrasController.getUpcoming.bind(extrasController));
+
 // Get single booking
 router.get('/:id', async (req: Request, res: Response) => {
   const booking = await prisma.booking.findUnique({
@@ -81,21 +90,21 @@ router.get('/:id', async (req: Request, res: Response) => {
     include: { client: { select: { id: true, name: true } }, provider: { select: { id: true, name: true } }, payment: true },
   });
   if (!booking) throw new AppError('Booking not found.', 404);
-
-  const { userId, role } = req.user!;
-  const isOwner = booking.clientId === userId || booking.providerId === userId;
-  const isAdmin = role === 'admin' || role === 'super_admin';
-  if (!isOwner && !isAdmin) throw new AppError('Forbidden.', 403);
+  assertBookingAccess(req, booking);
 
   res.json({ booking });
 });
 
-// Accept/reject booking
+// Accept/reject booking — provider accepts/rejects; client may cancel
 router.patch('/:id/status', async (req: Request, res: Response) => {
   const { status, reason } = z.object({ status: z.enum(['accepted','rejected','cancelled']), reason: z.string().optional() }).parse(req.body);
 
-  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
-  if (!existing) throw new AppError('Booking not found.', 404);
+  const existing = await loadBookingOrThrow(req.params.id);
+  if (status === 'cancelled') {
+    assertBookingAccess(req, existing);
+  } else {
+    assertBookingProvider(req, existing);
+  }
 
   assertAppointmentTransition(existing.status, status);
 
@@ -115,8 +124,8 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
 // Start booking
 router.post('/:id/start', async (req: Request, res: Response) => {
-  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
-  if (!existing) throw new AppError('Booking not found.', 404);
+  const existing = await loadBookingOrThrow(req.params.id);
+  assertBookingProvider(req, existing);
 
   assertAppointmentTransition(existing.status, 'in_progress');
 
@@ -129,8 +138,8 @@ router.post('/:id/start', async (req: Request, res: Response) => {
 
 // Complete booking
 router.post('/:id/complete', async (req: Request, res: Response) => {
-  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
-  if (!existing) throw new AppError('Booking not found.', 404);
+  const existing = await loadBookingOrThrow(req.params.id);
+  assertBookingProvider(req, existing);
 
   assertAppointmentTransition(existing.status, 'completed');
 
@@ -146,6 +155,7 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
 router.post('/:id/pay-with-credits', bookingLimiter, async (req: Request, res: Response) => {
   const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
   if (!booking) throw new AppError('Booking not found.', 404);
+  assertBookingClient(req, booking);
   if (!booking.totalAmount) throw new AppError('Booking has no amount set.', 422);
 
   assertAppointmentTransition(booking.status, 'accepted');
@@ -159,6 +169,9 @@ router.post('/:id/pay-with-credits', bookingLimiter, async (req: Request, res: R
 // Counter offer
 router.post('/:id/counter-offer', async (req: Request, res: Response) => {
   const { amount, notes } = z.object({ amount: z.number(), notes: z.string().optional() }).parse(req.body);
+  const existing = await loadBookingOrThrow(req.params.id);
+  assertBookingProvider(req, existing);
+
   const booking = await prisma.booking.update({
     where: { id: req.params.id },
     data: { totalAmount: amount, isCounterOffered: true, counterOfferAt: new Date(), counterOffer: { amount, notes } as object },
@@ -176,6 +189,8 @@ router.post('/:id/counter-offer', async (req: Request, res: Response) => {
 // Mark no-show (client didn't show up — penalty applied)
 router.post('/:id/no-show', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const existing = await loadBookingOrThrow(req.params.id);
+    assertBookingProvider(req, existing);
     await NoShowPenaltyService.applyClientNoShow(req.params.id);
     res.json({ success: true, message: 'No-show penalty applied.' });
   } catch (err) {
@@ -186,6 +201,8 @@ router.post('/:id/no-show', async (req: Request, res: Response, next: NextFuncti
 // Mark provider no-show (provider didn't show up — full refund to client)
 router.post('/:id/provider-no-show', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const existing = await loadBookingOrThrow(req.params.id);
+    assertBookingClient(req, existing);
     await NoShowPenaltyService.applyProviderNoShow(req.params.id);
     res.json({ success: true, message: 'Provider no-show recorded. Full refund issued.' });
   } catch (err) {
@@ -197,9 +214,8 @@ router.post('/:id/provider-no-show', async (req: Request, res: Response, next: N
 router.post('/:id/clock-in', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { latitude, longitude } = z.object({ latitude: z.number(), longitude: z.number() }).parse(req.body);
-    const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
-    if (!booking) throw new AppError('Booking not found.', 404);
-    if (booking.providerId !== req.user!.userId) throw new AppError('Only the assigned provider can clock in.', 403);
+    const booking = await loadBookingOrThrow(req.params.id);
+    assertBookingProvider(req, booking);
 
     const { GPSService } = await import('../services/GPSService');
     const geofenceResult = await GPSService.validateCheckin({ lat: latitude, lng: longitude }, booking.clientId);
@@ -217,9 +233,8 @@ router.post('/:id/clock-in', async (req: Request, res: Response, next: NextFunct
 router.post('/:id/clock-out', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { latitude, longitude } = z.object({ latitude: z.number(), longitude: z.number() }).parse(req.body);
-    const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
-    if (!booking) throw new AppError('Booking not found.', 404);
-    if (booking.providerId !== req.user!.userId) throw new AppError('Only the assigned provider can clock out.', 403);
+    const booking = await loadBookingOrThrow(req.params.id);
+    assertBookingProvider(req, booking);
 
     const { GPSService } = await import('../services/GPSService');
     await GPSService.logCheckout(req.user!.userId, null, { lat: latitude, lng: longitude });
@@ -230,16 +245,15 @@ router.post('/:id/clock-out', async (req: Request, res: Response, next: NextFunc
   }
 });
 
-// Payment for booking
+// Payment for booking (controllers enforce client ownership)
 router.post('/:bookingId/pay', bookingLimiter, BookingPaymentController.initiatePayment);
 router.post('/:bookingId/payment/verify', BookingPaymentController.verifyPayment);
 router.post('/:bookingId/refund', BookingPaymentController.selfRefund);
 
-// Dispute for booking
+// Dispute for booking (service enforces party ownership)
 router.post('/:bookingId/dispute', DisputeController.open);
 
-// Booking extras
-router.get('/upcoming', extrasController.getUpcoming.bind(extrasController));
+// Booking extras (controllers enforce client/provider ownership)
 router.put('/:id', extrasController.updateBooking.bind(extrasController));
 router.post('/:id/cancel', extrasController.cancelBooking.bind(extrasController));
 router.post('/:id/counter-offer/respond', extrasController.respondToCounterOffer.bind(extrasController));

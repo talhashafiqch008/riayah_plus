@@ -391,19 +391,23 @@ export function AppRoutes() {
           <Route path="/meet-ai"          element={<S><AIMeetPage /></S>} />
         </Route>
 
-        {/* ── Demo coordinator (public prototype) ─────────────────────── */}
-        <Route element={<DemoCoordinatorLayout />}>
-          <Route path="/demo/coordinator"              element={<S><DemoWorkflowPage /></S>} />
-          <Route path="/demo/coordinator/dashboard"    element={<S><DemoDashboardPage /></S>} />
-          <Route path="/demo/coordinator/intake"       element={<S><DemoIntakePage /></S>} />
-          <Route path="/demo/coordinator/careseeker"   element={<S><DemoCareseekerPage /></S>} />
-          <Route path="/demo/coordinator/provider"     element={<S><DemoProviderPage /></S>} />
-          <Route path="/demo/coordinator/helper"       element={<S><DemoHelperPage /></S>} />
-          <Route path="/demo/coordinator/bookings"     element={<S><DemoBookingsPage /></S>} />
-          <Route path="/demo/coordinator/reporting"    element={<S><DemoReportingPage /></S>} />
-          <Route path="/demo/coordinator/monitoring"   element={<S><DemoMonitoringPage /></S>} />
-          <Route path="/demo/coordinator/organization" element={<S><DemoOrganizationPage /></S>} />
-        </Route>
+        {/* ── Demo coordinator (dev/auth gated — Z-8) ─────────────────── */}
+        {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_ROUTES === 'true') && (
+          <Route element={<ProtectedRoute />}>
+            <Route element={<DemoCoordinatorLayout />}>
+              <Route path="/demo/coordinator"              element={<S><DemoWorkflowPage /></S>} />
+              <Route path="/demo/coordinator/dashboard"    element={<S><DemoDashboardPage /></S>} />
+              <Route path="/demo/coordinator/intake"       element={<S><DemoIntakePage /></S>} />
+              <Route path="/demo/coordinator/careseeker"   element={<S><DemoCareseekerPage /></S>} />
+              <Route path="/demo/coordinator/provider"     element={<S><DemoProviderPage /></S>} />
+              <Route path="/demo/coordinator/helper"       element={<S><DemoHelperPage /></S>} />
+              <Route path="/demo/coordinator/bookings"     element={<S><DemoBookingsPage /></S>} />
+              <Route path="/demo/coordinator/reporting"    element={<S><DemoReportingPage /></S>} />
+              <Route path="/demo/coordinator/monitoring"   element={<S><DemoMonitoringPage /></S>} />
+              <Route path="/demo/coordinator/organization" element={<S><DemoOrganizationPage /></S>} />
+            </Route>
+          </Route>
+        )}
 
         {/* ── 404 ───────────────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />

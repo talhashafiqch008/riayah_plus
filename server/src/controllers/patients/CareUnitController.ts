@@ -157,14 +157,49 @@ export class CareUnitController {
       throw new AppError('familyUserId is required when creating a care unit as staff.', 422);
     }
 
-    const organizationId =
-      data.organizationId ??
-      req.tenant?.organizationId ??
-      (await prisma.user.findUnique({
-        where: { id: familyUserId },
-        select: { organizationId: true },
-      }))?.organizationId ??
-      null;
+    const familyUser = await prisma.user.findUnique({
+      where: { id: familyUserId },
+      select: { id: true, organizationId: true, role: true },
+    });
+    if (!familyUser) {
+      throw new AppError('Family user not found.', 404);
+    }
+
+    // Staff cannot attach families from another organization (C-2).
+    if (isCoordinator(role) || isAdmin(role)) {
+      const tw = tenantWhere(req);
+      if (tw.organizationId === '__no_tenant__') {
+        throw new AppError('No organization assigned to this account.', 403);
+      }
+      if (
+        tw.organizationId &&
+        familyUser.organizationId &&
+        familyUser.organizationId !== tw.organizationId
+      ) {
+        throw new AppError('Family user is outside your organization.', 403);
+      }
+      // Non-admin coordinators cannot pick a foreign organizationId in the body.
+      if (
+        !isAdmin(role) &&
+        data.organizationId &&
+        tw.organizationId &&
+        data.organizationId !== tw.organizationId
+      ) {
+        throw new AppError('Cannot create care unit in another organization.', 403);
+      }
+    }
+
+    // Family cannot set organizationId/clinicId (M-3 partial).
+    const organizationId = isFamily(role)
+      ? familyUser.organizationId ?? req.tenant?.organizationId ?? null
+      : data.organizationId ??
+        req.tenant?.organizationId ??
+        familyUser.organizationId ??
+        null;
+
+    if (isFamily(role) && (data.organizationId || data.clinicId)) {
+      // Strip silently for family — ignore body org/clinic
+    }
 
     const unit = await prisma.careUnit.create({
       data: {
@@ -177,7 +212,7 @@ export class CareUnitController {
         city: data.city,
         country: data.country ?? 'QA',
         organizationId: organizationId ?? undefined,
-        clinicId: data.clinicId,
+        clinicId: isFamily(role) ? undefined : data.clinicId,
       },
     });
 
@@ -186,7 +221,7 @@ export class CareUnitController {
       action: 'care_unit_created',
       entity: 'CareUnit',
       entityId: unit.id,
-      after: unit,
+      after: { id: unit.id, familyUserId: unit.familyUserId, organizationId: unit.organizationId },
       req,
     });
 
@@ -214,9 +249,32 @@ export class CareUnitController {
     }
 
     const data = updateCareUnitSchema.parse(req.body);
+    // Family cannot reassign org/clinic (M-3).
+    const safeData = isFamily(role)
+      ? {
+          name: data.name,
+          primaryCaregiverName: data.primaryCaregiverName,
+          primaryCaregiverPhone: data.primaryCaregiverPhone,
+          primaryCaregiverRelation: data.primaryCaregiverRelation,
+          address: data.address,
+          city: data.city,
+          country: data.country,
+        }
+      : data;
+
+    if (
+      !isAdmin(role) &&
+      isCoordinator(role) &&
+      data.organizationId &&
+      req.tenant?.organizationId &&
+      data.organizationId !== req.tenant.organizationId
+    ) {
+      throw new AppError('Cannot move care unit to another organization.', 403);
+    }
+
     const updated = await prisma.careUnit.update({
       where: { id: existing.id },
-      data,
+      data: safeData,
     });
 
     await AuditService.log({
@@ -308,6 +366,10 @@ export class CareUnitController {
     if (!existing) throw new AppError('Patient not found.', 404);
 
     const data = updatePatientSchema.parse(req.body);
+    // Family cannot overwrite diagnosis codes (M-4).
+    if (isFamily(req.user!.role) && data.diagnosisCodes !== undefined) {
+      throw new AppError('Only care staff can update diagnosis codes.', 403);
+    }
     let dateOfBirth: Date | null | undefined = undefined;
     if (data.dateOfBirth === undefined) {
       dateOfBirth = undefined;
@@ -367,7 +429,7 @@ export class CareUnitController {
     const revisions = await prisma.careRecipientRevision.findMany({
       where: { careRecipientId: existing.id },
       orderBy: { createdAt: 'desc' },
-      include: { changedBy: { select: { id: true, name: true, email: true } } },
+      include: { changedBy: { select: { id: true, name: true } } },
     });
     res.json({ data: revisions });
   }

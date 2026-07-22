@@ -9,6 +9,14 @@ import { AuditService } from '../../services/AuditService';
 import { sendEmailVerificationForUser } from '../../utils/emailVerification';
 import { sanitizedString } from '../../utils/sanitize';
 
+const PUBLIC_SELF_REGISTER_ROLES = new Set<UserRole>([
+  'client',
+  'consumer',
+  'family',
+  'patient',
+  'provider',
+]);
+
 const registerSchema = z
   .object({
     name: sanitizedString(z.string().min(2)).optional(),
@@ -56,7 +64,14 @@ export class RegistrationController {
     if (existing) throw new AppError('Email already registered.', 409);
 
     const passwordHash = await bcrypt.hash(data.password, env.BCRYPT_ROUNDS);
-    const role = data.role ?? 'client';
+    const requestedRole = data.role ?? 'client';
+    if (!PUBLIC_SELF_REGISTER_ROLES.has(requestedRole)) {
+      throw new AppError(
+        'Invalid role for self-registration. Contact an administrator for staff accounts.',
+        422,
+      );
+    }
+    const role = requestedRole;
 
     const user = await prisma.user.create({
       data: {

@@ -137,3 +137,58 @@ export function requireCareCoordinator(req: Request, res: Response, next: NextFu
   }
   next();
 }
+
+/** Family account holders + coordinators/admins (care-unit write surface). */
+export function requireFamilyOrCoordinator(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.user) {
+    res.status(401).json({ message: 'Unauthenticated.' });
+    return;
+  }
+  const allowed: UserRole[] = [
+    'family',
+    'client',
+    'consumer',
+    'patient',
+    'care_coordinator',
+    ...ADMIN_ROLES,
+  ];
+  if (!allowed.includes(req.user.role)) {
+    res.status(403).json({ message: 'Family or care coordinator access required.' });
+    return;
+  }
+  next();
+}
+
+/** Clinical staff completing assessments, or coordinators/admins. */
+export function requireClinicalOrCoordinator(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.user) {
+    res.status(401).json({ message: 'Unauthenticated.' });
+    return;
+  }
+  const allowed: UserRole[] = [
+    'clinical_staff',
+    'doctor',
+    'nurse',
+    'physiotherapist',
+    'occupational_therapist',
+    'speech_therapist',
+    'psychologist',
+    'dietitian',
+    'therapist',
+    'care_coordinator',
+    ...ADMIN_ROLES,
+  ];
+  if (!allowed.includes(req.user.role)) {
+    res.status(403).json({ message: 'Clinical or care coordinator access required.' });
+    return;
+  }
+  next();
+}

@@ -7,13 +7,17 @@ import { assertTenantOrgAccess, mergeTenantOrg } from '../../middleware/tenantAc
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
 import { assertCareEpisodeTransition } from '../../utils/stateMachine';
-
-const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
+import {
+  assertEpisodeAccess,
+  familyEpisodeWhere,
+  isFamilyRole,
+  resolveEpisodePartyIds,
+} from '../../utils/careAccess';
 
 const createEpisodeSchema = z.object({
-  patientId: z.string(),
-  careRecipientId: z.string().optional(),
-  careUnitId: z.string().optional(),
+  patientId: z.string().optional(),
+  careRecipientId: z.string().min(1),
+  careUnitId: z.string().min(1),
   title: z.string().min(2),
   urgencyLevel: z.nativeEnum(UrgencyLevel).optional(),
   reasonForCare: z.string().optional(),
@@ -23,24 +27,10 @@ const createEpisodeSchema = z.object({
   serviceInterests: z.array(z.nativeEnum(ServiceCategory)).optional(),
 });
 
-const updateIntakeSchema = z.object({
-  intakeSummary: z.record(z.unknown()).optional(),
-  status: z.string().optional(),
+/** Whitelisted status transitions only — no mass-assign (H-3). */
+const updateEpisodeSchema = z.object({
+  status: z.nativeEnum(CareEpisodeStatus).optional(),
 });
-
-function assertEpisodeAccess(
-  req: Request,
-  episode: { patientId: string; organizationId: string | null },
-): void {
-  const role = req.user!.role;
-  if (FAMILY_ROLES.includes(role)) {
-    if (episode.patientId !== req.user!.userId) {
-      throw new AppError('Forbidden.', 403);
-    }
-    return;
-  }
-  assertTenantOrgAccess(req, episode.organizationId);
-}
 
 export class CareEpisodeController {
   static async index(req: Request, res: Response): Promise<void> {
@@ -51,8 +41,8 @@ export class CareEpisodeController {
     if (status) where.status = status;
 
     const role = req.user!.role;
-    if (FAMILY_ROLES.includes(role)) {
-      where.patientId = req.user!.userId;
+    if (isFamilyRole(role)) {
+      Object.assign(where, familyEpisodeWhere(req.user!.userId));
     } else {
       mergeTenantOrg(req, where);
     }
@@ -64,6 +54,7 @@ export class CareEpisodeController {
           patient: { select: { id: true, name: true, email: true } },
           coordinator: { select: { id: true, name: true } },
           careRecipient: { select: { id: true, name: true, externalRef: true } },
+          careUnit: { select: { id: true, name: true, familyUserId: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -78,29 +69,25 @@ export class CareEpisodeController {
   static async store(req: Request, res: Response): Promise<void> {
     const data = createEpisodeSchema.parse(req.body);
 
-    const orgWhere: { organizationId?: string } = {};
-    mergeTenantOrg(req, orgWhere);
+    const unit = await prisma.careUnit.findFirst({
+      where: { id: data.careUnitId, deletedAt: null },
+    });
+    if (!unit) throw new AppError('Care unit not found.', 404);
+    assertTenantOrgAccess(req, unit.organizationId);
 
-    let organizationId = orgWhere.organizationId ?? req.tenant?.organizationId ?? null;
-    let careUnitId = data.careUnitId;
-
-    if (data.careUnitId) {
-      const unit = await prisma.careUnit.findFirst({
-        where: { id: data.careUnitId, deletedAt: null },
-      });
-      if (!unit) throw new AppError('Care unit not found.', 404);
-      assertTenantOrgAccess(req, unit.organizationId);
-      organizationId = unit.organizationId ?? organizationId;
-      careUnitId = unit.id;
-    }
+    const party = await resolveEpisodePartyIds({
+      careUnitId: unit.id,
+      careRecipientId: data.careRecipientId,
+      patientId: data.patientId,
+    });
 
     const episode = await prisma.careEpisode.create({
       data: {
         coordinatorId: req.user!.userId,
-        patientId: data.patientId,
-        careRecipientId: data.careRecipientId,
-        careUnitId,
-        organizationId: organizationId ?? undefined,
+        patientId: party.patientId,
+        careRecipientId: party.careRecipientId,
+        careUnitId: unit.id,
+        organizationId: party.organizationId ?? unit.organizationId ?? undefined,
         title: data.title,
         urgencyLevel: data.urgencyLevel,
         reasonForCare: data.reasonForCare,
@@ -127,9 +114,18 @@ export class CareEpisodeController {
     const episode = await prisma.careEpisode.findUnique({
       where: { id: req.params.id },
       include: {
-        patient: true,
+        patient: { select: { id: true, name: true } },
         coordinator: { select: { id: true, name: true } },
-        careRecipient: true,
+        careRecipient: {
+          select: {
+            id: true,
+            name: true,
+            externalRef: true,
+            dateOfBirth: true,
+            gender: true,
+          },
+        },
+        careUnit: { select: { id: true, name: true, familyUserId: true } },
         assessments: true,
         carePlans: true,
         sessions: { orderBy: { scheduledAt: 'desc' } },
@@ -138,31 +134,43 @@ export class CareEpisodeController {
       },
     });
 
-    if (!episode) throw new AppError('Episode not found.', 404);
-    assertEpisodeAccess(req, episode);
+    // M-15 / M-30: uniform 404 for missing + unauthorized; limited patient fields
+    if (!episode) throw new AppError('Care episode not found.', 404);
+    try {
+      await assertEpisodeAccess(req, episode);
+    } catch {
+      throw new AppError('Care episode not found.', 404);
+    }
     res.json({ data: episode });
   }
 
   static async update(req: Request, res: Response): Promise<void> {
-    const data = updateIntakeSchema.parse(req.body);
+    const data = updateEpisodeSchema.parse(req.body);
 
-    const existing = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
-    if (!existing) throw new AppError('Episode not found.', 404);
-    assertEpisodeAccess(req, existing);
+    const existing = await prisma.careEpisode.findUnique({
+      where: { id: req.params.id },
+      include: { careUnit: { select: { familyUserId: true } } },
+    });
+    if (!existing) throw new AppError('Care episode not found.', 404);
+    await assertEpisodeAccess(req, existing);
 
-    const nextStatus = data.status as CareEpisodeStatus | undefined;
+    const nextStatus = data.status;
     if (nextStatus && nextStatus !== existing.status) {
       assertCareEpisodeTransition(existing.status, nextStatus);
+    }
+
+    // Do not allow jumping to validated via free PATCH (M-10 / H-3).
+    if (nextStatus === 'validated') {
+      throw new AppError(
+        'Use structured intake review or submit-intake to validate an episode.',
+        422,
+      );
     }
 
     const episode = await prisma.careEpisode.update({
       where: { id: req.params.id },
       data: {
-        ...data,
         status: nextStatus,
-        intakeSummary: (data.intakeSummary as Prisma.InputJsonValue) ?? undefined,
-        intakeReviewedAt: nextStatus === 'validated' ? new Date() : undefined,
-        intakeReviewerId: nextStatus === 'validated' ? req.user!.userId : undefined,
       },
     });
 
@@ -171,6 +179,8 @@ export class CareEpisodeController {
       action: 'episode_updated',
       entity: 'CareEpisode',
       entityId: episode.id,
+      before: { status: existing.status },
+      after: { status: episode.status },
       req,
     });
     res.json({ data: episode });
@@ -179,9 +189,12 @@ export class CareEpisodeController {
   static async submitIntake(req: Request, res: Response): Promise<void> {
     const { intakeSummary } = z.object({ intakeSummary: z.record(z.unknown()) }).parse(req.body);
 
-    const episode = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
-    if (!episode) throw new AppError('Episode not found.', 404);
-    assertEpisodeAccess(req, episode);
+    const episode = await prisma.careEpisode.findUnique({
+      where: { id: req.params.id },
+      include: { careUnit: { select: { familyUserId: true } } },
+    });
+    if (!episode) throw new AppError('Care episode not found.', 404);
+    await assertEpisodeAccess(req, episode);
 
     assertCareEpisodeTransition(episode.status, 'validated');
 
@@ -195,8 +208,9 @@ export class CareEpisodeController {
       },
     });
 
+    const notifyUserId = episode.careUnit?.familyUserId ?? episode.patientId;
     await NotificationService.create({
-      userId: episode.patientId,
+      userId: notifyUserId,
       title: 'Your intake has been reviewed',
       body: 'Your care coordinator has reviewed your intake and your episode is now active.',
       type: 'episode_validated',

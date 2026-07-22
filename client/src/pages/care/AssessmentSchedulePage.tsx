@@ -7,6 +7,7 @@ import {
   updateAssessment,
   type Assessment,
 } from '@/lib/api/assessments';
+import { familyAssessmentStatusLabel } from '@/lib/familyLanguage';
 
 function statusClass(status: string) {
   switch (status) {
@@ -16,6 +17,8 @@ function statusClass(status: string) {
       return 'bg-emerald-50 text-emerald-800';
     case 'cancelled':
       return 'bg-stone-100 text-stone-600';
+    case 'no_show':
+      return 'bg-orange-50 text-orange-800';
     default:
       return 'bg-stone-100 text-stone-700';
   }
@@ -28,6 +31,7 @@ export default function AssessmentSchedulePage({
 }: {
   mode?: Mode;
 }) {
+  const isFamily = mode === 'family';
   const [rows, setRows] = useState<Assessment[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -41,11 +45,13 @@ export default function AssessmentSchedulePage({
   const [recommendations, setRecommendations] = useState('');
   const [reportUrl, setReportUrl] = useState('');
 
-  const title = mode === 'clinical' ? 'Assessment Schedule' : 'Assessment Bookings';
-  const description =
-    mode === 'clinical'
-      ? 'Assessments assigned to you — complete with findings and report.'
-      : 'Assessments scheduled for your care episodes.';
+  const title = isFamily ? 'Appointments' : 'Assessment Schedule';
+  const description = isFamily
+    ? 'Consultations booked for your care journeys.'
+    : 'Assessments assigned to you — complete with findings and report.';
+
+  const statusLabel = (value: string) =>
+    isFamily ? familyAssessmentStatusLabel(value) : value.replace(/_/g, ' ');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,11 +64,11 @@ export default function AssessmentSchedulePage({
       setTotal(result.total);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load assessments');
+      else toast.error(isFamily ? 'Failed to load appointments' : 'Failed to load assessments');
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, isFamily]);
 
   useEffect(() => {
     void load();
@@ -134,11 +140,14 @@ export default function AssessmentSchedulePage({
           className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
         >
           <option value="">All statuses</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="completed">Completed</option>
+          <option value="scheduled">{isFamily ? 'Consultation booked' : 'Scheduled'}</option>
+          <option value="completed">{isFamily ? 'Consultation completed' : 'Completed'}</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <span className="text-sm text-stone-500">{total} result{total === 1 ? '' : 's'}</span>
+        <span className="text-sm text-stone-500">
+          {total} {isFamily ? 'appointment' : 'result'}
+          {total === 1 ? '' : 's'}
+        </span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -148,13 +157,21 @@ export default function AssessmentSchedulePage({
               <Loader2 className="size-6 animate-spin text-teal-600" />
             </div>
           ) : rows.length === 0 ? (
-            <p className="p-8 text-center text-sm text-stone-500">No assessments match these filters.</p>
+            <p className="p-8 text-center text-sm text-stone-500">
+              {isFamily
+                ? 'No appointments yet. Book a consultation from your care journey.'
+                : 'No assessments match these filters.'}
+            </p>
           ) : (
             rows.map((row) => (
               <button
                 key={row.id}
                 type="button"
-                onClick={() => (mode === 'clinical' && row.status === 'scheduled' ? openComplete(row) : setSelected(row))}
+                onClick={() =>
+                  mode === 'clinical' && row.status === 'scheduled'
+                    ? openComplete(row)
+                    : setSelected(row)
+                }
                 className={`w-full text-left p-4 hover:bg-teal-50/40 transition-colors ${
                   selected?.id === row.id ? 'bg-teal-50/60' : ''
                 }`}
@@ -166,12 +183,14 @@ export default function AssessmentSchedulePage({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-stone-900 capitalize">{row.type}</p>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(row.status)}`}>
-                        {row.status}
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(row.status)}`}
+                      >
+                        {statusLabel(row.status)}
                       </span>
                     </div>
                     <p className="mt-0.5 text-sm text-stone-500 truncate">
-                      {row.episode?.title || 'Episode'}
+                      {row.episode?.title || (isFamily ? 'Care journey' : 'Episode')}
                     </p>
                     <p className="mt-0.5 text-xs text-stone-400">
                       {new Date(row.scheduledAt).toLocaleString()}
@@ -188,7 +207,11 @@ export default function AssessmentSchedulePage({
           {!selected ? (
             <div className="h-full flex flex-col items-center justify-center text-stone-400 py-16">
               <CalendarClock className="size-10 mb-3 opacity-40" />
-              <p className="text-sm">Select an assessment to view details.</p>
+              <p className="text-sm">
+                {isFamily
+                  ? 'Select an appointment to view details.'
+                  : 'Select an assessment to view details.'}
+              </p>
             </div>
           ) : mode === 'clinical' && selected.status === 'scheduled' ? (
             <div className="space-y-4">
@@ -237,7 +260,9 @@ export default function AssessmentSchedulePage({
                   />
                 </label>
                 <label className="sm:col-span-2 text-sm">
-                  <span className="text-xs font-semibold text-stone-500">Report URL (optional if recommendations set)</span>
+                  <span className="text-xs font-semibold text-stone-500">
+                    Report URL (optional if recommendations set)
+                  </span>
                   <input
                     value={reportUrl}
                     onChange={(e) => setReportUrl(e.target.value)}
@@ -280,28 +305,43 @@ export default function AssessmentSchedulePage({
             <div className="space-y-4 text-sm">
               <div>
                 <h3 className="text-lg font-semibold text-stone-900 capitalize">{selected.type}</h3>
-                <span className={`inline-block mt-2 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(selected.status)}`}>
-                  {selected.status}
+                <span
+                  className={`inline-block mt-2 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(selected.status)}`}
+                >
+                  {statusLabel(selected.status)}
                 </span>
               </div>
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs font-semibold text-stone-500">Episode</dt>
+                  <dt className="text-xs font-semibold text-stone-500">
+                    {isFamily ? 'Care journey' : 'Episode'}
+                  </dt>
                   <dd className="mt-0.5 text-stone-900">{selected.episode?.title || '—'}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">Scheduled</dt>
-                  <dd className="mt-0.5 text-stone-900">{new Date(selected.scheduledAt).toLocaleString()}</dd>
+                  <dd className="mt-0.5 text-stone-900">
+                    {new Date(selected.scheduledAt).toLocaleString()}
+                  </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-semibold text-stone-500">Assessor</dt>
+                  <dt className="text-xs font-semibold text-stone-500">
+                    {isFamily ? 'Clinician' : 'Assessor'}
+                  </dt>
                   <dd className="mt-0.5 text-stone-900">{selected.assessor?.name || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-semibold text-stone-500">Report</dt>
+                  <dt className="text-xs font-semibold text-stone-500">
+                    {isFamily ? 'Visit summary' : 'Report'}
+                  </dt>
                   <dd className="mt-0.5 text-stone-900">
                     {selected.reportUrl ? (
-                      <a href={selected.reportUrl} className="text-teal-700 underline" target="_blank" rel="noreferrer">
+                      <a
+                        href={selected.reportUrl}
+                        className="text-teal-700 underline"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         Open report
                       </a>
                     ) : (
@@ -312,7 +352,9 @@ export default function AssessmentSchedulePage({
               </dl>
               {selected.findings && (
                 <div>
-                  <p className="text-xs font-semibold text-stone-500 mb-2">Findings</p>
+                  <p className="text-xs font-semibold text-stone-500 mb-2">
+                    {isFamily ? 'Visit notes' : 'Findings'}
+                  </p>
                   <dl className="grid gap-3 sm:grid-cols-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
                     {Object.entries(selected.findings)
                       .filter(([, value]) => value != null && String(value).trim() !== '')

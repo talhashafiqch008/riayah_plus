@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, RefreshCw, ClipboardCheck, HeartHandshake } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Loader2, RefreshCw, ClipboardCheck, HeartHandshake } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import {
@@ -7,15 +8,30 @@ import {
   listIntakeQueue,
   reviewIntake,
   updateIntakeStatus,
+  updateIntakeUrgency,
   intakeDocumentDownloadUrl,
   type IntakeRecord,
   type ServiceCategory,
   type UrgencyLevel,
 } from '@/lib/api/intake';
+import { createCoordinatorDocumentRequest } from '@/lib/api/documents';
 import {
   PENDING_DIAGNOSIS,
   parseFamilyWizardSummary,
 } from '@/lib/familyCareseekerIntake';
+import {
+  buildCoordinatorNextActions,
+  nextUrgencyLevel,
+  queueHintForIntake,
+} from '@/lib/coordinatorIntakeNextActions';
+
+const DOC_REQUEST_TYPES = [
+  { value: 'medical_report', label: 'Medical report' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'prior_assessment', label: 'Prior assessment' },
+  { value: 'insurance', label: 'Insurance' },
+  { value: 'other', label: 'Other' },
+];
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -130,6 +146,11 @@ export default function CoordinatorIntakeQueuePage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [escalating, setEscalating] = useState(false);
+  const [requestingDocs, setRequestingDocs] = useState(false);
+  const [showDocRequest, setShowDocRequest] = useState(false);
+  const [docType, setDocType] = useState('medical_report');
+  const [docNote, setDocNote] = useState('');
 
   const [keyConcerns, setKeyConcerns] = useState<string[]>([]);
   const [urgencyIndicators, setUrgencyIndicators] = useState<string[]>([]);
@@ -139,10 +160,17 @@ export default function CoordinatorIntakeQueuePage() {
   const [createEpisode, setCreateEpisode] = useState(true);
   const [episodeTitle, setEpisodeTitle] = useState('');
 
+  const reviewSectionRef = useRef<HTMLDivElement | null>(null);
+
   const canReview = useMemo(() => {
     if (!detail) return false;
     return detail.status === 'submitted' || detail.status === 'under_review';
   }, [detail]);
+
+  const nextActions = useMemo(
+    () => (detail ? buildCoordinatorNextActions(detail) : []),
+    [detail],
+  );
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
@@ -179,6 +207,9 @@ export default function CoordinatorIntakeQueuePage() {
     setNotes('');
     setCreateEpisode(true);
     setEpisodeTitle('');
+    setShowDocRequest(false);
+    setDocType('medical_report');
+    setDocNote('');
     try {
       const data = await getIntake(id);
       setDetail(data);
@@ -206,11 +237,76 @@ export default function CoordinatorIntakeQueuePage() {
       const refreshed = await getIntake(detail.id);
       setDetail(refreshed);
       await loadQueue();
+      window.setTimeout(() => {
+        reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
       else toast.error('Could not update status');
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const handleEscalateUrgency = async () => {
+    if (!detail) return;
+    const next = nextUrgencyLevel(detail.urgencyLevel);
+    if (detail.urgencyLevel === 'urgent') {
+      toast('Already at urgent');
+      return;
+    }
+    setEscalating(true);
+    try {
+      const updated = await updateIntakeUrgency(detail.id, next);
+      setDetail((prev) => (prev ? { ...prev, ...updated } : updated));
+      toast.success(`Urgency raised to ${next}`);
+      await loadQueue();
+    } catch (error: unknown) {
+      if (isApiError(error)) toast.error(error.message);
+      else toast.error('Could not escalate urgency');
+    } finally {
+      setEscalating(false);
+    }
+  };
+
+  const handleRequestDocuments = async () => {
+    if (!detail?.familyUser?.id) {
+      toast.error('No family user on this intake to notify');
+      return;
+    }
+    setRequestingDocs(true);
+    try {
+      await createCoordinatorDocumentRequest({
+        targetUserId: detail.familyUser.id,
+        documentType: docType,
+        description: docNote.trim() || undefined,
+      });
+      toast.success('Document request sent to family');
+      setShowDocRequest(false);
+      setDocNote('');
+    } catch (error: unknown) {
+      if (isApiError(error)) toast.error(error.message);
+      else toast.error('Could not send document request');
+    } finally {
+      setRequestingDocs(false);
+    }
+  };
+
+  const handleNextAction = (actionId: string) => {
+    if (actionId === 'review') {
+      if (detail?.status === 'submitted') {
+        void handleStartReview();
+      } else {
+        reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+    if (actionId === 'documents') {
+      setShowDocRequest(true);
+      return;
+    }
+    if (actionId === 'escalate') {
+      void handleEscalateUrgency();
     }
   };
 
@@ -313,6 +409,7 @@ export default function CoordinatorIntakeQueuePage() {
             <ul className="divide-y divide-stone-100">
               {rows.map((row) => {
                 const active = row.id === selectedId;
+                const hint = queueHintForIntake(row);
                 return (
                   <li key={row.id}>
                     <button
@@ -330,6 +427,11 @@ export default function CoordinatorIntakeQueuePage() {
                           <p className="text-xs text-stone-500 mt-0.5">
                             {row.careUnit?.name ?? 'Care unit'} · {row.familyUser?.name ?? 'Family'}
                           </p>
+                          {hint && (
+                            <p className="text-[11px] font-semibold text-teal-700 mt-1">
+                              Next: {hint}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span
@@ -392,6 +494,122 @@ export default function CoordinatorIntakeQueuePage() {
                   </p>
                 )}
               </div>
+
+              {nextActions.length > 0 && (
+                <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-stone-900">Next actions</p>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Clear steps for this request — keep using structured review for clinical detail.
+                    </p>
+                  </div>
+                  <ul className="space-y-2">
+                    {nextActions.map((action) => (
+                      <li
+                        key={action.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-stone-900">{action.label}</p>
+                          <p className="text-xs text-stone-500 mt-0.5">{action.description}</p>
+                        </div>
+                        {action.id === 'schedule' && detail.careEpisode?.id ? (
+                          <Link
+                            to={`/coordinator/episodes/${detail.careEpisode.id}`}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shrink-0 ${
+                              action.primary
+                                ? 'bg-teal-600 text-white hover:bg-teal-700'
+                                : 'border border-stone-200 text-stone-700 hover:bg-stone-50'
+                            }`}
+                          >
+                            Open episode
+                            <ArrowRight className="size-3.5" />
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={
+                              (action.id === 'review' && claiming) ||
+                              (action.id === 'escalate' && escalating) ||
+                              (action.id === 'documents' && requestingDocs)
+                            }
+                            onClick={() => handleNextAction(action.id)}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shrink-0 disabled:opacity-50 ${
+                              action.primary
+                                ? 'bg-teal-600 text-white hover:bg-teal-700'
+                                : 'border border-stone-200 text-stone-700 hover:bg-stone-50'
+                            }`}
+                          >
+                            {(action.id === 'review' && claiming) ||
+                            (action.id === 'escalate' && escalating) ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <ArrowRight className="size-3.5" />
+                            )}
+                            {action.id === 'review' && detail.status === 'submitted'
+                              ? 'Start review'
+                              : action.id === 'review'
+                                ? 'Go to review'
+                                : action.id === 'documents'
+                                  ? 'Request docs'
+                                  : action.id === 'escalate'
+                                    ? `Raise to ${nextUrgencyLevel(detail.urgencyLevel)}`
+                                    : 'Continue'}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {showDocRequest && (
+                    <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 space-y-3">
+                      <p className="text-xs font-semibold text-teal-900">Request document from family</p>
+                      <label className="block text-sm">
+                        <span className="text-xs font-semibold text-stone-500">Document type</span>
+                        <select
+                          value={docType}
+                          onChange={(e) => setDocType(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm bg-white"
+                        >
+                          {DOC_REQUEST_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-sm">
+                        <span className="text-xs font-semibold text-stone-500">Note (optional)</span>
+                        <textarea
+                          value={docNote}
+                          onChange={(e) => setDocNote(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm min-h-[64px] bg-white"
+                          placeholder="e.g. Please upload the latest discharge summary"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={requestingDocs}
+                          onClick={() => void handleRequestDocuments()}
+                          className="rounded-xl bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+                        >
+                          {requestingDocs && <Loader2 className="size-3.5 animate-spin" />}
+                          Send request
+                        </button>
+                        <button
+                          type="button"
+                          disabled={requestingDocs}
+                          onClick={() => setShowDocRequest(false)}
+                          className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-white"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {(() => {
                 const familySummary = parseFamilyWizardSummary(
@@ -594,7 +812,6 @@ export default function CoordinatorIntakeQueuePage() {
                                 contentType.includes('msword') ||
                                 contentType.includes('officedocument');
 
-                              // S3 signed URL path returns JSON { data: { url } }
                               if (!isFile && contentType.includes('application/json')) {
                                 const body = (await res.json()) as {
                                   data?: { url?: string };
@@ -628,8 +845,35 @@ export default function CoordinatorIntakeQueuePage() {
                       </li>
                     ))}
                   </ul>
+                  {(detail.status === 'submitted' || detail.status === 'under_review') && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDocRequest(true)}
+                      className="mt-3 text-xs font-semibold text-teal-700 hover:underline"
+                    >
+                      Request another document from family
+                    </button>
+                  )}
                 </div>
               )}
+
+              {(detail.documents?.length ?? 0) === 0 &&
+                (detail.status === 'submitted' || detail.status === 'under_review') && (
+                  <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-3">
+                    <p className="text-sm font-medium text-stone-800">No documents attached</p>
+                    <p className="text-xs text-stone-500 mt-1">
+                      Ask the family to upload what you need for review.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDocRequest(true)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                    >
+                      Request missing documents
+                      <ArrowRight className="size-3.5" />
+                    </button>
+                  </div>
+                )}
 
               {(detail.consents?.length ?? 0) > 0 && (
                 <div className="rounded-xl border border-stone-200 p-3">
@@ -674,7 +918,7 @@ export default function CoordinatorIntakeQueuePage() {
               )}
 
               {canReview ? (
-                <div className="space-y-4 border-t border-stone-100 pt-5">
+                <div ref={reviewSectionRef} className="space-y-4 border-t border-stone-100 pt-5">
                   <h4 className="font-semibold text-stone-900">Structured review</h4>
 
                   <div>
@@ -782,7 +1026,8 @@ export default function CoordinatorIntakeQueuePage() {
                 </div>
               ) : (
                 <div className="space-y-4 rounded-xl bg-stone-50 p-4 text-sm text-stone-700">
-                  {detail.status === 'episode_created' && (
+                  {(detail.status === 'episode_created' || detail.status === 'validated') &&
+                    detail.careEpisode?.id && (
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                         Linked episode
@@ -797,9 +1042,16 @@ export default function CoordinatorIntakeQueuePage() {
                           </span>
                         )}
                         <span className="font-mono text-stone-400">
-                          {detail.careEpisode?.id ?? '—'}
+                          {detail.careEpisode.id.slice(0, 8)}…
                         </span>
                       </div>
+                      <Link
+                        to={`/coordinator/episodes/${detail.careEpisode.id}`}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700"
+                      >
+                        Schedule consultation
+                        <ArrowRight className="size-3.5" />
+                      </Link>
                     </div>
                   )}
 

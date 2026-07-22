@@ -142,7 +142,7 @@ Prior M2 context (not redone here): family schedule assessments, per-patient car
 - Decide product rule for clearing/replacing `PENDING_CLINICAL_REVIEW` (coordinator review? assessment complete? sync from `diagnosisCodes`?).
 - Optionally sync patient profile `diagnosisCodes` ↔ episode `diagnoses` if Clinical Summary should stay live.
 - Collect real care-recipient name in 6-step family onboarding (still deferred).
-- Remaining revision items R1/R2/R4+ per `MILESTONE_TWO_REVISION.md`.
+- **Next revision (optional):** R6 coordinator next-action polish · R7 Talk to Us · R8 role blurbs.
 
 ---
 

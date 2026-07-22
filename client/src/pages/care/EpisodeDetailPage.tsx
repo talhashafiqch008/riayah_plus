@@ -15,6 +15,11 @@ import {
   scheduleAssessment,
   type ClinicianOption,
 } from '@/lib/api/assessments';
+import {
+  familyAssessmentStatusLabel,
+  familyEpisodeStatusLabel,
+} from '@/lib/familyLanguage';
+import { buildFamilyJourneyMilestones } from '@/lib/familyJourneyMilestones';
 
 type Props = {
   basePath: string;
@@ -127,6 +132,10 @@ function formatLabel(status: string) {
   return status.replace(/_/g, ' ');
 }
 
+function displayEpisodeStatus(status: string, familyFacing: boolean) {
+  return familyFacing ? familyEpisodeStatusLabel(status) : formatLabel(status);
+}
+
 function stepIndex(status: string) {
   const idx = EPISODE_STATUS_STEPS.indexOf(status as (typeof EPISODE_STATUS_STEPS)[number]);
   if (idx >= 0) return idx;
@@ -138,8 +147,10 @@ function stepIndex(status: string) {
 }
 
 /** Step 4 only shows active or on hold (coordinator status). */
-function stepFourLabel(status: string) {
-  if (LIFECYCLE_STATUS_STATUSES.has(status)) return formatLabel(status);
+function stepFourLabel(status: string, familyFacing: boolean) {
+  if (LIFECYCLE_STATUS_STATUSES.has(status)) {
+    return displayEpisodeStatus(status, familyFacing);
+  }
   return 'Status';
 }
 
@@ -170,11 +181,11 @@ export default function EpisodeDetailPage({
       setEpisode(data);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load episode');
+      else toast.error(familyFacing ? 'Failed to load care journey' : 'Failed to load episode');
     } finally {
       setLoading(false);
     }
-  }, [episodeId]);
+  }, [episodeId, familyFacing]);
 
   useEffect(() => {
     void load();
@@ -243,11 +254,16 @@ export default function EpisodeDetailPage({
   }
 
   if (!episode) {
-    return <p className="text-stone-500">Episode not found.</p>;
+    return (
+      <p className="text-stone-500">
+        {familyFacing ? 'Care journey not found.' : 'Episode not found.'}
+      </p>
+    );
   }
 
   const currentStep = stepIndex(episode.status);
   const intakeSummary = episode.intakeSummary as Record<string, unknown> | null | undefined;
+  const familyMilestones = familyFacing ? buildFamilyJourneyMilestones(episode) : [];
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -256,25 +272,85 @@ export default function EpisodeDetailPage({
           to={basePath}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
         >
-          <ArrowLeft className="size-4" /> Back to episodes
+          <ArrowLeft className="size-4" />{' '}
+          {familyFacing ? 'Back to care journey' : 'Back to episodes'}
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-stone-900">{episode.title}</h2>
             <p className="mt-1 text-sm text-stone-500">
               {episode.careRecipient?.name || episode.patient?.name || 'Patient'}
-              {episode.coordinator?.name ? ` · Coord. ${episode.coordinator.name}` : ''}
+              {!familyFacing && episode.coordinator?.name
+                ? ` · Coord. ${episode.coordinator.name}`
+                : ''}
             </p>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(episode.status)}`}
           >
-            {formatLabel(episode.status)}
+            {displayEpisodeStatus(episode.status, familyFacing)}
           </span>
         </div>
       </div>
 
-      {/* Status stepper */}
+      {/* Family milestones (R5) or staff lifecycle stepper */}
+      {familyFacing ? (
+        <div className="rounded-2xl border bg-white shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-stone-900 mb-1">Your care journey</h3>
+          <p className="text-sm text-stone-500 mb-4">
+            Simple milestones so you always know what comes next.
+          </p>
+          <ol className="space-y-3">
+            {familyMilestones.map((m, i) => (
+              <li key={m.id} className="flex items-start gap-3">
+                <span
+                  className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    m.locked
+                      ? 'bg-stone-100 text-stone-400 border border-dashed border-stone-300'
+                      : m.current
+                        ? 'bg-teal-600 text-white'
+                        : m.done
+                          ? 'bg-teal-100 text-teal-800'
+                          : 'bg-stone-100 text-stone-400'
+                  }`}
+                >
+                  {m.locked ? '·' : i + 1}
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <p
+                    className={`text-sm font-medium ${
+                      m.locked
+                        ? 'text-stone-400'
+                        : m.current
+                          ? 'text-teal-800'
+                          : m.done
+                            ? 'text-stone-900'
+                            : 'text-stone-400'
+                    }`}
+                  >
+                    {m.label}
+                    {m.locked && (
+                      <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+                        Coming soon
+                      </span>
+                    )}
+                    {m.current && !m.locked && (
+                      <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700">
+                        Now
+                      </span>
+                    )}
+                  </p>
+                  {m.description && (
+                    <p className={`mt-0.5 text-xs ${m.locked ? 'text-stone-400' : 'text-stone-500'}`}>
+                      {m.description}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
       <div className="rounded-2xl border bg-white shadow-sm p-5">
         <h3 className="text-sm font-semibold text-stone-900 mb-4">Lifecycle</h3>
         <ol className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0">
@@ -291,7 +367,9 @@ export default function EpisodeDetailPage({
                 ? episode.status
                 : 'pending'
               : step;
-            const label = isLastStep ? stepFourLabel(episode.status) : formatLabel(step);
+            const label = isLastStep
+              ? stepFourLabel(episode.status, false)
+              : formatLabel(step);
 
             return (
               <li key={step} className="flex sm:flex-1 items-center gap-3">
@@ -359,48 +437,59 @@ export default function EpisodeDetailPage({
           <p className="mt-4 text-sm text-stone-500">No further status transitions available.</p>
         )}
       </div>
+      )}
 
-      {/* Clinical summary */}
+      {/* Care / clinical summary */}
       <div className="rounded-2xl border bg-white shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-stone-900 mb-3">Clinical summary</h3>
+        <h3 className="text-sm font-semibold text-stone-900 mb-3">
+          {familyFacing ? 'Care summary' : 'Clinical summary'}
+        </h3>
         <dl className="grid gap-3 sm:grid-cols-2 text-sm">
           <div className="sm:col-span-2">
             <dt className="text-xs font-semibold text-stone-500">Reason for care</dt>
             <dd className="mt-0.5 text-stone-900">{episode.reasonForCare || '—'}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-semibold text-stone-500">Urgency</dt>
-            <dd className="mt-0.5 text-stone-900">{episode.urgencyLevel || '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold text-stone-500">Diagnoses</dt>
-            <dd className="mt-0.5 flex flex-wrap gap-1.5">
-              {(episode.diagnoses ?? []).length > 0 ? (
-                episode.diagnoses!.map((d) => (
-                  <span
-                    key={d}
-                    className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900"
-                  >
-                    {d}
-                  </span>
-                ))
-              ) : (
-                <span className="text-stone-400">—</span>
-              )}
-            </dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-semibold text-stone-500">Medical history</dt>
-            <dd className="mt-0.5 text-stone-900 whitespace-pre-wrap">
-              {episode.medicalHistory || '—'}
-            </dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-semibold text-stone-500">Current medications</dt>
-            <dd className="mt-0.5 text-stone-900 whitespace-pre-wrap">
-              {episode.currentMeds || '—'}
-            </dd>
-          </div>
+          {!familyFacing && (
+            <div>
+              <dt className="text-xs font-semibold text-stone-500">Urgency</dt>
+              <dd className="mt-0.5 text-stone-900">{episode.urgencyLevel || '—'}</dd>
+            </div>
+          )}
+          {!familyFacing && (
+            <div>
+              <dt className="text-xs font-semibold text-stone-500">Diagnoses</dt>
+              <dd className="mt-0.5 flex flex-wrap gap-1.5">
+                {(episode.diagnoses ?? []).length > 0 ? (
+                  episode.diagnoses!.map((d) => (
+                    <span
+                      key={d}
+                      className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900"
+                    >
+                      {d}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-stone-400">—</span>
+                )}
+              </dd>
+            </div>
+          )}
+          {!familyFacing && (
+            <>
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-semibold text-stone-500">Medical history</dt>
+                <dd className="mt-0.5 text-stone-900 whitespace-pre-wrap">
+                  {episode.medicalHistory || '—'}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-semibold text-stone-500">Current medications</dt>
+                <dd className="mt-0.5 text-stone-900 whitespace-pre-wrap">
+                  {episode.currentMeds || '—'}
+                </dd>
+              </div>
+            </>
+          )}
         </dl>
       </div>
 
@@ -410,7 +499,9 @@ export default function EpisodeDetailPage({
         <ol className="relative border-l border-stone-200 ml-3 space-y-4">
           <li className="ml-4">
             <span className="absolute -left-1.5 mt-1.5 size-3 rounded-full bg-amber-400" />
-            <p className="text-sm font-medium text-stone-900">Intake / episode created</p>
+            <p className="text-sm font-medium text-stone-900">
+              {familyFacing ? 'Care request received' : 'Intake / episode created'}
+            </p>
             <p className="text-xs text-stone-500">
               {episode.createdAt ? new Date(episode.createdAt).toLocaleString() : '—'}
             </p>
@@ -418,11 +509,13 @@ export default function EpisodeDetailPage({
           {episode.intakeReviewedAt && (
             <li className="ml-4">
               <span className="absolute -left-1.5 mt-1.5 size-3 rounded-full bg-teal-500" />
-              <p className="text-sm font-medium text-stone-900">Intake reviewed</p>
+              <p className="text-sm font-medium text-stone-900">
+                {familyFacing ? 'Care team reviewed' : 'Intake reviewed'}
+              </p>
               <p className="text-xs text-stone-500">
                 {new Date(episode.intakeReviewedAt).toLocaleString()}
               </p>
-              {intakeSummary && (
+              {!familyFacing && intakeSummary && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(['keyConcerns', 'urgencyIndicators', 'suggestedServiceCategories', 'riskFlags'] as const).flatMap(
                     (key) => {
@@ -453,7 +546,7 @@ export default function EpisodeDetailPage({
               }`}
             />
             <p className="text-sm font-medium text-stone-900">
-              Current: {formatLabel(episode.status)}
+              Current: {displayEpisodeStatus(episode.status, familyFacing)}
             </p>
             <p className="text-xs text-stone-500">
               {episode.updatedAt ? new Date(episode.updatedAt).toLocaleString() : '—'}
@@ -465,22 +558,32 @@ export default function EpisodeDetailPage({
                 (episode.assessments?.length ?? 0) > 0 ? 'bg-sky-500' : 'bg-stone-200'
               }`}
             />
-            <p className="text-sm font-medium text-stone-900">Assessments</p>
+            <p className="text-sm font-medium text-stone-900">
+              {familyFacing ? 'Consultations' : 'Assessments'}
+            </p>
             <p className="text-xs text-stone-500">
               {(episode.assessments?.length ?? 0) > 0
-                ? `${episode.assessments!.length} linked`
-                : 'None scheduled yet'}
+                ? `${episode.assessments!.length} ${familyFacing ? 'booked' : 'linked'}`
+                : familyFacing
+                  ? 'None booked yet'
+                  : 'None scheduled yet'}
             </p>
           </li>
         </ol>
       </div>
 
-      {/* Assessments */}
+      {/* Assessments / Consultations */}
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-stone-900">Assessments</h3>
+        <h3 className="text-sm font-semibold text-stone-900">
+          {familyFacing ? 'Consultations' : 'Assessments'}
+        </h3>
 
         {(episode.assessments?.length ?? 0) === 0 ? (
-          <p className="text-sm text-stone-500">No assessments linked to this episode yet.</p>
+          <p className="text-sm text-stone-500">
+            {familyFacing
+              ? 'No consultations booked for this care journey yet.'
+              : 'No assessments linked to this episode yet.'}
+          </p>
         ) : (
           <ul className="space-y-2">
             {episode.assessments!.map((a) => (
@@ -489,11 +592,13 @@ export default function EpisodeDetailPage({
                 className="rounded-xl bg-stone-50 px-3 py-2 text-sm flex flex-wrap items-center justify-between gap-2"
               >
                 <span className="font-medium text-stone-900 capitalize">
-                  {a.type || 'assessment'}
+                  {a.type || (familyFacing ? 'consultation' : 'assessment')}
                   {a.scheduledAt ? ` · ${new Date(a.scheduledAt).toLocaleString()}` : ''}
                 </span>
                 <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900">
-                  {(a.status || 'scheduled').replace(/_/g, ' ')}
+                  {familyFacing
+                    ? familyAssessmentStatusLabel(a.status || 'scheduled')
+                    : (a.status || 'scheduled').replace(/_/g, ' ')}
                 </span>
               </li>
             ))}

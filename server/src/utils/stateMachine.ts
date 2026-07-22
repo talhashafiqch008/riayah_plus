@@ -16,7 +16,7 @@ export type StateMachineEntity = 'care_episode' | 'care_plan' | 'appointment' | 
 type TransitionMatrix = Record<string, readonly string[]>;
 
 const CARE_EPISODE_TRANSITIONS: TransitionMatrix = {
-  intake_submitted: ['under_review', 'validated', 'closed'],
+  intake_submitted: ['under_review', 'closed'],
   under_review: ['validated', 'on_hold', 'closed'],
   validated: ['active', 'on_hold', 'closed'],
   active: ['on_hold', 'closed'],

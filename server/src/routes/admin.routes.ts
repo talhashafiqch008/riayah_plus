@@ -4,6 +4,7 @@ import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/rbac';
 import {
+  requireApprove,
   requireCreate,
   requireDelete,
   requireEdit,
@@ -21,7 +22,7 @@ const router = Router();
 router.use(authenticate, requireAdmin, adminLimiter);
 
 // Dashboard stats
-router.get('/dashboard', async (_req: Request, res: Response) => {
+router.get('/dashboard', requireView('user'), async (_req: Request, res: Response) => {
   const [users, bookings, activeEpisodes, pendingDocs, pendingPayouts, overdueInvoices] =
     await Promise.all([
       prisma.user.count({ where: { deletedAt: null } }),
@@ -87,25 +88,25 @@ router.get('/payments', requireView('booking'), async (req: Request, res: Respon
 });
 
 // Payouts
-router.get('/payouts', async (req: Request, res: Response) => {
+router.get('/payouts', requireView('booking'), async (req: Request, res: Response) => {
   const payouts = await prisma.payoutRequest.findMany({ include: { provider: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } });
   res.json({ data: payouts });
 });
 
-router.patch('/payouts/:id/approve', async (req: Request, res: Response) => {
+router.patch('/payouts/:id/approve', requireApprove('booking'), async (req: Request, res: Response) => {
   const payout = await prisma.payoutRequest.update({ where: { id: req.params.id }, data: { status: 'approved', processedAt: new Date() } });
   await AuditService.log({ userId: req.user!.userId, action: 'payout_approved', entity: 'PayoutRequest', entityId: payout.id, req });
   res.json({ data: payout });
 });
 
-router.patch('/payouts/:id/reject', async (req: Request, res: Response) => {
+router.patch('/payouts/:id/reject', requireApprove('booking'), async (req: Request, res: Response) => {
   const { notes } = z.object({ notes: z.string().optional() }).parse(req.body);
   const payout = await prisma.payoutRequest.update({ where: { id: req.params.id }, data: { status: 'rejected', adminNotes: notes } });
   res.json({ data: payout });
 });
 
 // Documents
-router.get('/documents', async (req: Request, res: Response) => {
+router.get('/documents', requireView('document'), async (req: Request, res: Response) => {
   const { status } = req.query as { status?: string };
   const docs = await prisma.document.findMany({ where: status ? { status: status as any } : {}, include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } });
   res.json({ data: docs });
@@ -177,7 +178,7 @@ router.put('/settings', requireEdit('organization'), async (req: Request, res: R
 });
 
 // Reporting
-router.get('/reports/care-outcomes', async (_req: Request, res: Response) => {
+router.get('/reports/care-outcomes', requireView('care_episode'), async (_req: Request, res: Response) => {
   const [active, closed, achieved] = await Promise.all([
     prisma.careEpisode.count({ where: { status: 'active' } }),
     prisma.careEpisode.count({ where: { status: 'closed' } }),
@@ -186,7 +187,7 @@ router.get('/reports/care-outcomes', async (_req: Request, res: Response) => {
   res.json({ activeEpisodes: active, closedEpisodes: closed, achievedGoals: achieved });
 });
 
-router.get('/reports/financial', async (req: Request, res: Response) => {
+router.get('/reports/financial', requireView('booking'), async (req: Request, res: Response) => {
   const { from, to } = req.query as { from?: string; to?: string };
   const where: Record<string, unknown> = {};
   if (from || to) {
@@ -209,7 +210,7 @@ router.get('/reports/financial', async (req: Request, res: Response) => {
 });
 
 // GPS compliance
-router.get('/reports/gps-compliance', async (_req: Request, res: Response) => {
+router.get('/reports/gps-compliance', requireView('booking'), async (_req: Request, res: Response) => {
   const [total, outOfRadius] = await Promise.all([
     prisma.gpsLog.count({ where: { eventType: 'checkin' } }),
     prisma.gpsLog.count({ where: { eventType: 'checkin', geofenced: false } }),
@@ -218,41 +219,41 @@ router.get('/reports/gps-compliance', async (_req: Request, res: Response) => {
 });
 
 // ── Advanced admin routes ──────────────────────────────────────────────────────
-router.get('/dashboard/full', AdvancedAdminController.dashboard);
+router.get('/dashboard/full', requireView('user'), AdvancedAdminController.dashboard);
 
 // Verification queue
-router.get('/verification-queue', AdvancedAdminController.verificationQueue);
-router.patch('/users/:userId/verify', AdvancedAdminController.verifyUser);
+router.get('/verification-queue', requireView('user'), AdvancedAdminController.verificationQueue);
+router.patch('/users/:userId/verify', requireApprove('user'), AdvancedAdminController.verifyUser);
 
 // Credit adjustments
-router.post('/users/:userId/credit-adjustment', AdvancedAdminController.creditAdjustment);
+router.post('/users/:userId/credit-adjustment', requireEdit('booking'), AdvancedAdminController.creditAdjustment);
 
 // Service catalogue
-router.get('/services', AdvancedAdminController.listServices);
-router.post('/services', AdvancedAdminController.createService);
-router.patch('/services/:id', AdvancedAdminController.updateService);
+router.get('/services', requireView('organization'), AdvancedAdminController.listServices);
+router.post('/services', requireCreate('organization'), AdvancedAdminController.createService);
+router.patch('/services/:id', requireEdit('organization'), AdvancedAdminController.updateService);
 
 // Incidents
-router.get('/incidents', AdvancedAdminController.listIncidents);
-router.post('/incidents', AdvancedAdminController.createIncident);
-router.patch('/incidents/:id', AdvancedAdminController.updateIncident);
+router.get('/incidents', requireView('care_episode'), AdvancedAdminController.listIncidents);
+router.post('/incidents', requireCreate('care_episode'), AdvancedAdminController.createIncident);
+router.patch('/incidents/:id', requireEdit('care_episode'), AdvancedAdminController.updateIncident);
 
 // Disputes
-router.get('/disputes', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/disputes', requireView('booking'), async (req: Request, res: Response, next: NextFunction) => {
   const { DisputeController } = await import('../controllers/disputes/DisputeController');
   DisputeController.adminList(req, res, next);
 });
-router.post('/disputes/:disputeId/resolve', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/disputes/:disputeId/resolve', requireApprove('booking'), async (req: Request, res: Response, next: NextFunction) => {
   const { DisputeController } = await import('../controllers/disputes/DisputeController');
   DisputeController.resolve(req, res, next);
 });
 
 // CSV exports
-router.get('/export/bookings', AdvancedAdminController.exportBookings);
-router.get('/export/users', AdvancedAdminController.exportUsers);
+router.get('/export/bookings', requireView('booking'), AdvancedAdminController.exportBookings);
+router.get('/export/users', requireView('user'), AdvancedAdminController.exportUsers);
 
 // ── Review moderation ─────────────────────────────────────────────────────────
-router.delete('/reviews/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/reviews/:id', requireDelete('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const review = await prisma.review.findUnique({ where: { id: req.params.id } });
     if (!review) return next(new (await import('../middleware/errorHandler')).AppError('Review not found.', 404));
@@ -266,7 +267,7 @@ router.delete('/reviews/:id', async (req: Request, res: Response, next: NextFunc
     next(err);
   }
 });
-router.get('/reviews', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/reviews', requireView('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
@@ -298,7 +299,7 @@ router.delete('/users/:id', requireDelete('user'), async (req: Request, res: Res
     next(err);
   }
 });
-router.post('/users/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/users/:id/restore', requireEdit('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.user.update({ where: { id: req.params.id }, data: { deletedAt: null } });
     await AuditService.log({ userId: req.user!.userId, action: 'admin_user_restore', entity: 'User', entityId: req.params.id, req });
@@ -310,7 +311,7 @@ router.post('/users/:id/restore', async (req: Request, res: Response, next: Next
 
 // ── Compliance report ──────────────────────────────────────────────────────────
 // Document coverage per provider: how many required doc types each provider has uploaded vs. required
-router.get('/reports/compliance', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/reports/compliance', requireView('organization'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const requiredDocTypes = ['id_document', 'professional_license', 'police_clearance'];
     const providers = await prisma.user.findMany({
@@ -342,7 +343,7 @@ router.get('/reports/compliance', async (req: Request, res: Response, next: Next
 
 // ── Platform staff management ──────────────────────────────────────────────────
 // List internal platform staff (admin, care_coordinator, staff roles)
-router.get('/platform-staff', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/platform-staff', requireView('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const staff = await prisma.user.findMany({
       where: { role: { in: ['admin', 'care_coordinator', 'staff'] }, deletedAt: null },
@@ -354,7 +355,7 @@ router.get('/platform-staff', async (req: Request, res: Response, next: NextFunc
     next(err);
   }
 });
-router.patch('/platform-staff/:id/suspend', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/platform-staff/:id/suspend', requireEdit('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.user.update({ where: { id: req.params.id }, data: { isActive: false } });
     await AuditService.log({ userId: req.user!.userId, action: 'staff_suspended', entity: 'User', entityId: req.params.id, req });
@@ -363,7 +364,7 @@ router.patch('/platform-staff/:id/suspend', async (req: Request, res: Response, 
     next(err);
   }
 });
-router.patch('/platform-staff/:id/role', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/platform-staff/:id/role', requireEdit('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { role } = z.object({ role: z.string() }).parse(req.body);
     await prisma.user.update({ where: { id: req.params.id }, data: { role: role as never } });
@@ -375,7 +376,7 @@ router.patch('/platform-staff/:id/role', async (req: Request, res: Response, nex
 });
 
 // ── Booking: admin force-cancel ────────────────────────────────────────────────
-router.post('/bookings/:id/force-cancel', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/bookings/:id/force-cancel', requireEdit('booking'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { reason } = z.object({ reason: z.string().optional() }).parse(req.body);
     await prisma.booking.update({ where: { id: req.params.id }, data: { status: 'cancelled', cancellationReason: reason ?? 'Admin force-cancelled' } });
@@ -387,7 +388,7 @@ router.post('/bookings/:id/force-cancel', async (req: Request, res: Response, ne
 });
 
 // ── Payment history for user ───────────────────────────────────────────────────
-router.get('/users/:userId/payments', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/users/:userId/payments', requireView('booking'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
@@ -402,53 +403,53 @@ router.get('/users/:userId/payments', async (req: Request, res: Response, next: 
 });
 
 // ── Document workflows ─────────────────────────────────────────────────────────
-router.get('/documents/pending', adminDocController.listPending.bind(adminDocController));
-router.get('/documents/statistics', adminDocController.getStatistics.bind(adminDocController));
-router.post('/documents/:id/approve', adminDocController.approveDocument.bind(adminDocController));
-router.post('/documents/:id/reject', adminDocController.rejectDocument.bind(adminDocController));
-router.post('/documents/:id/verify', adminDocController.verifyDocument.bind(adminDocController));
-router.get('/document-requests', adminDocController.listDocumentRequests.bind(adminDocController));
-router.get('/document-requests/pending', adminDocController.listPendingDocumentRequests.bind(adminDocController));
-router.post('/document-requests/:id/approve', adminDocController.approveDocumentRequest.bind(adminDocController));
-router.post('/document-requests/:id/reject', adminDocController.rejectDocumentRequest.bind(adminDocController));
+router.get('/documents/pending', requireView('document'), adminDocController.listPending.bind(adminDocController));
+router.get('/documents/statistics', requireView('document'), adminDocController.getStatistics.bind(adminDocController));
+router.post('/documents/:id/approve', requireApprove('document'), adminDocController.approveDocument.bind(adminDocController));
+router.post('/documents/:id/reject', requireApprove('document'), adminDocController.rejectDocument.bind(adminDocController));
+router.post('/documents/:id/verify', requireApprove('document'), adminDocController.verifyDocument.bind(adminDocController));
+router.get('/document-requests', requireView('document'), adminDocController.listDocumentRequests.bind(adminDocController));
+router.get('/document-requests/pending', requireView('document'), adminDocController.listPendingDocumentRequests.bind(adminDocController));
+router.post('/document-requests/:id/approve', requireApprove('document'), adminDocController.approveDocumentRequest.bind(adminDocController));
+router.post('/document-requests/:id/reject', requireApprove('document'), adminDocController.rejectDocumentRequest.bind(adminDocController));
 
 // ── Payout reconciliation ──────────────────────────────────────────────────────
-router.get('/payouts/:id', adminPayoutController.getOne.bind(adminPayoutController));
-router.post('/payouts/:id/confirm-reconciliation', adminPayoutController.confirmReconciliation.bind(adminPayoutController));
-router.get('/payments/stats', adminPayoutController.getPaymentStats.bind(adminPayoutController));
-router.get('/payments/:id', adminPayoutController.getPayment.bind(adminPayoutController));
-router.post('/payments/:id/mark-paid', adminPayoutController.markPaid.bind(adminPayoutController));
-router.get('/payment-audits', adminPayoutController.listPaymentAudits.bind(adminPayoutController));
-router.get('/dashboard/revenue-breakdown', adminPayoutController.revenueBreakdown.bind(adminPayoutController));
-router.get('/dashboard/user-analytics', adminPayoutController.userAnalytics.bind(adminPayoutController));
+router.get('/payouts/:id', requireView('booking'), adminPayoutController.getOne.bind(adminPayoutController));
+router.post('/payouts/:id/confirm-reconciliation', requireApprove('booking'), adminPayoutController.confirmReconciliation.bind(adminPayoutController));
+router.get('/payments/stats', requireView('booking'), adminPayoutController.getPaymentStats.bind(adminPayoutController));
+router.get('/payments/:id', requireView('booking'), adminPayoutController.getPayment.bind(adminPayoutController));
+router.post('/payments/:id/mark-paid', requireApprove('booking'), adminPayoutController.markPaid.bind(adminPayoutController));
+router.get('/payment-audits', requireView('booking'), adminPayoutController.listPaymentAudits.bind(adminPayoutController));
+router.get('/dashboard/revenue-breakdown', requireView('booking'), adminPayoutController.revenueBreakdown.bind(adminPayoutController));
+router.get('/dashboard/user-analytics', requireView('user'), adminPayoutController.userAnalytics.bind(adminPayoutController));
 
 // ── Provider approval workflows ────────────────────────────────────────────────
-router.get('/providers/pending', adminProviderController.listPending.bind(adminProviderController));
-router.post('/providers/:id/approve', adminProviderController.approveProvider.bind(adminProviderController));
-router.post('/providers/:id/reject', adminProviderController.rejectProvider.bind(adminProviderController));
-router.get('/doctors/:id', adminProviderController.getDoctorDetail.bind(adminProviderController));
-router.put('/doctors/:id/approve', adminProviderController.approveDoctor.bind(adminProviderController));
-router.put('/doctors/:id/reject', adminProviderController.rejectDoctor.bind(adminProviderController));
-router.get('/compliance/stats', adminProviderController.complianceStats.bind(adminProviderController));
+router.get('/providers/pending', requireView('user'), adminProviderController.listPending.bind(adminProviderController));
+router.post('/providers/:id/approve', requireApprove('user'), adminProviderController.approveProvider.bind(adminProviderController));
+router.post('/providers/:id/reject', requireApprove('user'), adminProviderController.rejectProvider.bind(adminProviderController));
+router.get('/doctors/:id', requireView('user'), adminProviderController.getDoctorDetail.bind(adminProviderController));
+router.put('/doctors/:id/approve', requireApprove('user'), adminProviderController.approveDoctor.bind(adminProviderController));
+router.put('/doctors/:id/reject', requireApprove('user'), adminProviderController.rejectDoctor.bind(adminProviderController));
+router.get('/compliance/stats', requireView('organization'), adminProviderController.complianceStats.bind(adminProviderController));
 
 // ── Wallets & credits ──────────────────────────────────────────────────────────
-router.get('/wallets', adminProviderController.listWallets.bind(adminProviderController));
-router.get('/credit-transactions', adminProviderController.listCreditTransactions.bind(adminProviderController));
+router.get('/wallets', requireView('booking'), adminProviderController.listWallets.bind(adminProviderController));
+router.get('/credit-transactions', requireView('booking'), adminProviderController.listCreditTransactions.bind(adminProviderController));
 
 // ── Booking admin detail ───────────────────────────────────────────────────────
-router.get('/bookings/:id', adminProviderController.getBookingDetail.bind(adminProviderController));
+router.get('/bookings/:id', requireView('booking'), adminProviderController.getBookingDetail.bind(adminProviderController));
 
 // ── Provider reports (admin view) ─────────────────────────────────────────────
-router.get('/reports', adminProviderController.listProviderReports.bind(adminProviderController));
-router.get('/reports/:id', adminProviderController.getReport.bind(adminProviderController));
-router.post('/reports/:id/status', adminProviderController.updateReportStatus.bind(adminProviderController));
+router.get('/reports', requireView('user'), adminProviderController.listProviderReports.bind(adminProviderController));
+router.get('/reports/:id', requireView('user'), adminProviderController.getReport.bind(adminProviderController));
+router.post('/reports/:id/status', requireEdit('user'), adminProviderController.updateReportStatus.bind(adminProviderController));
 
 // ── Incident management ────────────────────────────────────────────────────────
-router.post('/incidents/:id/escalate', adminProviderController.escalateIncident.bind(adminProviderController));
-router.post('/incidents/:id/suspend-provider', adminProviderController.suspendProviderFromIncident.bind(adminProviderController));
+router.post('/incidents/:id/escalate', requireEdit('care_episode'), adminProviderController.escalateIncident.bind(adminProviderController));
+router.post('/incidents/:id/suspend-provider', requireEdit('user'), adminProviderController.suspendProviderFromIncident.bind(adminProviderController));
 
 // ── Service management ─────────────────────────────────────────────────────────
-router.put('/services/:id/deactivate', adminProviderController.deactivateService.bind(adminProviderController));
+router.put('/services/:id/deactivate', requireEdit('organization'), adminProviderController.deactivateService.bind(adminProviderController));
 
 // ── Organization hierarchy (granular permission gates — extend in M2+) ─────────
 router.get('/organizations', requireView('organization'), OrganizationController.listOrganizations);
@@ -494,9 +495,9 @@ router.patch('/departments/:id', requireEdit('department'), OrganizationControll
 router.delete('/departments/:id', requireDelete('department'), OrganizationController.deleteDepartment);
 
 // ── Internal staff CRUD ────────────────────────────────────────────────────────
-router.get('/staff', adminProviderController.listStaff.bind(adminProviderController));
-router.post('/staff', adminProviderController.createStaff.bind(adminProviderController));
-router.put('/staff/:id', adminProviderController.updateStaff.bind(adminProviderController));
-router.delete('/staff/:id', adminProviderController.removeStaff.bind(adminProviderController));
+router.get('/staff', requireView('user'), adminProviderController.listStaff.bind(adminProviderController));
+router.post('/staff', requireCreate('user'), adminProviderController.createStaff.bind(adminProviderController));
+router.put('/staff/:id', requireEdit('user'), adminProviderController.updateStaff.bind(adminProviderController));
+router.delete('/staff/:id', requireDelete('user'), adminProviderController.removeStaff.bind(adminProviderController));
 
 export default router;

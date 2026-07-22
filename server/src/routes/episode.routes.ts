@@ -4,6 +4,8 @@ import { authenticate } from '../middleware/auth';
 import { requireCareCoordinator } from '../middleware/rbac';
 import { CareSummaryPDFService } from '../services/CareSummaryPDFService';
 import { AppError } from '../middleware/errorHandler';
+import { assertTenantOrgAccess } from '../middleware/tenantAccess';
+import { isFamilyRole } from '../utils/careAccess';
 
 const router = Router();
 router.use(authenticate);
@@ -14,18 +16,34 @@ router.get('/:id', CareEpisodeController.show);
 router.patch('/:id', requireCareCoordinator, CareEpisodeController.update);
 router.post('/:id/submit-intake', requireCareCoordinator, CareEpisodeController.submitIntake);
 
-// Care summary PDF
+// Care summary PDF — tenant + party checks (C-5)
 router.get('/:id/summary-pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { prisma } = await import('../config/database');
-    const episode = await prisma.careEpisode.findUnique({ where: { id: req.params.id } });
+    const episode = await prisma.careEpisode.findUnique({
+      where: { id: req.params.id },
+      include: { careUnit: { select: { familyUserId: true } } },
+    });
     if (!episode) throw new AppError('Care episode not found.', 404);
 
-    const isAdmin = ['admin', 'super_admin', 'care_coordinator'].includes(req.user!.role);
-    const isParty = episode.patientId === req.user!.userId || episode.coordinatorId === req.user!.userId;
-    if (!isParty && !isAdmin) throw new AppError('Forbidden.', 403);
+    const role = req.user!.role;
+    if (isFamilyRole(role)) {
+      const owns =
+        episode.patientId === req.user!.userId ||
+        episode.careUnit?.familyUserId === req.user!.userId;
+      if (!owns) throw new AppError('Forbidden.', 403);
+    } else if (['admin', 'super_admin', 'care_coordinator'].includes(role)) {
+      assertTenantOrgAccess(req, episode.organizationId);
+    } else if (episode.coordinatorId === req.user!.userId) {
+      assertTenantOrgAccess(req, episode.organizationId);
+    } else {
+      throw new AppError('Forbidden.', 403);
+    }
 
-    if (episode.summaryPdfUrl) { res.json({ success: true, pdfUrl: episode.summaryPdfUrl }); return; }
+    if (episode.summaryPdfUrl) {
+      res.json({ success: true, pdfUrl: episode.summaryPdfUrl });
+      return;
+    }
 
     const pdfUrl = await CareSummaryPDFService.generateForEpisode(req.params.id);
     res.json({ success: true, pdfUrl });

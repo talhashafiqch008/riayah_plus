@@ -1,0 +1,84 @@
+import type { CareEpisode } from '@/lib/api/episodes';
+
+export type FamilyMilestone = {
+  id: string;
+  label: string;
+  description?: string;
+  done: boolean;
+  current: boolean;
+  locked?: boolean;
+};
+
+function episodeProgressRank(status: string): number {
+  switch (status) {
+    case 'intake_submitted':
+      return 0;
+    case 'under_review':
+      return 1;
+    case 'validated':
+    case 'active':
+    case 'on_hold':
+      return 2;
+    case 'closed':
+      return 3;
+    default:
+      return 0;
+  }
+}
+
+/** Family-facing care journey milestones (R5). */
+export function buildFamilyJourneyMilestones(episode: CareEpisode): FamilyMilestone[] {
+  const rank = episodeProgressRank(episode.status);
+  const assessments = episode.assessments ?? [];
+  const consultationBooked = assessments.some(
+    (a) => a.status === 'scheduled' || a.status === 'completed' || a.status === 'no_show',
+  );
+  const consultationCompleted = assessments.some((a) => a.status === 'completed');
+
+  const raw: Omit<FamilyMilestone, 'current'>[] = [
+    {
+      id: 'received',
+      label: 'Request received',
+      description: 'Your care request is with our team.',
+      done: true,
+    },
+    {
+      id: 'reviewing',
+      label: 'Care team reviewing',
+      description: 'A coordinator is reviewing your request.',
+      done: rank >= 1,
+    },
+    {
+      id: 'started',
+      label: 'Care journey started',
+      description: 'Your care journey is underway.',
+      done: rank >= 2,
+    },
+    {
+      id: 'booked',
+      label: 'Consultation booked',
+      description: 'A consultation has been scheduled.',
+      done: consultationBooked,
+    },
+    {
+      id: 'completed',
+      label: 'Consultation completed',
+      description: 'Your clinician has finished the consultation.',
+      done: consultationCompleted,
+    },
+    {
+      id: 'careplan',
+      label: 'Care plan ready',
+      description: 'Coming in a later release.',
+      done: false,
+      locked: true,
+    },
+  ];
+
+  const firstOpen = raw.findIndex((m) => !m.done && !m.locked);
+
+  return raw.map((m, i) => ({
+    ...m,
+    current: !m.locked && (firstOpen === -1 ? m.done && i === raw.length - 2 : i === firstOpen),
+  }));
+}

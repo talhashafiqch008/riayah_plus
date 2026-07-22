@@ -7,6 +7,10 @@ import { assertTenantOrgAccess, mergeTenantOrg } from '../../middleware/tenantAc
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
 import { assertAssessmentTransition } from '../../utils/stateMachine';
+import {
+  assertEpisodeAccess,
+  familyAssessmentWhere,
+} from '../../utils/careAccess';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -29,18 +33,28 @@ function isFamily(role: string) {
 const createSchema = z.object({
   episodeId: z.string().min(1),
   assessorId: z.string().min(1),
-  type: z.string().min(2).max(80).default('initial'),
+  type: z.enum(['initial', 'follow_up', 'discharge']).default('initial'),
   scheduledAt: z.string().datetime().or(z.string().min(8)),
   notes: z.string().max(2000).optional(),
 });
+
+const findingsSchema = z
+  .object({
+    summary: z.string().max(4000).optional().nullable(),
+    functionalStatus: z.string().max(2000).optional().nullable(),
+    risks: z.string().max(2000).optional().nullable(),
+    goals: z.string().max(2000).optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+  })
+  .strict();
 
 const updateSchema = z.object({
   status: z.nativeEnum(AssessmentStatus).optional(),
   scheduledAt: z.string().datetime().or(z.string().min(8)).optional(),
   assessorId: z.string().min(1).optional(),
-  type: z.string().min(2).max(80).optional(),
+  type: z.enum(['initial', 'follow_up', 'discharge']).optional(),
   notes: z.string().max(2000).optional().nullable(),
-  findings: z.record(z.unknown()).optional(),
+  findings: findingsSchema.optional(),
   recommendations: z.string().max(4000).optional().nullable(),
   reportUrl: z
     .union([z.string().url(), z.literal(''), z.null()])
@@ -49,7 +63,15 @@ const updateSchema = z.object({
 
 const ASSESSMENT_INCLUDE = {
   episode: {
-    select: { id: true, title: true, status: true, patientId: true, organizationId: true },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      patientId: true,
+      organizationId: true,
+      careUnitId: true,
+      careUnit: { select: { familyUserId: true } },
+    },
   },
   assessor: { select: { id: true, name: true, email: true } },
   patient: { select: { id: true, name: true, email: true } },
@@ -75,11 +97,23 @@ function assertAccess(
   assessment: {
     patientId: string;
     assessorId: string;
-    episode: { patientId: string; organizationId: string | null };
+    episode: {
+      patientId: string;
+      organizationId: string | null;
+      careUnitId?: string | null;
+      careUnit?: { familyUserId: string } | null;
+    };
   },
 ): void {
   const role = req.user!.role;
-  if (isFamily(role) && assessment.patientId === req.user!.userId) return;
+  if (isFamily(role)) {
+    const owns =
+      assessment.patientId === req.user!.userId ||
+      assessment.episode.patientId === req.user!.userId ||
+      assessment.episode.careUnit?.familyUserId === req.user!.userId;
+    if (!owns) throw new AppError('Forbidden.', 403);
+    return;
+  }
   if (isClinical(role) && !isCoordinator(role) && !isAdmin(role)) {
     if (assessment.assessorId !== req.user!.userId) throw new AppError('Forbidden.', 403);
     return;
@@ -157,7 +191,7 @@ export class AssessmentController {
     if (episodeId) where.episodeId = episodeId;
 
     if (isFamily(role) && !isAdmin(role)) {
-      where.patientId = req.user!.userId;
+      Object.assign(where, familyAssessmentWhere(req.user!.userId));
     } else if (isClinical(role) && !isCoordinator(role) && !isAdmin(role)) {
       where.assessorId = req.user!.userId;
     } else if (!isCoordinator(role) && !isAdmin(role)) {
@@ -167,6 +201,15 @@ export class AssessmentController {
       mergeTenantOrg(req, orgFilter);
       if (orgFilter.organizationId) {
         where.episode = { ...(where.episode as object), organizationId: orgFilter.organizationId };
+      }
+      // Validate episodeId belongs to tenant when provided (M-27).
+      if (episodeId) {
+        const ep = await prisma.careEpisode.findUnique({
+          where: { id: episodeId },
+          select: { organizationId: true },
+        });
+        if (!ep) throw new AppError('Episode not found.', 404);
+        assertTenantOrgAccess(req, ep.organizationId);
       }
     }
 
@@ -200,43 +243,52 @@ export class AssessmentController {
     }
 
     const body = createSchema.parse(req.body);
-    const episode = await prisma.careEpisode.findUnique({ where: { id: body.episodeId } });
+    const episode = await prisma.careEpisode.findUnique({
+      where: { id: body.episodeId },
+      include: { careUnit: { select: { familyUserId: true } } },
+    });
     if (!episode) throw new AppError('Episode not found.', 404);
 
     if (isStaffScheduler) {
       assertTenantOrgAccess(req, episode.organizationId);
-    } else if (episode.patientId !== req.user!.userId) {
-      throw new AppError('You can only book consultations on your own care journey.', 403);
+    } else {
+      await assertEpisodeAccess(req, episode);
     }
 
     if (!['validated', 'active', 'under_review', 'intake_submitted', 'on_hold'].includes(episode.status)) {
       throw new AppError('Cannot schedule assessment on a closed episode.', 422);
     }
 
-    const assessor = await prisma.user.findFirst({
-      where: {
-        id: body.assessorId,
-        isActive: true,
-        deletedAt: null,
-        role: {
-          in: [
-            'clinical_staff',
-            'doctor',
-            'nurse',
-            'physiotherapist',
-            'occupational_therapist',
-            'speech_therapist',
-            'psychologist',
-            'dietitian',
-            'therapist',
-            'care_coordinator',
-            'admin',
-            'super_admin',
-          ],
-        },
+    const assessorWhere: Prisma.UserWhereInput = {
+      id: body.assessorId,
+      isActive: true,
+      deletedAt: null,
+      role: {
+        in: [
+          'clinical_staff',
+          'doctor',
+          'nurse',
+          'physiotherapist',
+          'occupational_therapist',
+          'speech_therapist',
+          'psychologist',
+          'dietitian',
+          'therapist',
+          'care_coordinator',
+          'admin',
+          'super_admin',
+        ],
       },
+    };
+    // Assessor must share the episode organization (H-1).
+    if (episode.organizationId) {
+      assessorWhere.organizationId = episode.organizationId;
+    }
+
+    const assessor = await prisma.user.findFirst({
+      where: assessorWhere,
     });
-    if (!assessor) throw new AppError('Assessor not found or not clinical staff.', 422);
+    if (!assessor) throw new AppError('Assessor not found or not clinical staff in this organization.', 422);
 
     const scheduledAt = parseScheduledAt(body.scheduledAt);
 
@@ -300,13 +352,64 @@ export class AssessmentController {
       throw new AppError('Family users cannot update assessments.', 403);
     }
 
-    // Clinical can complete / cancel own; coordinator can reassign / reschedule / cancel
+    // M-18: completed assessments are immutable except coordinator corrections to notes only
+    if (existing.status === 'completed') {
+      const allowedKeys = Object.keys(body).filter((k) => body[k as keyof typeof body] !== undefined);
+      const onlyNotes = allowedKeys.every((k) => k === 'notes');
+      if (!isCoordinator(role) && !isAdmin(role)) {
+        throw new AppError('Completed assessments cannot be modified.', 422);
+      }
+      if (!onlyNotes) {
+        throw new AppError(
+          'Completed assessments can only receive coordinator note corrections.',
+          422,
+        );
+      }
+    }
+
+    // Clinical can complete / update own; cancellation requires coordinator (M-19)
     if (isClinical(role) && !isCoordinator(role) && !isAdmin(role)) {
       if (existing.assessorId !== req.user!.userId) {
         throw new AppError('Forbidden.', 403);
       }
       if (body.assessorId && body.assessorId !== existing.assessorId) {
         throw new AppError('Clinicians cannot reassign assessments.', 403);
+      }
+      if (body.status === 'cancelled') {
+        throw new AppError('Only a care coordinator can cancel an assessment.', 403);
+      }
+    }
+
+    // M-26: reassignment must stay in episode org
+    if (body.assessorId && body.assessorId !== existing.assessorId) {
+      if (!isCoordinator(role) && !isAdmin(role)) {
+        throw new AppError('Only a care coordinator can reassign assessments.', 403);
+      }
+      const orgId = existing.episode.organizationId;
+      const assessor = await prisma.user.findFirst({
+        where: {
+          id: body.assessorId,
+          isActive: true,
+          deletedAt: null,
+          ...(orgId ? { organizationId: orgId } : {}),
+          role: {
+            in: [
+              'clinical_staff',
+              'doctor',
+              'nurse',
+              'physiotherapist',
+              'occupational_therapist',
+              'speech_therapist',
+              'psychologist',
+              'dietitian',
+              'therapist',
+              'care_coordinator',
+            ],
+          },
+        },
+      });
+      if (!assessor) {
+        throw new AppError('Assessor not found in this organization.', 422);
       }
     }
 
@@ -330,7 +433,12 @@ export class AssessmentController {
     }
 
     let scheduledAt: Date | undefined;
-    if (body.scheduledAt) scheduledAt = parseScheduledAt(body.scheduledAt);
+    if (body.scheduledAt) {
+      if (existing.status === 'completed') {
+        throw new AppError('Cannot reschedule a completed assessment.', 422);
+      }
+      scheduledAt = parseScheduledAt(body.scheduledAt);
+    }
 
     const updated = await prisma.assessment.update({
       where: { id: existing.id },
@@ -356,18 +464,22 @@ export class AssessmentController {
       action: nextStatus === 'completed' ? 'assessment_completed' : 'assessment_updated',
       entity: 'Assessment',
       entityId: updated.id,
-      before: existing,
-      after: updated,
+      before: { id: existing.id, status: existing.status, assessorId: existing.assessorId },
+      after: { id: updated.id, status: updated.status, assessorId: updated.assessorId },
       req,
     });
 
     if (nextStatus === 'completed') {
-      await NotificationService.create({
-        userId: existing.patientId,
-        title: 'Assessment completed',
-        body: 'Your assessment findings are ready.',
-        type: 'assessment_completed',
-      }).catch(() => undefined);
+      try {
+        await NotificationService.create({
+          userId: existing.patientId,
+          title: 'Assessment completed',
+          body: 'Your assessment findings are ready.',
+          type: 'assessment_completed',
+        });
+      } catch (err) {
+        console.error('assessment_completed notification failed', err);
+      }
     }
 
     res.json({ data: updated });

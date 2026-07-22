@@ -168,6 +168,13 @@ export async function updateIntakeStatus(id: string, status: string) {
   return data.data;
 }
 
+export async function updateIntakeUrgency(id: string, urgencyLevel: UrgencyLevel) {
+  const { data } = await client.patch<{ data: IntakeRecord }>(`/intake/${id}/urgency`, {
+    urgencyLevel,
+  });
+  return data.data;
+}
+
 export async function listCareUnits(params?: { search?: string; limit?: number }) {
   const { data } = await client.get<{ data: CareUnit[]; total: number }>('/care-units', {
     params,
@@ -320,6 +327,7 @@ export async function presignIntakeDocument(payload: {
           mode: 's3';
           uploadUrl: string;
           key: string;
+          uploadToken: string;
           expiresIn: number;
           category: string;
           careUnitId: string;
@@ -333,8 +341,9 @@ export async function confirmIntakeDocument(payload: {
   category: IntakeDocumentCategory;
   key: string;
   name: string;
-  mimeType: string;
-  size: number;
+  mimeType?: string;
+  size?: number;
+  uploadToken: string;
 }) {
   const { data } = await client.post<{ data: IntakeDocument }>('/intake/documents/confirm', payload);
   return data.data;
@@ -379,6 +388,9 @@ export async function uploadIntakeDocumentSmart(
     if (!put.ok) {
       throw new Error('S3 upload failed — try again or use a smaller file.');
     }
+    if (!presign.uploadToken) {
+      throw new Error('Upload token missing from presign response.');
+    }
     return confirmIntakeDocument({
       careUnitId,
       category,
@@ -386,6 +398,7 @@ export async function uploadIntakeDocumentSmart(
       name: file.name,
       mimeType: file.type || 'application/octet-stream',
       size: file.size,
+      uploadToken: presign.uploadToken,
     });
   }
 

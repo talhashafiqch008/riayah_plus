@@ -8,6 +8,7 @@ import { WhatsAppService } from '../../services/WhatsAppService';
 import { env } from '../../config/env';
 import { generateAccessToken, generateRefreshToken, AuthPayload } from '../../middleware/auth';
 import { setAuthCookies } from '../../utils/authCookies';
+import { persistRefreshToken } from '../../utils/refreshTokenStore';
 import { sanitizedString } from '../../utils/sanitize';
 
 const sendSchema = z.object({
@@ -79,7 +80,15 @@ export class OtpController {
 
     if (!record) throw new AppError('Invalid or expired OTP.', 422);
 
-    await prisma.otpVerification.update({ where: { id: record.id }, data: { verifiedAt: new Date() } });
+    // M-44: purge used OTP immediately (single-use)
+    await prisma.otpVerification.delete({ where: { id: record.id } });
+    await prisma.otpVerification.deleteMany({
+      where: {
+        identifier: parsedIdentifier,
+        type: parsedType,
+        expiresAt: { lt: new Date() },
+      },
+    });
 
     let user = null;
     if (parsedType === 'phone') {
@@ -94,24 +103,18 @@ export class OtpController {
       }
     }
 
-    if (user) {
+    // M-43: OTP verifies identity only — do not issue a full session unless explicitly enabled.
+    const allowOtpLogin = process.env.ALLOW_OTP_LOGIN === 'true';
+    if (user && allowOtpLogin) {
       const payload: AuthPayload = { userId: user.id, role: user.role, email: user.email };
       const accessToken = generateAccessToken(payload);
       const refreshToken = generateRefreshToken({ userId: user.id });
-
-      await prisma.refreshToken.create({
-        data: {
-          userId: user.id,
-          token: refreshToken,
-          ipAddress: req.ip,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
-
+      await persistRefreshToken(user.id, refreshToken, req);
       setAuthCookies(res, accessToken, refreshToken);
 
       res.json({
         verified: true,
+        loginRequired: false,
         token: accessToken,
         accessToken,
         refreshToken,
@@ -121,6 +124,13 @@ export class OtpController {
       return;
     }
 
-    res.json({ verified: true, is_registered: false });
+    res.json({
+      verified: true,
+      loginRequired: Boolean(user),
+      is_registered: Boolean(user),
+      message: user
+        ? 'Phone/email verified. Please sign in with your password.'
+        : 'Verified. Continue registration.',
+    });
   }
 }

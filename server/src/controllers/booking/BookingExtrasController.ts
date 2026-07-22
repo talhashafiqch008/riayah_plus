@@ -2,8 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
-import { AuditService } from '../../services/AuditService';
 import { assertAppointmentTransition } from '../../utils/stateMachine';
+import {
+  assertBookingAccess,
+  assertBookingClient,
+  loadBookingOrThrow,
+} from '../../utils/bookingAccess';
 
 const updateBookingSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
@@ -16,14 +20,10 @@ export class BookingExtrasController {
   async updateBooking(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const userId = req.user!.userId;
       const parsed = updateBookingSchema.parse(req.body);
 
-      const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) throw new AppError('Booking not found', 404);
-      if (booking.clientId !== userId && booking.providerId !== userId) {
-        throw new AppError('Forbidden', 403);
-      }
+      const booking = await loadBookingOrThrow(id);
+      assertBookingAccess(req, booking);
       if (!['pending', 'accepted'].includes(booking.status)) {
         throw new AppError('Cannot update a booking in its current state', 400);
       }
@@ -51,14 +51,10 @@ export class BookingExtrasController {
   async cancelBooking(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const userId = req.user!.userId;
       const { reason } = req.body;
 
-      const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) throw new AppError('Booking not found', 404);
-      if (booking.clientId !== userId && booking.providerId !== userId && req.user!.role !== 'admin') {
-        throw new AppError('Forbidden', 403);
-      }
+      const booking = await loadBookingOrThrow(id);
+      assertBookingAccess(req, booking);
       if (['cancelled', 'completed'].includes(booking.status)) {
         throw new AppError('Booking cannot be cancelled in its current state', 400);
       }
@@ -143,9 +139,8 @@ export class BookingExtrasController {
       const { action, bidId } = req.body;
       if (!['accept', 'reject'].includes(action)) throw new AppError('action must be accept or reject', 400);
 
-      const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) throw new AppError('Booking not found', 404);
-      if (booking.clientId !== req.user!.userId) throw new AppError('Only the client can respond to a counter-offer', 403);
+      const booking = await loadBookingOrThrow(id);
+      assertBookingClient(req, booking);
 
       if (action === 'accept') {
         assertAppointmentTransition(booking.status, 'accepted');
