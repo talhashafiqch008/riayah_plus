@@ -320,16 +320,17 @@ Build these before (or in parallel with) frontend work.
 
 ## 3. Frontend — Not Built for M3 ❌
 
-**No production M3 care-plan UI** in coordinator / family / clinical / staff shells.
-
-What exists today (do not confuse with M3):
+**No production M3 care-plan UI** exists in coordinator / family / clinical / staff shells. The table below clarifies what is present so it is not confused with finished work.
 
 | Existing surface | Reality |
 |---|---|
-| `client/src/pages/careseeker/CarePlansPage.tsx` | Legacy careseeker page: calls `getCarePlans()` **and** shows subscription tier pricing UI. **Not** the clinical builder / family approval flow. |
-| `client/src/lib/api/careseeker.ts` | `getCarePlans` live; create/update/delete mostly commented out |
-| Proposal role shells (`/family`, `/coordinator`, …) | Placeholder / early pages; family `care-plans` route still says M3 arrives later |
-| Demo coordinator pages | Mock data / mock AI — **do not ship as product** |
+| `client/src/pages/careseeker/CarePlansPage.tsx` | Legacy careseeker page: calls `getCarePlans()` and renders a subscription tier pricing UI (Basic / Standard / Premium). **Not** the clinical builder or family approval flow. |
+| `client/src/lib/api/careseeker.ts` | `getCarePlans` is live; `createCarePlan`, `updateCarePlan`, `deleteCarePlan` are commented out. |
+| `/family/care-plans` route | Renders `RoleShellPlaceholder` with the message *"Family care-plan review and approval arrives in Milestone 3."* — placeholder only, no real UI. |
+| `/coordinator/plans` route | Renders `RoleShellPlaceholder` with title "Care Plans" — placeholder only. |
+| `/clinical/notes` route | Renders `RoleShellPlaceholder` with title "Session Notes" — placeholder only. |
+| `/support/shifts` + `/support/tasks` routes | Both render `RoleShellPlaceholder` — placeholders only. |
+| Demo coordinator pages (`/demo/coordinator/*`) | Mock data, no API calls. Contain reusable UI patterns. **See §3.1 for full audit and reuse guidance.** |
 
 ### Pages to build
 
@@ -362,6 +363,72 @@ What exists today (do not confuse with M3):
 |---|---|---|
 | Daily Schedule | `/staff/schedule` | Assigned sessions |
 | Active Shift | `/staff/shift` | Start shift, tasks, evidence, end shift |
+
+---
+
+### 3.1 Legacy / Demo UI — Verified Present on This Branch ✅
+
+A full audit was run on 2026-07-23 (milestone3 branch). The following files exist and all their dependencies resolve. **All demo pages use hardcoded mock data — none are wired to the real API.** They are valuable starting points for M3 UI, not finished product.
+
+#### Demo coordinator pages — `client/src/pages/demo/coordinator/`
+
+All 10 pages are registered in the router under `DemoCoordinatorLayout` (routes `/demo/coordinator/*`). They are lazy-loaded and auth-gated.
+
+| File | Lines | M3 Relevance | What it has |
+|---|---|---|---|
+| `CareseekerPage.tsx` | 428 | **High** — family care plan flow | Active plan + task list, pending-approval banner with Approve / Request Changes buttons, plan list tab with progress bars, PDF export. Local state only — swap mock data for real API calls to wire it up. |
+| `MonitoringPage.tsx` | 487 | Medium — task delivery tracking | Live task feed with animated progress, alerts, status badges. Useful reference for support worker shift view. |
+| `WorkflowPage.tsx` | 345 | Low — visual reference | Diagram of the full care plan → task engine → approval flow. Role responsibility matrix. |
+| `IntakePage.tsx` | 421 | Low — AI demo, not product | AI chat + intake extraction UI using mock data. Do not repurpose as the real AI summary panel. |
+| `DashboardPage.tsx` | 675 | Low | Coordinator overview stats, mock KPIs |
+| `BookingsPage.tsx` | 378 | Low | Booking list, mock data |
+| `HelperPage.tsx` | 343 | Low | Helper/support worker assignment mock |
+| `ProviderPage.tsx` | 404 | Low | Provider matching mock |
+| `ReportingPage.tsx` | 643 | Low | Reports mock |
+| `OrganizationPage.tsx` | 526 | Low | Org management mock |
+
+#### Demo data / helpers — `client/src/demo/coordinator/`
+
+All 6 files present and verified:
+
+| File | What it contains |
+|---|---|
+| `types.ts` | `DemoPatient`, `DemoTask`, `DemoCarePlan`, `DemoProvider`, `DemoProgress` — type shapes closely mirror the real Prisma models |
+| `data.ts` | `mockPatients`, `mockCarePlans`, `mockProviders`, `mockProgress` — rich sample data with tasks, goals, statuses, budgets |
+| `components/shared.tsx` | `StatusBadge`, `StatCard`, `ProgressBar`, `ProgressRing`, `LoadingSkeleton`, `TabNav` — reusable presentational components |
+| `components/notification-center.tsx` | Notification panel component |
+| `tokens.ts` | Design tokens (colours, typography, shadows) used across all demo pages |
+| `pdf-export.ts` | `exportCarePlanPDF`, `exportPatientProgress`, `exportCoordinatorReport` — client-side PDF helpers |
+
+`DemoCarePlan` shape for reference:
+```ts
+{
+  id, patientId, patientName, title
+  clinicalBudget, dailyLivingBudget, equipmentBudget, totalBudget
+  status: "draft" | "pending_approval" | "approved" | "active" | "completed"
+  tasks: DemoTask[]     // category, frequency, role, status, assignedTo, dueDate, notes
+  createdAt, approvedAt?, approvedBy?
+}
+```
+
+#### Non-demo pages with M3-adjacent UI
+
+| File | Lines | What it has | Status |
+|---|---|---|---|
+| `client/src/pages/provider/TasksPage.tsx` | 995 | Full task management UI for support/clinical workers — categories, priorities, vitals logging, evidence upload, shift-like workflow | **Not wired to API.** Uses role detection from `localStorage`. Good basis for real support worker shift page. |
+| `client/src/pages/staff/TasksPage.tsx` | ~100 | Simple hardcoded task toggle list with priority badges | Minimal — replace entirely. |
+
+#### What to reuse vs what to build fresh
+
+| M3 Feature | Action |
+|---|---|
+| Family care plan review / approve / reject UI | **Adapt** `demo/coordinator/CareseekerPage.tsx` — replace `mockCarePlans` with real `GET /care-plans?episodeId=...`, wire Approve / Request Changes buttons to real endpoints |
+| Support worker task + shift workflow | **Adapt** `provider/TasksPage.tsx` — wire to `GET /shifts/active`, `PATCH /shifts/tasks/:id`, `POST /shifts/start` |
+| Shared UI atoms (badges, progress bars, tabs) | **Reuse** `demo/coordinator/components/shared.tsx` or extract into `/components/ui/` |
+| Coordinator care plan builder | **Build fresh** — no legacy equivalent exists |
+| Clinical notes page | **Build fresh** |
+| Staff scheduling / availability | **Build fresh** |
+| AI summary panel | **Build fresh** — `IntakePage.tsx` demo is a different concept (voice chat); do not repurpose |
 
 ---
 
