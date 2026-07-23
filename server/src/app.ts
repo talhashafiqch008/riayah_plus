@@ -7,6 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { Server as SocketIOServer } from 'socket.io';
+import jwt from 'jsonwebtoken';
 import * as Sentry from '@sentry/node';
 
 import { env } from './config/env';
@@ -53,12 +54,22 @@ const io = new SocketIOServer(server, {
 app.locals.io = io;
 
 io.on('connection', (socket) => {
-  const userId = socket.handshake.query.userId as string;
-  if (userId) {
-    socket.join(`chat.${userId}`);
-    socket.join(`notification.user.${userId}`);
-    logger.debug(`Socket connected: ${userId}`);
+  const token = socket.handshake.auth?.token as string | undefined;
+  if (!token) {
+    socket.disconnect(true);
+    return;
   }
+  let userId: string;
+  try {
+    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as { userId: string };
+    userId = payload.userId;
+  } catch {
+    socket.disconnect(true);
+    return;
+  }
+  socket.join(`chat.${userId}`);
+  socket.join(`notification.user.${userId}`);
+  logger.debug(`Socket connected: ${userId}`);
 
   socket.on('disconnect', () => {
     logger.debug(`Socket disconnected: ${userId}`);
@@ -96,7 +107,7 @@ app.use(
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Request'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 

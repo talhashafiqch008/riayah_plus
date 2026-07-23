@@ -41,8 +41,8 @@ export class EmergencyController {
       await Promise.all(recipients.map(r =>
         NotificationService.create({
           userId: r.id,
-          title: '🚨 Emergency Alert',
-          body: `Client raised an emergency: ${body.description.substring(0, 80)}`,
+          title: 'Emergency Alert',
+          body: 'A client has raised an emergency. Open the app to respond.',
           type: 'emergency_alert',
           data: { emergencyId: request.id, clientId },
         })

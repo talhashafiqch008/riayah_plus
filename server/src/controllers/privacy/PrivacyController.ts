@@ -22,6 +22,7 @@ const exportSchema = z.object({
         'invoices',
         'emergency',
         'family_members',
+        'gps_logs',
       ]),
     )
     .optional(),
@@ -62,6 +63,7 @@ export class PrivacyController {
         familyMembers,
         consents,
         consentLogs,
+        gpsLogs,
       ] = await Promise.all([
         include('profile')
           ? prisma.user.findUnique({
@@ -117,6 +119,7 @@ export class PrivacyController {
           : [],
         prisma.consent.findMany({ where: { userId } }),
         prisma.consentLog.findMany({ where: { userId }, take: 200, orderBy: { createdAt: 'desc' } }),
+        include('gps_logs') ? prisma.gpsLog.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 500 }) : [],
       ]);
 
       const exportData = {
@@ -143,6 +146,7 @@ export class PrivacyController {
         familyMembers,
         consents,
         consentLogs,
+        gpsLogs,
       };
 
       await prisma.dataExportRequest.update({

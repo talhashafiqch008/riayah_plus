@@ -64,7 +64,7 @@ export class TelehealthController {
     await NotificationService.create({
       userId: session.clientId,
       title: 'Your telehealth session is ready',
-      body: `Join your session with ${session.provider.name}`,
+      body: 'Your session is ready. Open the app to join.',
       type: 'telehealth_ready',
       data: { sessionId, roomName },
     });
