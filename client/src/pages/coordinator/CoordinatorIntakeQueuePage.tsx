@@ -15,6 +15,7 @@ import {
   type UrgencyLevel,
 } from '@/lib/api/intake';
 import { createCoordinatorDocumentRequest } from '@/lib/api/documents';
+import { getCoordinators, type CoordinatorOption } from '@/lib/api/episodes';
 import {
   PENDING_DIAGNOSIS,
   parseFamilyWizardSummary,
@@ -152,6 +153,9 @@ export default function CoordinatorIntakeQueuePage() {
   const [docType, setDocType] = useState('medical_report');
   const [docNote, setDocNote] = useState('');
 
+  const [coordinators, setCoordinators] = useState<CoordinatorOption[]>([]);
+  const [selectedCoordinatorId, setSelectedCoordinatorId] = useState('');
+
   const [keyConcerns, setKeyConcerns] = useState<string[]>([]);
   const [urgencyIndicators, setUrgencyIndicators] = useState<string[]>([]);
   const [suggestedServices, setSuggestedServices] = useState<ServiceCategory[]>([]);
@@ -161,6 +165,12 @@ export default function CoordinatorIntakeQueuePage() {
   const [episodeTitle, setEpisodeTitle] = useState('');
 
   const reviewSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    getCoordinators()
+      .then(setCoordinators)
+      .catch(() => undefined);
+  }, []);
 
   const canReview = useMemo(() => {
     if (!detail) return false;
@@ -207,6 +217,7 @@ export default function CoordinatorIntakeQueuePage() {
     setNotes('');
     setCreateEpisode(true);
     setEpisodeTitle('');
+    setSelectedCoordinatorId('');
     setShowDocRequest(false);
     setDocType('medical_report');
     setDocNote('');
@@ -335,6 +346,7 @@ export default function CoordinatorIntakeQueuePage() {
         createEpisode,
         episodeTitle: episodeTitle.trim() || undefined,
         notes: notes.trim() || undefined,
+        coordinatorId: selectedCoordinatorId || undefined,
       });
       toast.success(
         createEpisode
@@ -990,6 +1002,26 @@ export default function CoordinatorIntakeQueuePage() {
                       placeholder="Additional structured comment — not a substitute for chips above"
                     />
                   </div>
+
+                  {coordinators.length > 0 && (
+                    <div>
+                      <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
+                        Assign coordinator (defaults to you)
+                      </label>
+                      <select
+                        value={selectedCoordinatorId}
+                        onChange={(e) => setSelectedCoordinatorId(e.target.value)}
+                        className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
+                      >
+                        <option value="">— Assign to myself —</option>
+                        {coordinators.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <label className="flex items-center gap-2 text-sm text-stone-700">
                     <input

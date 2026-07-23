@@ -10,11 +10,8 @@ import { sendEmailVerificationForUser } from '../../utils/emailVerification';
 import { sanitizedString } from '../../utils/sanitize';
 
 const PUBLIC_SELF_REGISTER_ROLES = new Set<UserRole>([
-  'client',
-  'consumer',
   'family',
   'patient',
-  'provider',
 ]);
 
 const registerSchema = z

@@ -32,6 +32,10 @@ const updateEpisodeSchema = z.object({
   status: z.nativeEnum(CareEpisodeStatus).optional(),
 });
 
+const assignCoordinatorSchema = z.object({
+  coordinatorId: z.string().min(1),
+});
+
 export class CareEpisodeController {
   static async index(req: Request, res: Response): Promise<void> {
     const { page = '1', limit = '20', status } = req.query as Record<string, string>;
@@ -184,6 +188,57 @@ export class CareEpisodeController {
       req,
     });
     res.json({ data: episode });
+  }
+
+  static async coordinators(req: Request, res: Response): Promise<void> {
+    const where: Record<string, unknown> = { role: 'care_coordinator' };
+    mergeTenantOrg(req, where);
+    const list = await prisma.user.findMany({
+      where,
+      select: { id: true, name: true, email: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ data: list });
+  }
+
+  static async assignCoordinator(req: Request, res: Response): Promise<void> {
+    const { coordinatorId } = assignCoordinatorSchema.parse(req.body);
+
+    const episode = await prisma.careEpisode.findUnique({
+      where: { id: req.params.id },
+      include: { careUnit: { select: { familyUserId: true } } },
+    });
+    if (!episode) throw new AppError('Care episode not found.', 404);
+    await assertEpisodeAccess(req, episode);
+
+    const coordinator = await prisma.user.findUnique({
+      where: { id: coordinatorId },
+      select: { id: true, role: true, organizationId: true },
+    });
+    if (!coordinator || coordinator.role !== 'care_coordinator') {
+      throw new AppError('Coordinator not found.', 404);
+    }
+    assertTenantOrgAccess(req, coordinator.organizationId);
+
+    const updated = await prisma.careEpisode.update({
+      where: { id: req.params.id },
+      data: { coordinatorId },
+      include: {
+        coordinator: { select: { id: true, name: true } },
+      },
+    });
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'episode_coordinator_assigned',
+      entity: 'CareEpisode',
+      entityId: updated.id,
+      before: { coordinatorId: episode.coordinatorId },
+      after: { coordinatorId },
+      req,
+    });
+
+    res.json({ data: updated });
   }
 
   static async submitIntake(req: Request, res: Response): Promise<void> {

@@ -12,8 +12,10 @@ router.use(authenticate);
 
 router.get('/', requireCareUser, CareEpisodeController.index);
 router.post('/', requireCareCoordinator, CareEpisodeController.store);
+router.get('/coordinators', requireCareCoordinator, CareEpisodeController.coordinators);
 router.get('/:id', requireCareUser, CareEpisodeController.show);
 router.patch('/:id', requireCareCoordinator, CareEpisodeController.update);
+router.patch('/:id/assign-coordinator', requireCareCoordinator, CareEpisodeController.assignCoordinator);
 router.post('/:id/submit-intake', requireCareCoordinator, CareEpisodeController.submitIntake);
 
 // Care summary PDF — tenant + party checks (C-5)

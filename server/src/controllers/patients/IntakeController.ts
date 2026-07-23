@@ -59,6 +59,7 @@ const reviewSchema = z.object({
   createEpisode: z.boolean().optional().default(true),
   episodeTitle: optionalSanitizedString(),
   notes: optionalSanitizedString(),
+  coordinatorId: z.string().min(1).optional(),
 });
 
 const statusSchema = z.object({
@@ -734,7 +735,7 @@ export class IntakeController {
 
         const episode = await tx.careEpisode.create({
           data: {
-            coordinatorId: req.user!.userId,
+            coordinatorId: review.coordinatorId ?? req.user!.userId,
             // Account party = CareRecipient.userId (family guardian in M2). Clinical patient = careRecipientId (C-1).
             patientId: party.patientId,
             careRecipientId: party.careRecipientId,

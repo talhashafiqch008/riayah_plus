@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, History, Loader2, Save } from 'lucide-react';
+import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import {
@@ -274,9 +275,16 @@ export default function CarePatientDetailPage({ basePath }: Props) {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
+        <Breadcrumb
+          items={[
+            { label: isFamilyView ? 'Home' : 'Care Units', href: basePath },
+            { label: unit.name, href: `${basePath}/${unitId}` },
+            { label: patient.name },
+          ]}
+        />
         <Link
           to={`${basePath}/${unitId}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
+          className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
         >
           <ArrowLeft className="size-4" /> Back to {unit.name}
         </Link>

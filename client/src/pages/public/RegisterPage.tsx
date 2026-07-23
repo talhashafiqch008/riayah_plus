@@ -1,15 +1,14 @@
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
+import { m, LazyMotion, domAnimation } from "framer-motion";
 import { isApiError } from '@/lib/errors';
 import { registerSchema } from '@/lib/validation';
 import {
  Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone, Heart,
- Stethoscope, CheckCircle2, ChevronLeft, ShieldCheck
+ CheckCircle2, ShieldCheck
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { FieldError } from '@/components/forms/FieldError';
@@ -27,18 +26,7 @@ const fadeIn = {
 };
 
 function RegisterContent() {
- const [searchParams] = useSearchParams();
- const roleParam = searchParams.get('role');
- const typeParam = searchParams.get('type');
-
- const [step, setStep] = useState(1); // 1: Role selection, 2: Details
- const [selectedRole, setSelectedRole] = useState<'family' | 'provider' | 'client' | null>(
- roleParam === 'provider' ? 'provider' :
- roleParam === 'family' ? 'family' :
- typeParam === 'provider' ? 'provider' :
- typeParam === 'seeker' ? 'client' :
- null
- );
+ const selectedRole = 'family';
  const [formData, setFormData] = useState({
  email: '',
  password: '',
@@ -47,28 +35,12 @@ function RegisterContent() {
  lastName: '',
  phone: '',
  });
- const [showPassword, setShowPassword] = useState(false);
  const [loading, setLoading] = useState(false);
  const [agreedToTerms, setAgreedToTerms] = useState(false);
  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
  const { register } = useAuth();
  const navigate = useNavigate();
 
- // Auto-advance if role or type is in URL
- // TODO: Refactor cascading setState into useReducer or batched update
- // TODO: Combine multiple setState calls
- useEffect(() => {
- if (roleParam === 'provider' || roleParam === 'family') {
- setSelectedRole(roleParam as 'family' | 'provider');
- setStep(2);
- } else if (typeParam === 'provider') {
- setSelectedRole('provider');
- setStep(2);
- } else if (typeParam === 'seeker') {
- setSelectedRole('client');
- setStep(2);
- }
- }, [roleParam, typeParam]);
 
  const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
  setFormData({
@@ -77,10 +49,6 @@ function RegisterContent() {
  });
  };
 
- const handleRoleSelect = (role: 'family' | 'provider' | 'client') => {
- setSelectedRole(role);
- setStep(2);
- };
 
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
@@ -118,21 +86,9 @@ function RegisterContent() {
 
  const registeredUser = result.user;
  toast.success('Account created successfully! Redirecting...');
-      const role = typeof registeredUser.role === 'string' ? registeredUser.role.toLowerCase() : '';
       const onboardingStatus = registeredUser.onboarding_status;
-      if (onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed') {
-        if (role === 'client' || role === 'family' || role === 'patient') {
-          navigate('/careseeker/onboarding');
-        } else {
-          navigate('/provider/onboarding');
-        }
-      } else if (role === 'family') {
-        navigate('/family');
-      } else if (role === 'provider' || role === 'provider_admin') {
-        navigate('/provider/dashboard');
-      } else {
-        navigate('/careseeker');
-      }
+      const onboardingPending = onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed';
+      navigate(onboardingPending ? '/family/onboarding' : '/family');
  } catch (error: unknown) {
  if (isApiError(error) && error.fieldErrors) {
  setFieldErrors(error.fieldErrors);
@@ -178,29 +134,9 @@ function RegisterContent() {
  <Logo size="xl" animated={true} />
  </Link>
 
- <AnimatePresence mode="wait">
- {step === 1 ? (
- <m.div key="step1-text" {...fadeIn}>
- <h1 className="text-5xl font-semibold text-stone-900 mb-6 leading-tight">
- Join the <br />
- <span className="text-teal-600">community.</span>
- </h1>
- <p className="text-lg text-stone-500 mb-8 leading-relaxed">
- Whether you're looking for care tailored to your family's needs or you're a professional ready to help, you're in the right place.
- </p>
- <div className="space-y-4">
- <FeatureItem icon={ShieldCheck} text="Verified Providers & Families" />
- <FeatureItem icon={Heart} text="Compassionate Care Matching" />
- <FeatureItem icon={CheckCircle2} text="Secure Payments & Insurance" />
- </div>
- </m.div>
- ) : (
- <m.div key="step2-text" {...fadeIn} className="bg-white/60 backdrop-blur-md p-8 rounded-3xl border border-white/50 shadow-sm">
- <h2 className="text-2xl font-semibold text-stone-900 mb-2">
- {(selectedRole === 'family' || selectedRole === 'client') ? 'Care Seeker Account' : 'Care Provider Account'}
- </h2>
- <p className="text-stone-500 mb-6">You are creating an account as a <span className="font-semibold text-teal-600">{(selectedRole === 'family' || selectedRole === 'client') ? 'Family Member' : 'Health Professional'}</span>.</p>
-
+ <m.div {...fadeIn} className="bg-white/60 backdrop-blur-md p-8 rounded-3xl border border-white/50 shadow-sm">
+ <h2 className="text-2xl font-semibold text-stone-900 mb-2">Family Account</h2>
+ <p className="text-stone-500 mb-6">You are creating an account as a <span className="font-semibold text-teal-600">Family Member</span>.</p>
  <div className="p-4 bg-teal-50 rounded-xl flex items-start gap-3 border border-teal-100">
  <div className="size-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0 text-teal-600">
  <ShieldCheck className="size-4" />
@@ -211,8 +147,6 @@ function RegisterContent() {
  </div>
  </div>
  </m.div>
- )}
- </AnimatePresence>
  </m.div>
 
  {/* Right Side: Glass Registration Card */}
@@ -225,56 +159,11 @@ function RegisterContent() {
  {/* Decorative Blob */}
  <div className="absolute -z-10 -bottom-10 -left-10 size-40 bg-amber-100/50 rounded-full blur-3xl"></div>
 
- <div className="text-center mb-8 relative">
- {step === 2 && (
- <button
- onClick={() => setStep(1)}
- className="absolute left-0 top-1/2 -translate-y-1/2 p-2 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-700 transition-colors"
- >
- <ChevronLeft className="size-5" />
- </button>
- )}
- <h2 className="text-2xl font-semibold text-stone-900">
- {step === 1 ? 'Get Started' : 'Create Account'}
- </h2>
-                {step === 1 && (
-                  <p className="text-stone-500 text-sm mt-1">
-                    Select your role to continue — tap <strong>I Need Care</strong> to register
-                  </p>
-                )}
+ <div className="text-center mb-8">
+ <h2 className="text-2xl font-semibold text-stone-900">Create Account</h2>
  </div>
 
- <AnimatePresence mode="wait">
-            {step === 1 ? (
-              <m.div key="step1-content" {...fadeIn} className="space-y-4">
-                <RoleCard
-                  icon={Heart}
-                  title="I Need Care"
-                  subtitle="Family members & care seekers"
-                  active={selectedRole === 'family' || selectedRole === 'client'}
-                  onClick={() => handleRoleSelect('family')}
-                  color="teal"
-                />
-                <RoleCard
-                  icon={Stethoscope}
-                  title="I Provide Care"
-                  subtitle="Coming Soon"
-                  active={false}
-                  disabled={true}
-                  color="blue"
-                />
-
-                <div className="pt-6 text-center">
-                  <p className="text-stone-500 text-sm">
-                    Already have an account?{' '}
-                    <Link to="/login" className="text-teal-600 hover:text-teal-700 font-bold hover:underline">
-                      Sign in
-                    </Link>
-                  </p>
-                </div>
-              </m.div>
-            ) : (
- <m.form key="step2-form" {...fadeIn} onSubmit={handleSubmit} className="space-y-4">
+ <m.form {...fadeIn} onSubmit={handleSubmit} className="space-y-4">
  <FormErrorSummary errors={fieldErrors} />
  <div className="grid grid-cols-2 gap-4">
  <div>
@@ -367,8 +256,6 @@ function RegisterContent() {
  )}
  </m.button>
  </m.form>
- )}
- </AnimatePresence>
  </m.div>
  </div>
  </div>

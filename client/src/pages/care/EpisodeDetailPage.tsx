@@ -8,7 +8,10 @@ import {
   EPISODE_STATUS_STEPS,
   getEpisode,
   updateEpisodeStatus,
+  getCoordinators,
+  assignCoordinator,
   type CareEpisode,
+  type CoordinatorOption,
 } from '@/lib/api/episodes';
 import {
   listClinicians,
@@ -20,6 +23,7 @@ import {
   familyEpisodeStatusLabel,
 } from '@/lib/familyLanguage';
 import { buildFamilyJourneyMilestones } from '@/lib/familyJourneyMilestones';
+import { Breadcrumb } from '@/components/ui/Breadcrumb';
 
 type Props = {
   basePath: string;
@@ -170,6 +174,10 @@ export default function EpisodeDetailPage({
   const [scheduledAt, setScheduledAt] = useState('');
   const [scheduling, setScheduling] = useState(false);
 
+  const [coordinators, setCoordinators] = useState<CoordinatorOption[]>([]);
+  const [reassignId, setReassignId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
+
   const showScheduleForm = canSchedule || canTransition;
   const familyFacing = canSchedule && !canTransition;
 
@@ -200,6 +208,13 @@ export default function EpisodeDetailPage({
       })
       .catch(() => undefined);
   }, [showScheduleForm]);
+
+  useEffect(() => {
+    if (!canTransition) return;
+    void getCoordinators()
+      .then(setCoordinators)
+      .catch(() => undefined);
+  }, [canTransition]);
 
   const nextStatuses = useMemo(
     () => (episode ? allowedEpisodeTransitions(episode.status) : []),
@@ -245,6 +260,35 @@ export default function EpisodeDetailPage({
     }
   };
 
+  const handleReassign = async () => {
+    if (!episode || !reassignId) return;
+    setReassigning(true);
+    try {
+      const selected = coordinators.find((c) => c.id === reassignId);
+      const updated = await assignCoordinator(episode.id, reassignId);
+      setEpisode((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updated,
+              coordinator:
+                updated.coordinator ??
+                (selected
+                  ? { id: selected.id, name: selected.name }
+                  : prev.coordinator),
+            }
+          : updated,
+      );
+      setReassignId('');
+      toast.success('Coordinator reassigned');
+    } catch (error: unknown) {
+      if (isApiError(error)) toast.error(error.message);
+      else toast.error('Reassign failed');
+    } finally {
+      setReassigning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -268,9 +312,15 @@ export default function EpisodeDetailPage({
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
+        <Breadcrumb
+          items={[
+            { label: familyFacing ? 'Care Journey' : 'Episodes', href: basePath },
+            { label: episode.title },
+          ]}
+        />
         <Link
           to={basePath}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
+          className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
         >
           <ArrowLeft className="size-4" />{' '}
           {familyFacing ? 'Back to care journey' : 'Back to episodes'}
@@ -435,6 +485,38 @@ export default function EpisodeDetailPage({
 
         {canTransition && nextStatuses.length === 0 && (
           <p className="mt-4 text-sm text-stone-500">No further status transitions available.</p>
+        )}
+
+        {canTransition && coordinators.length > 0 && (
+          <div className="mt-5 pt-4 border-t">
+            <p className="text-xs font-semibold text-stone-500 mb-1">Assigned coordinator</p>
+            <p className="text-sm text-stone-800 mb-3">
+              {episode.coordinator?.name ?? 'Unassigned'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={reassignId}
+                onChange={(e) => setReassignId(e.target.value)}
+                className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              >
+                <option value="">— Reassign to —</option>
+                {coordinators.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!reassignId || reassigning}
+                onClick={() => void handleReassign()}
+                className="rounded-xl bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {reassigning && <Loader2 className="size-3 animate-spin" />}
+                Reassign
+              </button>
+            </div>
+          </div>
         )}
       </div>
       )}
