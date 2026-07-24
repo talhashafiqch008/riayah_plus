@@ -80,6 +80,8 @@ io.on('connection', (socket) => {
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    // A-7: explicit no-referrer so reset/verify tokens in URLs don't leak via Referer header
+    referrerPolicy: { policy: 'no-referrer' },
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {

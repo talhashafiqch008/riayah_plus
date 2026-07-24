@@ -1,10 +1,60 @@
-# Ahmed Revision — Progress Tracker
+# M2 Revision Progress Tracker
 
 **Branch:** `milestone2-revisions`  
-**Source brief:** `AHMED_REVISION_PLAN.md`  
-**Last updated:** 2026-07-23  
+**Source brief:** `M2_REVISION_PLAN.md`  
+**Last updated:** 2026-07-24  
 
 > This file is the handoff doc. If the session ends, the next developer (Cursor or otherwise) should read this, check the current git status, and continue from the first 🔄 item.
+
+---
+
+## 🔴 CURRENT PRIORITY: Karim Re-Audit (ea27627) — Security & GDPR Fixes
+
+**Full audit:** `mern/docx/GDPR_Security_ReTest_ea27627.md`  
+**Commit audited:** `ea27627`  
+**Ahmed's revision items (R-A through R-D): all committed and tested ✅ — see below.**
+
+Scope: M2 findings (issues in files M2 changed) + M1 auth/session hardening findings (auth system touched in M1, should have been caught then). Payment, billing, LMS, cache, and infrastructure findings go to their respective future milestones and are not tracked here.
+
+---
+
+### M1 — Auth & Session Hardening
+
+| ID | Severity | Finding | File | Fix |
+|----|----------|---------|------|-----|
+| **A-3** | 🔴 Critical | JWT secrets default to `'change-me-access-secret'` / `'change-me-refresh-secret'` — server starts and issues forgeable tokens if env vars not overridden | `server/src/config/env.ts:20-21` | Refuse to start if secrets equal default values |
+| **A-1** | 🔴 High | OTP verify endpoints have no rate limiter — 6-digit OTP brute-forceable; prior OTPs not invalidated on new send | `server/src/controllers/auth/OtpController.ts:32,56-80`; `server/src/routes/auth.routes.ts:45-46` | Apply `otpLimiter` to verify endpoints; invalidate old OTPs on new send |
+| **A-2** | 🔴 High | 2FA verify endpoint unthrottled; `two_fa_token` is just the user ID — TOTP brute-force possible | `server/src/controllers/auth/AuthController.ts:101-102,129-148`; `server/src/routes/auth.routes.ts:42-43` | Add per-identifier rate limiter; replace user-ID challenge with opaque random state token |
+| **A-4** | 🔴 High | `OtpController.verify` stores refresh tokens in plaintext — password auth hashes them (inconsistency) | `server/src/controllers/auth/OtpController.ts:102-109` | Use `persistRefreshToken` (which hashes) inside `OtpController.verify` |
+| **A-10** | 🟡 Medium | Legacy plaintext refresh-token fallback still active in `refreshTokenStore.ts` — downgrade path accepts plaintext tokens | `server/src/utils/refreshTokenStore.ts:24-48` | Remove legacy fallback; hash all stored refresh tokens |
+| **A-5** | 🟡 Medium | Multiple concurrent valid password-reset tokens allowed per user — old email link still works after new reset requested | `server/src/controllers/auth/AuthController.ts:260-271,280-300` | Delete all prior `password_reset` rows for the identifier on each new `forgotPassword` |
+| **A-6** | 🟡 Medium | `DeviceTokenController.register` silently reassigns push token to a different userId — enables push notification hijack | `server/src/controllers/auth/DeviceTokenController.ts:18-35` | Require `existing.userId === req.user.userId` before updating; otherwise delete + re-create |
+| **A-7** | 🟡 Medium | No global `Referrer-Policy` header; reset/verify tokens in URL query strings can leak via Referer to third-party assets | `server/src/app.ts`; `server/src/services/EmailService.ts:47-72` | Add `Referrer-Policy: strict-origin-when-cross-origin` globally; add `<meta name="referrer">` in email templates |
+| **A-8** | 🟢 Low | Auth cookies use `sameSite: 'lax'` — evaluate `strict` for a health-data platform | `server/src/utils/authCookies.ts:11-17` | Evaluate `sameSite: 'strict'` for the refresh cookie; document decision |
+| **A-9** | 🟢 Low | Login timing oracle — missing user returns faster than wrong password (no dummy bcrypt call) | `server/src/controllers/auth/AuthController.ts:79-99` | Run dummy `bcrypt.compare` when user is not found |
+
+---
+
+### M2 — Findings in Files M2 Changed
+
+| ID | Severity | Finding | File | Fix |
+|----|----------|---------|------|-----|
+| **R-3** | 🟡 Medium | Registration schema still accepts any `UserRole` via direct API — backend whitelist (R-C) was UI-only; defaults to `client` not `family` | `server/src/controllers/auth/RegistrationController.ts:12-70` | Change schema to `z.enum(['family', 'patient']).default('family')` |
+| **H-27** | 🟡 Medium | `CareEpisodeController.index` returns `patient.email` + `careRecipient.externalRef` in list — more PHI than needed | `server/src/controllers/patients/CareEpisodeController.ts:64-67` | Remove `email` and `externalRef` from the list projection |
+| **H-28** | 🟡 Medium | `CareEpisodeController.show` returns all nested PHI with no role-based projection | `server/src/controllers/patients/CareEpisodeController.ts:126-143` | Scope `include` to minimum necessary fields per caller role |
+| **H-30** | 🟡 Medium | `IntakeController.review` audit log includes `reviewSummary.notes` which may contain free-text PHI | `server/src/controllers/patients/IntakeController.ts:581-592` | Strip `notes` from the audit blob; log structured metadata only |
+| **R-2 / R-6** | 🟢 Low | `GET /episodes/coordinators` returns coordinator `email` + sequential IDs — probably unnecessary for a name dropdown | `server/src/controllers/patients/CareEpisodeController.ts` | Remove `email` from response if UI only needs `name`/`id` |
+| **R-7** | 🟢 Low | Registration response returns full user object (`id`, `name`, `email`, `role`, `onboardingStatus`) — excessive for a verify-email flow | `server/src/controllers/auth/RegistrationController.ts:101-114` | Return only `{ id, onboardingStatus }` or `{ success, requiresEmailVerification }` |
+
+---
+
+### ✅ False Positives / Not an issue
+
+| ID | Reason |
+|----|--------|
+| **R-1** | `IntakeController.review` accepting arbitrary `coordinatorId` — **withdrawn by Karim**. Branch does not accept `coordinatorId`; episode always uses `req.user!.userId`. |
+| **R-9** | Admin routes missing granular permission gates — **false positive**. Every route Karim cited already has `requireView`/`requireApprove`/`requireEdit` from `permissions.ts`. Verified in source. |
+| **R-11 / H-32** | Admin disputes routes missing per-route gate — **false positive**. Both routes have `requireView('booking')` and `requireApprove('booking')` respectively. Verified in source. |
 
 ---
 
@@ -19,68 +69,77 @@ MERN stack health/care platform. Working directory is `mern/`. Server is Express
 - Server runs on `http://localhost:5001`
 - Client runs on `http://localhost:5173`
 - Branch: `milestone2-revisions`
-- Nothing has been committed yet — all changes are unstaged working tree edits
+- Latest commit: `ea27627` (rename + Ahmed revisions)
 
+### What has been implemented and committed ✅
 
+All four of Ahmed's revision items (R-A, R-B, R-C, R-D) are fully coded, tested, and committed in `c2a074d`. See the step tables below for the exact files changed.
 
-### What has been implemented (all ✅ in the tables below)
+### Current status: Karim re-audit fixes
 
-All four of Ahmed's revision items (R-A, R-B, R-C, R-D) are fully coded. See the step tables below for the exact files changed.
+Ahmed's revisions are done. Karim completed a GDPR/Security/HIPAA re-audit at `ea27627`. See the **CURRENT PRIORITY** section at the top of this file. Start with Critical, then High.
 
-### Current status: testing in progress
-
-The user is going through the Testing Guide section below. Tests R-B 4 and 5 failed — a bug was found and fixed. Everything else has not been tested yet.
-
-### The bug that was found and fixed (do NOT revert)
+### Bug that was found and fixed in R-B (already in ea27627 — do NOT revert)
 
 **File:** `mern/client/src/pages/careseeker/OnboardingPage.tsx`
 
-**Problem:** When a `family` user completes the onboarding wizard, `handleSubmit` called `submitFamilyIntake()` (creates care unit + intake) but never called `completeClientOnboarding()`. So the backend `user.onboardingStatus` stayed `'pending'`. The `HealthRoleLayout` guard saw `'pending'` and bounced the user back to `/family/onboarding` in a loop.
+**Problem:** Family onboarding wizard called `submitFamilyIntake()` but never `completeClientOnboarding()`. Backend `user.onboardingStatus` stayed `'pending'`, causing an infinite redirect loop.
 
 **Fix applied:**
-
 ```typescript
-// In handleSubmit(), inside the isFamily branch:
 await submitFamilyIntake();
-await completeClientOnboarding({});  // ← added: marks onboardingStatus = 'complete' on backend
-await refreshUser();                  // ← added: refreshes AuthContext so guard sees 'complete'
+await completeClientOnboarding({});  // marks onboardingStatus = 'complete'
+await refreshUser();                  // refreshes AuthContext so guard sees 'complete'
 localStorage.removeItem(draftKey);
 setStep(OnboardingStep.COMPLETE);
 ```
 
-Also added `refreshUser` to the `useAuth()` destructure on line ~113.
-
 ### What Cursor needs to do next
 
-1. **Re-test R-B steps 4 and 5** with a fresh account at `http://localhost:5173/register`
-2. **Continue testing** the remaining items in the Testing Guide (R-C, R-A, R-D)
-3. Fill in the Result column as you test each item
-4. Once all tests pass, **commit all changes** in one commit with message: `feat: Ahmed M2 revisions — coordinator assignment, family onboarding, role retirement, UI improvements`
-5. Push to `origin/milestone2-revisions`
-6. Update the Commit Log table at the bottom of this file with the actual hash
+Work through findings in this order:
+
+**M1 Auth — Critical first:**
+1. A-3 — JWT default secret startup check (`env.ts`)
+2. A-1 — Rate-limit OTP verify endpoints + invalidate old OTPs (`OtpController.ts`, `auth.routes.ts`)
+3. A-2 — Rate-limit 2FA verify + replace user-ID challenge token (`AuthController.ts`, `auth.routes.ts`)
+4. A-4 + A-10 — Hash refresh tokens in OTP flow; remove plaintext fallback (`OtpController.ts`, `refreshTokenStore.ts`)
+5. A-5 — Revoke old reset tokens on new forgotPassword (`AuthController.ts`)
+6. A-6 — Push token ownership check (`DeviceTokenController.ts`)
+7. A-7 — Global Referrer-Policy header + email meta tag (`app.ts`, `EmailService.ts`)
+8. A-8, A-9 — sameSite cookie + dummy bcrypt on login miss
+
+**M2 — after auth is done:**
+9. R-3 — Tighten registration schema to `z.enum(['family', 'patient'])` (`RegistrationController.ts`)
+10. H-27 — Remove `email` + `externalRef` from episode list projection (`CareEpisodeController.ts`)
+11. H-28 — Scope episode show `include` to minimum necessary fields (`CareEpisodeController.ts`)
+12. H-30 — Strip `notes` from intake review audit log (`IntakeController.ts`)
+13. R-2/R-6 — Remove `email` from coordinator list response (`CareEpisodeController.ts`)
+14. R-7 — Slim down registration response (`RegistrationController.ts`)
+
+Commit after each logical group with message referencing the finding IDs.
 
 
 
-### Key files changed in this session (for git staging)
+### Key files for Karim audit fixes (for git staging)
 
+**M1 — Auth & session hardening:**
 ```
-mern/server/src/controllers/patients/CareEpisodeController.ts
-mern/server/src/controllers/patients/IntakeController.ts
-mern/server/src/controllers/auth/RegistrationController.ts
-mern/server/src/routes/episode.routes.ts
-mern/client/src/lib/api/episodes.ts
-mern/client/src/lib/api/intake.ts
-mern/client/src/pages/careseeker/OnboardingPage.tsx          ← bug fix
-mern/client/src/pages/public/RegisterPage.tsx
-mern/client/src/pages/coordinator/CoordinatorIntakeQueuePage.tsx
-mern/client/src/pages/care/EpisodeDetailPage.tsx
-mern/client/src/pages/care/CareUnitDetailPage.tsx
-mern/client/src/pages/care/CarePatientDetailPage.tsx
-mern/client/src/layouts/HealthRoleLayout.tsx
-mern/client/src/components/ui/Breadcrumb.tsx                 ← new file
-mern/client/src/routes/index.tsx
-mern/docx/AHMED_REVISION_PROGRESS.md
-mern/docx/AHMED_REVISION_PLAN.md
+mern/server/src/config/env.ts                          — A-3: JWT default secret startup check
+mern/server/src/controllers/auth/OtpController.ts      — A-1, A-4: OTP rate limit + refresh token hashing
+mern/server/src/controllers/auth/AuthController.ts     — A-2, A-5, A-9: 2FA throttle, reset token cleanup, timing
+mern/server/src/controllers/auth/DeviceTokenController.ts — A-6: push token ownership
+mern/server/src/utils/refreshTokenStore.ts             — A-10: remove plaintext fallback
+mern/server/src/routes/auth.routes.ts                  — A-1, A-2: rate limiter wiring
+mern/server/src/app.ts                                 — A-7: global Referrer-Policy header
+mern/server/src/services/EmailService.ts               — A-7: meta referrer tag in email templates
+mern/server/src/utils/authCookies.ts                   — A-8: sameSite evaluation
+```
+
+**M2 — Care episode PHI + registration:**
+```
+mern/server/src/controllers/patients/CareEpisodeController.ts  — H-27, H-28, R-2/R-6: list/show projection + coordinator email
+mern/server/src/controllers/patients/IntakeController.ts        — H-30: notes in audit log
+mern/server/src/controllers/auth/RegistrationController.ts      — R-3, R-7: schema tightening + slim response
 ```
 
 ---
@@ -314,12 +373,12 @@ curl -X PATCH http://localhost:5001/api/episodes/<episode-id>/assign-coordinator
 ## Commit Log
 
 
-| Commit                    | Hash      | What                                                  |
-| ------------------------- | --------- | ----------------------------------------------------- |
-| HIPAA M2 compliance fixes | `d4980d1` | Previous work — not part of Ahmed revision            |
-| Ahmed R-B + R-C Phase 1   | `pending` | Registration redirect, onboarding guard, role cleanup |
-| Ahmed R-A                 | `pending` | Coordinator assignment backend + UI                   |
-| Ahmed R-D                 | `pending` | UI improvements                                       |
+| Commit                         | Hash      | What                                                                                 |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------ |
+| HIPAA M2 compliance fixes      | `d4980d1` | Previous work — not part of Ahmed revision                                           |
+| Ahmed M2 revisions             | `c2a074d` | R-A coordinator assignment, R-B onboarding bug fix, R-C route retirement, R-D UI   |
+| Rename docs                    | `ea27627` | AHMED_REVISION_PLAN → M2_REVISION_PLAN, AHMED_REVISION_PROGRESS → M2_REVISION_PROGRESS |
+| Karim re-audit fixes           | `pending` | Security/GDPR/HIPAA findings from GDPR_Security_ReTest_ea27627.md                  |
 
 
 ---

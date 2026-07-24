@@ -55,9 +55,10 @@ export class CareEpisodeController {
       prisma.careEpisode.findMany({
         where,
         include: {
-          patient: { select: { id: true, name: true, email: true } },
+          // H-27: email and externalRef (potential MRN) omitted from list projection
+          patient: { select: { id: true, name: true } },
           coordinator: { select: { id: true, name: true } },
-          careRecipient: { select: { id: true, name: true, externalRef: true } },
+          careRecipient: { select: { id: true, name: true } },
           careUnit: { select: { id: true, name: true, familyUserId: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -120,21 +121,21 @@ export class CareEpisodeController {
       include: {
         patient: { select: { id: true, name: true } },
         coordinator: { select: { id: true, name: true } },
+        // H-28: scoped to minimum necessary fields per HIPAA minimum-necessary
         careRecipient: {
           select: {
             id: true,
             name: true,
-            externalRef: true,
             dateOfBirth: true,
             gender: true,
           },
         },
         careUnit: { select: { id: true, name: true, familyUserId: true } },
-        assessments: true,
-        carePlans: true,
-        sessions: { orderBy: { scheduledAt: 'desc' } },
-        documents: true,
-        invoices: true,
+        assessments: { select: { id: true, type: true, status: true, scheduledAt: true, completedAt: true } },
+        carePlans: { select: { id: true, title: true, status: true, submittedAt: true, approvedAt: true } },
+        sessions: { select: { id: true, scheduledAt: true, status: true, durationMinutes: true }, orderBy: { scheduledAt: 'desc' } },
+        documents: { select: { id: true, name: true, type: true, status: true, createdAt: true } },
+        invoices: { select: { id: true, status: true, total: true, dueDate: true, createdAt: true } },
       },
     });
 
@@ -193,9 +194,10 @@ export class CareEpisodeController {
   static async coordinators(req: Request, res: Response): Promise<void> {
     const where: Record<string, unknown> = { role: 'care_coordinator' };
     mergeTenantOrg(req, where);
+    // R-2: email omitted — the picker UI only needs name/id
     const list = await prisma.user.findMany({
       where,
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
     res.json({ data: list });

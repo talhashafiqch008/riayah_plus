@@ -19,6 +19,7 @@ export const env = {
 
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'change-me-access-secret',
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'change-me-refresh-secret',
+  // A-3: validated below
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
@@ -81,3 +82,17 @@ export const env = {
   isDev: process.env.NODE_ENV !== 'production',
   isProd: process.env.NODE_ENV === 'production',
 };
+
+// A-3: refuse to start in production with default JWT secrets
+if (process.env.NODE_ENV === 'production') {
+  const DEFAULT_SECRETS = ['change-me-access-secret', 'change-me-refresh-secret'];
+  if (
+    DEFAULT_SECRETS.includes(env.JWT_ACCESS_SECRET) ||
+    DEFAULT_SECRETS.includes(env.JWT_REFRESH_SECRET)
+  ) {
+    throw new Error(
+      'FATAL: JWT_ACCESS_SECRET or JWT_REFRESH_SECRET is still set to its default placeholder. ' +
+        'Generate secure random secrets and set them in your environment before running in production.',
+    );
+  }
+}

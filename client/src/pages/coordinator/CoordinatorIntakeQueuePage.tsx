@@ -1016,7 +1016,7 @@ export default function CoordinatorIntakeQueuePage() {
                         <option value="">— Assign to myself —</option>
                         {coordinators.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name} ({c.email})
+                            {c.name}
                           </option>
                         ))}
                       </select>

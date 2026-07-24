@@ -73,7 +73,6 @@ export async function updateEpisodeStatus(id: string, status: string) {
 export interface CoordinatorOption {
   id: string;
   name: string;
-  email: string;
 }
 
 export async function getCoordinators() {

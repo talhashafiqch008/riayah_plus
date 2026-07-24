@@ -793,7 +793,13 @@ export class IntakeController {
       entityId: intake.id,
       after: {
         status: result.intake.status,
-        reviewSummary,
+        // H-30: notes omitted from audit log — may contain free-text PHI
+        reviewSummary: {
+          keyConcerns: reviewSummary.keyConcerns,
+          urgencyIndicators: reviewSummary.urgencyIndicators,
+          suggestedServiceCategories: reviewSummary.suggestedServiceCategories,
+          riskFlags: reviewSummary.riskFlags,
+        },
         careEpisodeId: result.episode?.id ?? null,
       },
       req,

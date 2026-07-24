@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { UserRole } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
@@ -9,10 +8,6 @@ import { AuditService } from '../../services/AuditService';
 import { sendEmailVerificationForUser } from '../../utils/emailVerification';
 import { sanitizedString } from '../../utils/sanitize';
 
-const PUBLIC_SELF_REGISTER_ROLES = new Set<UserRole>([
-  'family',
-  'patient',
-]);
 
 const registerSchema = z
   .object({
@@ -22,7 +17,8 @@ const registerSchema = z
     email: z.string().email(),
     password: z.string().min(8),
     phone: z.string().optional(),
-    role: z.nativeEnum(UserRole).optional(),
+    // R-3: only family/patient may self-register; any other role is rejected at schema level
+    role: z.enum(['family', 'patient']).default('family').optional(),
     consentAccepted: z.boolean().optional(),
   })
   .refine(
@@ -61,14 +57,8 @@ export class RegistrationController {
     if (existing) throw new AppError('Email already registered.', 409);
 
     const passwordHash = await bcrypt.hash(data.password, env.BCRYPT_ROUNDS);
-    const requestedRole = data.role ?? 'client';
-    if (!PUBLIC_SELF_REGISTER_ROLES.has(requestedRole)) {
-      throw new AppError(
-        'Invalid role for self-registration. Contact an administrator for staff accounts.',
-        422,
-      );
-    }
-    const role = requestedRole;
+    // R-3: schema already limits role to 'family' | 'patient'; default is 'family'
+    const role = data.role ?? 'family';
 
     const user = await prisma.user.create({
       data: {
@@ -110,6 +100,7 @@ export class RegistrationController {
 
     await AuditService.log({ userId: user.id, action: 'register', req });
 
+    // R-7: return only the minimum needed for the verify-email flow
     res.status(201).json({
       success: true,
       requiresEmailVerification: true,
@@ -117,12 +108,8 @@ export class RegistrationController {
         'Registration successful. Please check your email to verify your account before logging in.',
       user: {
         id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
         onboardingStatus: user.onboardingStatus,
       },
-      onboarding_status: user.onboardingStatus,
     });
   }
 
