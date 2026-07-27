@@ -43,6 +43,10 @@ const SENSITIVE_KEYS = new Set([
   'longitude',
   'dateofbirth',
   'date_of_birth',
+  'pocname',
+  'poc_name',
+  'pocphone',
+  'poc_phone',
 ]);
 
 export function redactForAudit(value: unknown, depth = 0): unknown {

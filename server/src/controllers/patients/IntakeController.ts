@@ -59,6 +59,7 @@ const reviewSchema = z.object({
   createEpisode: z.boolean().optional().default(true),
   episodeTitle: optionalSanitizedString(),
   notes: optionalSanitizedString(),
+  coordinatorId: z.string().min(1).optional(),
 });
 
 const statusSchema = z.object({
@@ -734,7 +735,7 @@ export class IntakeController {
 
         const episode = await tx.careEpisode.create({
           data: {
-            coordinatorId: req.user!.userId,
+            coordinatorId: review.coordinatorId ?? req.user!.userId,
             // Account party = CareRecipient.userId (family guardian in M2). Clinical patient = careRecipientId (C-1).
             patientId: party.patientId,
             careRecipientId: party.careRecipientId,
@@ -792,7 +793,13 @@ export class IntakeController {
       entityId: intake.id,
       after: {
         status: result.intake.status,
-        reviewSummary,
+        // H-30: notes omitted from audit log — may contain free-text PHI
+        reviewSummary: {
+          keyConcerns: reviewSummary.keyConcerns,
+          urgencyIndicators: reviewSummary.urgencyIndicators,
+          suggestedServiceCategories: reviewSummary.suggestedServiceCategories,
+          riskFlags: reviewSummary.riskFlags,
+        },
         careEpisodeId: result.episode?.id ?? null,
       },
       req,

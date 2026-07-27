@@ -163,6 +163,36 @@ export function requireFamilyOrCoordinator(
   next();
 }
 
+/** Any user with a care role — blocks marketplace-only roles (trainer, provider) from clinical read endpoints. */
+export function requireCareUser(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({ message: 'Unauthenticated.' });
+    return;
+  }
+  const allowed: UserRole[] = [
+    'family',
+    'client',
+    'consumer',
+    'patient',
+    'care_coordinator',
+    'clinical_staff',
+    'doctor',
+    'nurse',
+    'physiotherapist',
+    'occupational_therapist',
+    'speech_therapist',
+    'psychologist',
+    'dietitian',
+    'therapist',
+    ...ADMIN_ROLES,
+  ];
+  if (!allowed.includes(req.user.role)) {
+    res.status(403).json({ message: 'Care access required.' });
+    return;
+  }
+  next();
+}
+
 /** Clinical staff completing assessments, or coordinators/admins. */
 export function requireClinicalOrCoordinator(
   req: Request,

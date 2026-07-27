@@ -2,7 +2,7 @@ import { Request } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../config/database';
 import { RefreshToken } from '@prisma/client';
-import { hashRefreshToken, isLegacyPlainRefreshToken } from './refreshTokenHash';
+import { hashRefreshToken } from './refreshTokenHash';
 
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -33,22 +33,11 @@ export async function persistRefreshToken(
   });
 }
 
-/** Lookup by plain refresh JWT; supports legacy rows that still store the raw token. */
+// A-10: lookup by hashed token only — legacy plaintext fallback removed
 export async function findRefreshTokenByPlain(plainToken: string): Promise<RefreshToken | null> {
   const hashed = hashRefreshToken(plainToken);
   const byHash = await prisma.refreshToken.findUnique({ where: { token: hashed } });
-  // M-49: constant-time compare on hashed form
   if (byHash && timingSafeEqualHex(byHash.token, hashed)) return byHash;
-
-  const legacy = await prisma.refreshToken.findUnique({ where: { token: plainToken } });
-  if (
-    legacy &&
-    isLegacyPlainRefreshToken(legacy.token) &&
-    timingSafeEqualHex(legacy.token, plainToken)
-  ) {
-    return legacy;
-  }
-
   return null;
 }
 
@@ -59,7 +48,7 @@ export async function revokeRefreshTokenByPlain(
   const hashed = hashRefreshToken(plainToken);
   const result = await prisma.refreshToken.updateMany({
     where: {
-      OR: [{ token: hashed }, { token: plainToken }],
+      token: hashed,
       ...(userId ? { userId } : {}),
     },
     data: { revokedAt: new Date() },

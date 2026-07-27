@@ -155,6 +155,7 @@ export async function reviewIntake(
     createEpisode?: boolean;
     episodeTitle?: string;
     notes?: string;
+    coordinatorId?: string;
   },
 ) {
   const { data } = await client.post<{

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { RoleShellConfig } from '@/config/proposalRoleShells';
@@ -12,7 +12,17 @@ interface HealthRoleLayoutProps {
 export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const role = user?.role?.toLowerCase();
+    const onboardingStatus = (user as { onboarding_status?: string } | null)?.onboarding_status;
+    const pending = onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed';
+    if ((role === 'family' || role === 'patient') && pending && pathname !== '/family/onboarding') {
+      navigate('/family/onboarding', { replace: true });
+    }
+  }, [user, pathname, navigate]);
 
   const isActive = (href: string) => {
     if (href === config.basePath) {
@@ -38,17 +48,27 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
         }`}
       >
         <div className="px-5 pt-6 pb-4 border-b border-stone-100 shrink-0">
-          <Link to={config.basePath} className="flex items-center gap-3">
-            <div className="size-9 bg-teal-600 rounded-lg flex items-center justify-center text-white">
-              <Heart className="size-4" />
-            </div>
-            <div>
-              <p className="font-bold text-stone-900 text-sm">{config.portalTitle}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-600">
-                {config.roleBadge}
-              </p>
-            </div>
-          </Link>
+          <div className="flex items-center justify-between">
+            <Link to={config.basePath} className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
+              <div className="size-9 bg-teal-600 rounded-lg flex items-center justify-center text-white">
+                <Heart className="size-4" />
+              </div>
+              <div>
+                <p className="font-bold text-stone-900 text-sm">{config.portalTitle}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-600">
+                  {config.roleBadge}
+                </p>
+              </div>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
+              aria-label="Close sidebar"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-0.5 min-h-0">
@@ -96,14 +116,16 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
           >
             <Menu className="size-5" />
           </button>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden hidden p-2"
-            aria-label="Close menu"
-          >
-            <X className="size-5" />
-          </button>
+            {sidebarOpen && (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 text-stone-500 hover:bg-stone-100 rounded-lg mr-1"
+              aria-label="Close menu"
+            >
+              <X className="size-5" />
+            </button>
+          )}
           <h1 className="font-semibold text-stone-900">{pageTitle}</h1>
         </header>
         <main id="main-content" className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8">

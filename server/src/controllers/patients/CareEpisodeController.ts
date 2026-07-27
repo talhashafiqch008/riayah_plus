@@ -32,6 +32,10 @@ const updateEpisodeSchema = z.object({
   status: z.nativeEnum(CareEpisodeStatus).optional(),
 });
 
+const assignCoordinatorSchema = z.object({
+  coordinatorId: z.string().min(1),
+});
+
 export class CareEpisodeController {
   static async index(req: Request, res: Response): Promise<void> {
     const { page = '1', limit = '20', status } = req.query as Record<string, string>;
@@ -51,9 +55,10 @@ export class CareEpisodeController {
       prisma.careEpisode.findMany({
         where,
         include: {
-          patient: { select: { id: true, name: true, email: true } },
+          // H-27: email and externalRef (potential MRN) omitted from list projection
+          patient: { select: { id: true, name: true } },
           coordinator: { select: { id: true, name: true } },
-          careRecipient: { select: { id: true, name: true, externalRef: true } },
+          careRecipient: { select: { id: true, name: true } },
           careUnit: { select: { id: true, name: true, familyUserId: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -116,21 +121,21 @@ export class CareEpisodeController {
       include: {
         patient: { select: { id: true, name: true } },
         coordinator: { select: { id: true, name: true } },
+        // H-28: scoped to minimum necessary fields per HIPAA minimum-necessary
         careRecipient: {
           select: {
             id: true,
             name: true,
-            externalRef: true,
             dateOfBirth: true,
             gender: true,
           },
         },
         careUnit: { select: { id: true, name: true, familyUserId: true } },
-        assessments: true,
-        carePlans: true,
-        sessions: { orderBy: { scheduledAt: 'desc' } },
-        documents: true,
-        invoices: true,
+        assessments: { select: { id: true, type: true, status: true, scheduledAt: true, completedAt: true } },
+        carePlans: { select: { id: true, title: true, status: true, submittedAt: true, approvedAt: true } },
+        sessions: { select: { id: true, scheduledAt: true, status: true, durationMinutes: true }, orderBy: { scheduledAt: 'desc' } },
+        documents: { select: { id: true, name: true, type: true, status: true, createdAt: true } },
+        invoices: { select: { id: true, status: true, total: true, dueDate: true, createdAt: true } },
       },
     });
 
@@ -184,6 +189,58 @@ export class CareEpisodeController {
       req,
     });
     res.json({ data: episode });
+  }
+
+  static async coordinators(req: Request, res: Response): Promise<void> {
+    const where: Record<string, unknown> = { role: 'care_coordinator' };
+    mergeTenantOrg(req, where);
+    // R-2: email omitted — the picker UI only needs name/id
+    const list = await prisma.user.findMany({
+      where,
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ data: list });
+  }
+
+  static async assignCoordinator(req: Request, res: Response): Promise<void> {
+    const { coordinatorId } = assignCoordinatorSchema.parse(req.body);
+
+    const episode = await prisma.careEpisode.findUnique({
+      where: { id: req.params.id },
+      include: { careUnit: { select: { familyUserId: true } } },
+    });
+    if (!episode) throw new AppError('Care episode not found.', 404);
+    await assertEpisodeAccess(req, episode);
+
+    const coordinator = await prisma.user.findUnique({
+      where: { id: coordinatorId },
+      select: { id: true, role: true, organizationId: true },
+    });
+    if (!coordinator || coordinator.role !== 'care_coordinator') {
+      throw new AppError('Coordinator not found.', 404);
+    }
+    assertTenantOrgAccess(req, coordinator.organizationId);
+
+    const updated = await prisma.careEpisode.update({
+      where: { id: req.params.id },
+      data: { coordinatorId },
+      include: {
+        coordinator: { select: { id: true, name: true } },
+      },
+    });
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'episode_coordinator_assigned',
+      entity: 'CareEpisode',
+      entityId: updated.id,
+      before: { coordinatorId: episode.coordinatorId },
+      after: { coordinatorId },
+      req,
+    });
+
+    res.json({ data: updated });
   }
 
   static async submitIntake(req: Request, res: Response): Promise<void> {

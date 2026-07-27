@@ -7,6 +7,7 @@ import { AuditService } from '../../services/AuditService';
 import { tenantWhere } from '../../middleware/tenantScope';
 import { mergeTenantOrg } from '../../middleware/tenantAccess';
 import { sanitizedString, optionalSanitizedString } from '../../utils/sanitize';
+import { redactForAudit } from '../../utils/auditRedact';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -341,7 +342,7 @@ export class CareUnitController {
       data: {
         careRecipientId: patient.id,
         changedById: req.user!.userId,
-        snapshot: patientSnapshot(patient),
+        snapshot: redactForAudit(patientSnapshot(patient)) as object,
         changeSummary: 'Created',
       },
     });

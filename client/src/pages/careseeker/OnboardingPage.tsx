@@ -110,7 +110,7 @@ interface CareOnboardingWizardProps {
 export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingWizardProps) {
   const isFamily = variant === 'family';
   const navigate = useNavigate();
-  const { logout, user: authUser } = useAuth();
+  const { logout, user: authUser, refreshUser } = useAuth();
   const [step, setStep] = useState<OnboardingStep>(
     isFamily ? OnboardingStep.LOCATION : OnboardingStep.WELCOME,
   );
@@ -334,6 +334,8 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
 
       if (isFamily) {
         await submitFamilyIntake();
+        await completeClientOnboarding({});
+        await refreshUser();
         localStorage.removeItem(draftKey);
         setStep(OnboardingStep.COMPLETE);
         toast.success('Request received — our care team will review it soon.');

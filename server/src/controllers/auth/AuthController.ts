@@ -84,7 +84,10 @@ export class AuthController {
       ? await prisma.user.findUnique({ where: { email: body.email, deletedAt: null } })
       : await prisma.user.findFirst({ where: { phone: body.phone, deletedAt: null } });
 
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    // A-9: always run bcrypt regardless of whether the user exists to prevent timing-based enumeration
+    const passwordHash = user?.passwordHash ?? '$2a$12$cNV4pbbGpFVj8mcnExwV9eVk8GgZycv2RNFJWdNJAmR8IQCBsg0VO';
+    const passwordValid = await bcrypt.compare(password, passwordHash);
+    if (!user || !passwordValid) {
       throw new AppError('Invalid credentials.', 401);
     }
 
@@ -259,6 +262,11 @@ export class AuthController {
     if (user) {
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      // A-5: revoke all prior reset tokens for this email before issuing a new one
+      await prisma.otpVerification.deleteMany({
+        where: { identifier: email, type: 'password_reset', verifiedAt: null },
+      });
 
       await prisma.otpVerification.create({
         data: {

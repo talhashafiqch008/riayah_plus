@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { CareEpisodeController } from '../controllers/patients/CareEpisodeController';
 import { authenticate } from '../middleware/auth';
-import { requireCareCoordinator } from '../middleware/rbac';
+import { requireCareCoordinator, requireCareUser } from '../middleware/rbac';
 import { CareSummaryPDFService } from '../services/CareSummaryPDFService';
 import { AppError } from '../middleware/errorHandler';
 import { assertTenantOrgAccess } from '../middleware/tenantAccess';
@@ -10,10 +10,12 @@ import { isFamilyRole } from '../utils/careAccess';
 const router = Router();
 router.use(authenticate);
 
-router.get('/', CareEpisodeController.index);
+router.get('/', requireCareUser, CareEpisodeController.index);
 router.post('/', requireCareCoordinator, CareEpisodeController.store);
-router.get('/:id', CareEpisodeController.show);
+router.get('/coordinators', requireCareCoordinator, CareEpisodeController.coordinators);
+router.get('/:id', requireCareUser, CareEpisodeController.show);
 router.patch('/:id', requireCareCoordinator, CareEpisodeController.update);
+router.patch('/:id/assign-coordinator', requireCareCoordinator, CareEpisodeController.assignCoordinator);
 router.post('/:id/submit-intake', requireCareCoordinator, CareEpisodeController.submitIntake);
 
 // Care summary PDF — tenant + party checks (C-5)

@@ -69,3 +69,21 @@ export async function updateEpisodeStatus(id: string, status: string) {
   const { data } = await client.patch<{ data: CareEpisode }>(`/episodes/${id}`, { status });
   return data.data;
 }
+
+export interface CoordinatorOption {
+  id: string;
+  name: string;
+}
+
+export async function getCoordinators() {
+  const { data } = await client.get<{ data: CoordinatorOption[] }>('/episodes/coordinators');
+  return data.data;
+}
+
+export async function assignCoordinator(episodeId: string, coordinatorId: string) {
+  const { data } = await client.patch<{ data: CareEpisode }>(
+    `/episodes/${episodeId}/assign-coordinator`,
+    { coordinatorId },
+  );
+  return data.data;
+}

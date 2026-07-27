@@ -33,6 +33,11 @@ export class OtpController {
     const otp = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
+    // A-1: invalidate any existing unused OTPs for this identifier before issuing a new one
+    await prisma.otpVerification.deleteMany({
+      where: { identifier: parsedIdentifier, type: parsedType, verifiedAt: null },
+    });
+
     await prisma.otpVerification.create({
       data: { identifier: parsedIdentifier, otp, type: parsedType, expiresAt },
     });
