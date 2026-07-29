@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import authRoutes from './auth.routes';
 import episodeRoutes from './episode.routes';
 import carePlanRoutes from './carePlan.routes';
@@ -22,6 +22,9 @@ import paymentRoutes from './payment.routes';
 import marketplaceRoutes from './marketplace.routes';
 import reviewRoutes from './review.routes';
 import aiRoutes from './ai.routes';
+import clinicalNoteRoutes from './clinicalNote.routes';
+import availabilityRoutes from './availability.routes';
+import schedulingRoutes from './scheduling.routes';
 import careManagementRoutes from './caremanagement.routes';
 import agencyRoutes from './agency.routes';
 import providerDashboardRoutes from './provider-dashboard.routes';
@@ -43,8 +46,10 @@ import tasksRoutes from './tasks.routes';
 import receiptsRoutes from './receipts.routes';
 import { auditMiddleware } from '../middleware/auditMiddleware';
 import { authenticate } from '../middleware/auth';
+import { requireAiServiceApiKey } from '../middleware/aiServiceAuth';
 import { requireCareCoordinator } from '../middleware/rbac';
 import { IntakeController } from '../controllers/patients/IntakeController';
+import { CarePlanDraftCallbackController } from '../controllers/ai/CarePlanDraftCallbackController';
 
 const router = Router();
 
@@ -58,6 +63,16 @@ router.use(auditMiddleware);
 
 // Public routes
 router.use('/', publicRoutes);
+
+// ── Server-to-server AI callbacks (MUST be before auth.routes) ────────────────
+// auth.routes mounts `authenticate` at `/`, which would 401 these otherwise.
+router.post(
+  '/ai/callbacks/care-plan-draft',
+  requireAiServiceApiKey,
+  (req: Request, res: Response, next: NextFunction) => {
+    CarePlanDraftCallbackController.handle(req, res).catch(next);
+  },
+);
 
 // Auth & user management
 router.use('/', authRoutes);
@@ -112,8 +127,15 @@ router.use('/care-needs', marketplaceRoutes);
 // Reviews
 router.use('/reviews', reviewRoutes);
 
-// AI chat (Gemini)
+// AI chat (Gemini) + Riayah callbacks (callback also registered above auth)
 router.use('/ai', aiRoutes);
+
+// Clinical notes (immutable after save)
+router.use('/clinical-notes', clinicalNoteRoutes);
+
+// Staff availability + care session scheduling (M3 Wave 4)
+router.use('/availability', availabilityRoutes);
+router.use('/scheduling', schedulingRoutes);
 
 // Care management (recipients, consents, family members, client profile, reports, dashboard)
 router.use('/client', careManagementRoutes);

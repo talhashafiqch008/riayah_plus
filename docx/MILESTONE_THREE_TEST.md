@@ -42,25 +42,24 @@ Password (all roles): Password123!
 | 🟡 | Partial — API only or placeholder UI |
 | 🔴 | Not built yet — expect placeholder or 404 |
 
-**Current baseline (updated 2026-07-29):** Production M3 website pages are still mostly 🔴, but the backend care-plan API moved forward:
+**Current baseline (updated 2026-07-29):** Production M3 website pages are still mostly 🔴, but backend Wave 1 + early Wave 2 are ahead:
 
-- family login works after seed (seed now sets `isEmailVerified: true` and `emailVerifiedAt`)
-- care-plan **reject** API is working
-- care-plan **approve** API is working
-- goal → task creation on approve is working
+- family login works after seed (`isEmailVerified` + `emailVerifiedAt`)
+- care-plan **reject / approve / goal→task / re-approval gate** APIs working
+- `RiayahAiClient` + **AI intake summarize on review** working (summary row in `ai_intake_summaries`, status `draft`)
 
 Use **API smoke** sections until Wave 5 UI lands.
 
 ### Latest verified smoke
 
-These were manually verified in terminal/API smoke before this handoff:
+These were verified via API / DB smoke:
 
 1. `family@demo.com` login succeeded
-2. Family reject returned `Care plan rejected.`
-3. Family approve returned `Care plan approved.`
-4. Coordinator `/api/tasks` returned **2 pending tasks** matching the 2 approved goals
+2. Family reject / approve + goal → task
+3. Active plan material edit → draft v2 requiring re-approval (`CP8`)
+4. Intake review + create episode → `ai_intake_summaries` row (`draft`, model `deepseek-v4-flash`)
 
-Fresh seed note: family-visible care plans may start empty. If so, log in as coordinator, create a care plan for a family-owned episode, then submit it before testing family actions.
+Fresh seed note: family-visible care plans may start empty. If so, create + submit a care plan before family actions.
 
 ---
 
@@ -289,7 +288,7 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID
 
 **Accept:** `CP7`, `GOAL1`  
 **Tasks:** `M3-1.2`, `M3-3.3`, `M3-4.5`  
-**Status:** 🟡 backend verified (`goal` → `task` works in API smoke) · website UI still not built
+**Status:** 🟡 backend verified (`goal` → `task` + goal achieved API) · website UI still not built
 
 ### 4.1 Tasks created after family approves (website)
 
@@ -315,13 +314,56 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID
 
 **Pass:** Goal status → `achieved`; `achievedAt` set; UI reflects change.
 
+### 4.2b API smoke (manual — until UI)
+
+**When:** After `M3-3.3` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+# Use an active plan with goals (or create/approve one first)
+PLAN_ID=<ACTIVE_CARE_PLAN_ID>
+
+curl -s -b /tmp/coord.txt "http://localhost:5001/api/care-plans/$PLAN_ID/goals" | jq .
+GOAL_ID=$(curl -s -b /tmp/coord.txt "http://localhost:5001/api/care-plans/$PLAN_ID/goals" | jq -r '.goals[0].id')
+
+# Mark achieved — expect status=achieved + achievedAt set
+curl -s -b /tmp/coord.txt -X PATCH "http://localhost:5001/api/care-plans/$PLAN_ID/goals/$GOAL_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"achieved","notes":"Goal met in session"}' | jq .
+
+# Re-PATCH achieved is idempotent (achievedAt unchanged)
+curl -s -b /tmp/coord.txt -X PATCH "http://localhost:5001/api/care-plans/$PLAN_ID/goals/$GOAL_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"achieved"}' | jq '{status:.goal.status, achievedAt:.goal.achievedAt}'
+
+# Clinical can also update; family → 403
+curl -s -c /tmp/clinical.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"clinical@demo.com","password":"Password123!"}' | jq .
+curl -s -b /tmp/clinical.txt -X PATCH "http://localhost:5001/api/care-plans/$PLAN_ID/goals/$GOAL_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"active"}' | jq '{status:.goal.status, achievedAt:.goal.achievedAt}'
+```
+
+**Pass:**
+
+- `PATCH` with `status: achieved` → `achievedAt` set
+- Works on **active** plans without creating a new draft (not CP8)
+- Clinical + coordinator allowed; family → `403`
+- Empty body → `422`
+
+**Verified (2026-07-29):** ✅ list + mark achieved + idempotent `achievedAt` + clinical reopen + family 403.
+
 ---
 
 ## Flow 5 — Re-approval on active plan edit
 
 **Accept:** `CP8`  
 **Tasks:** `M3-1.4`  
-**Status:** 🔴
+**Status:** 🟡 Backend verified (website UI pending)
 
 ### 5.1 Material edit forces re-approval (website)
 
@@ -337,13 +379,68 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID
 - New version created; status requires submit → family approve again
 - Family sees updated plan for re-approval
 
+### 5.2 API smoke (manual — until coordinator UI)
+
+**When:** After `M3-1.4` ✅
+
+```bash
+# 1) Login
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+curl -s -c /tmp/family.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"family@demo.com","password":"Password123!"}' | jq .
+
+# 2) Create draft plan (use a family-owned episode id)
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/care-plans \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "episodeId":"<EPISODE_ID>",
+    "title":"CP8 reapproval smoke",
+    "goals":[{"title":"Walk daily","measurement":"minutes"}],
+    "items":[{"serviceType":"physiotherapy","frequency":"2x/week","unitCost":200}]
+  }' | jq .
+
+# 3) Submit → family approve (plan becomes active)
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID>/submit | jq .
+curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID>/approve | jq .
+
+# 4) In-place item edit must 422
+curl -s -b /tmp/coord.txt -X PATCH http://localhost:5001/api/care-plans/<PLAN_ID>/items/<ITEM_ID> \
+  -H 'Content-Type: application/json' -d '{"frequency":"3x/week"}' | jq .
+
+# 5) Material edit → new draft version
+curl -s -b /tmp/coord.txt -X PATCH http://localhost:5001/api/care-plans/<PLAN_ID> \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title":"CP8 revised",
+    "goals":[{"title":"Walk daily"},{"title":"Pain control"}],
+    "items":[{"serviceType":"physiotherapy","frequency":"3x/week","unitCost":200}]
+  }' | jq '{id:.data.id, status:.data.status, version:.data.version, prev:.data.previousVersionId, meta:.meta}'
+
+# 6) Resubmit new draft → family re-approve
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/care-plans/<NEW_PLAN_ID>/submit | jq .
+curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<NEW_PLAN_ID>/approve | jq .
+```
+
+**Pass:**
+
+- Step 4 → `422`
+- Step 5 → `status: draft`, bumped `version`, `previousVersionId` set, `meta.reapprovalRequired: true`
+- Old plan → `isCurrentVersion: false`, status `revision_requested`
+- Step 6 → new plan `active`
+
+**Verified (2026-07-29):** ✅ full path above passed in API smoke.
+
 ---
 
 ## Flow 6 — AI intake summary
 
 **Accept:** `AI1`, `AI2`, `AI5`  
-**Tasks:** `M3-1.1`, `M3-2.2`, `M3-5B.5`  
-**Status:** 🔴
+**Tasks:** `M3-1.1`, `M3-2.1`, `M3-2.2`, `M3-5B.5`  
+**Status:** 🟡 Backend summarize + approve verified (UI panel pending)
 
 ### 6.1 Summary generated after intake review (backend + UI)
 
@@ -359,6 +456,41 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID
 - Status = `draft` until coordinator approves
 - Intake review **still succeeded** even if AI service was down (test separately in 6.3)
 
+### 6.1b API smoke (manual — until UI)
+
+**When:** After `M3-2.2` ✅
+
+```bash
+# Login as coordinator
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+# Review a submitted intake with createEpisode:true
+# Note: path is /api/intake/:id/review (singular)
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/intake/<INTAKE_ID>/review \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "keyConcerns":["Home care support"],
+    "urgencyIndicators":["Medium urgency"],
+    "suggestedServiceCategories":["companion_care"],
+    "riskFlags":["fall_risk"],
+    "createEpisode":true,
+    "episodeTitle":"AI summarize smoke"
+  }' | jq '{status: .data.intake.status, episodeId: .data.episode.id}'
+
+# DB check
+# SELECT id, "careEpisodeId", status, model, "keyConcerns", confidence
+# FROM ai_intake_summaries ORDER BY "createdAt" DESC LIMIT 5;
+```
+
+**Pass:**
+
+- Review returns `200` with `intake.status = episode_created` and an `episode.id`
+- `ai_intake_summaries` has a row for that episode, `status = draft`, non-empty `keyConcerns`
+
+**Verified (2026-07-29):** ✅ review ~2.8s → row `draft` / model `deepseek-v4-flash` / concerns populated.
+
 ### 6.2 Coordinator approves AI summary (website)
 
 **When:** After `M3-2.6` + `M3-5B.5` ✅
@@ -367,30 +499,67 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID
 
 **Pass:** Status → approved; `approvedAt` / approver recorded.
 
+### 6.2b API smoke — get + approve (manual)
+
+**When:** After `M3-2.6` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+# Read draft summary
+curl -s -b /tmp/coord.txt http://localhost:5001/api/episodes/<EPISODE_ID>/ai-intake-summary | jq '{
+  status: .data.status,
+  keyConcerns: .data.keyConcerns,
+  confidence: .data.confidence
+}'
+
+# Approve (human-in-the-loop)
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/episodes/<EPISODE_ID>/ai-intake-summary/approve | jq '{
+  message, status: .data.status, approvedById: .data.approvedById, approvedAt: .data.approvedAt
+}'
+
+# Re-approve → idempotent
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/episodes/<EPISODE_ID>/ai-intake-summary/approve | jq .message
+```
+
+**Pass:**
+
+- GET returns summary with `status: draft` (before) / `approved` (after)
+- Approve sets `approvedById` + `approvedAt`
+- Second approve → “already approved”
+- Family → `403`
+
+**Verified (2026-07-29):** ✅ get + approve + idempotent re-approve; family blocked.
+
 ### 6.3 AI service down (negative test)
 
 **When:** After `M3-2.2` ✅
 
-1. Stop AI service or set bad `AI_SERVICE_URL` in `server/.env`
-2. Repeat Flow 0.2 (new intake → review → create episode)
+1. Stop AI service or set bad `AI_SERVICE_URL` in `server/.env` (restart API)
+2. Repeat Flow 0.2 / 6.1b (new intake → review → create episode)
 
-**Pass:** Review completes; episode created; no 500 to user; error logged server-side only.
+**Pass:** Review completes; episode created; no 500 to user; server log contains `AI intake summarize failed (non-blocking)`.
 
 ### 6.4 DB check (optional)
 
 ```sql
-SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER BY "createdAt" DESC LIMIT 5;
+SELECT id, "careEpisodeId", status, model, "keyConcerns", confidence
+FROM ai_intake_summaries
+ORDER BY "createdAt" DESC
+LIMIT 5;
 ```
 
-**Pass:** Row exists for episode created in Flow 0.2.
+**Pass:** Row exists for episode created in Flow 0.2 / 6.1b.
 
 ---
 
 ## Flow 7 — AI care plan draft
 
 **Accept:** `AI3`, `AI4`  
-**Tasks:** `M3-2.3`–`M3-2.5`, `M3-5B.6`  
-**Status:** 🔴
+**Tasks:** `M3-2.3`–`M3-2.5`, `M3-2.4`, `M3-5B.6`  
+**Status:** 🟡 Backend trigger + callback verified (website button pending)
 
 ### 7.1 Generate draft (website)
 
@@ -406,6 +575,41 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 - Status remains `draft` — **not** submitted to family
 - Coordinator can edit before submit
 
+### 7.1b API smoke — coordinator trigger (manual)
+
+**When:** After `M3-2.4` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+# Explicit generate (may take a few seconds — calls staging AI)
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/episodes/<EPISODE_ID>/ai-care-plan-draft \
+  -H 'Content-Type: application/json' \
+  -d '{"familyConsultationNotes":"Prefers morning PT sessions."}' | jq '{
+    status: .data.status,
+    carePlanId: .data.carePlanId,
+    created: .data.created,
+    goals: (.data.carePlan.goals|length),
+    items: (.data.carePlan.items|length),
+    ai: .data.ai
+  }'
+
+# Regenerate — same carePlanId, idempotentReplay/created false
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/episodes/<EPISODE_ID>/ai-care-plan-draft \
+  -H 'Content-Type: application/json' -d '{}' | jq '.data | {carePlanId, created, idempotentReplay}'
+```
+
+**Pass:**
+
+- `201`/`200` with `status: draft`, goals/items present
+- Regenerate keeps same `carePlanId`
+- Family calling this endpoint → `403`
+- Plan **not** `submitted_for_approval`
+
+**Verified (2026-07-29):** ✅ staging AI (~4s) → draft with goals/items; regenerate upserts same id.
+
 ### 7.2 Idempotent callback (technical)
 
 **When:** After `M3-2.3` ✅
@@ -414,6 +618,47 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 2. Check database / UI
 
 **Pass:** Only one draft plan created (or upsert — no duplicates).
+
+### 7.2b API smoke (manual)
+
+```bash
+# Auth: X-API-Key must match server AI_SERVICE_API_KEY
+# Path: POST /api/ai/callbacks/care-plan-draft  (registered before session auth)
+
+curl -s -X POST http://localhost:5001/api/ai/callbacks/care-plan-draft \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: local-dev-key-12345' \
+  -d '{
+    "episodeId":"<EPISODE_ID>",
+    "draftId":"manual-test-1",
+    "model":"manual",
+    "draft":{
+      "goals":[{"title":"Walk daily","measurementCriteria":"minutes"}],
+      "services":[{"serviceType":"physiotherapy","category":"rehab","frequency":"2x/week","durationMinutes":45,"unitCost":200}],
+      "clinicalNotes":"Manual callback smoke",
+      "currency":"QAR"
+    }
+  }' | jq .
+
+# Replay the exact same body — expect 200, same carePlanId, idempotentReplay:true
+curl -s -X POST http://localhost:5001/api/ai/callbacks/care-plan-draft \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: local-dev-key-12345' \
+  -d '{ ...same body... }' | jq .
+
+# Missing/wrong key → 401
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:5001/api/ai/callbacks/care-plan-draft \
+  -H 'Content-Type: application/json' -d '{"episodeId":"x","draft":{"goals":[],"services":[]}}'
+```
+
+**Pass:**
+
+- First call → `201`, `created: true`, `status: draft`
+- Replay → `200`, same `carePlanId`, `idempotentReplay: true`
+- Plan stays `draft` (not submitted to family)
+- Bad/missing API key → `401`
+
+**Verified (2026-07-29):** ✅ auth + create + idempotent replay + single AI draft upsert.
 
 ### 7.3 AI draft never auto-goes to family (negative)
 
@@ -427,8 +672,8 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 ## Flow 8 — Clinical documentation
 
 **Accept:** `NOTE1`, `NOTE2`  
-**Tasks:** `M3-3.1`–`M3-3.2`, `M3-5D.*`  
-**Status:** 🔴 (placeholder at `/clinical/notes`)
+**Tasks:** `M3-3.1`–`M3-3.2`, `M3-3.4`, `M3-5D.*`  
+**Status:** 🟡 Backend API verified (notes + co-sign); website UI pending
 
 ### 8.1 Add session note (website)
 
@@ -443,6 +688,48 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 - Note saved and listed
 - Author and timestamp shown
 - **No edit/delete** after save (immutable)
+
+### 8.1b API smoke (manual — until UI)
+
+**When:** After `M3-3.1` + `M3-3.2` ✅
+
+```bash
+# Clinical login
+curl -s -c /tmp/clinical.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"clinical@demo.com","password":"Password123!"}' | jq .
+
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+# Create note on episode
+curl -s -b /tmp/clinical.txt -X POST http://localhost:5001/api/clinical-notes \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "episodeId":"<EPISODE_ID>",
+    "content":"Patient tolerated PT well. Continue gait training.",
+    "noteType":"session_note",
+    "isPrivate":false
+  }' | jq .
+
+# List for coordinator (public notes)
+curl -s -b /tmp/coord.txt "http://localhost:5001/api/clinical-notes?episodeId=<EPISODE_ID>" | jq .
+
+# Immutability — expect 405
+curl -s -b /tmp/clinical.txt -X PATCH http://localhost:5001/api/clinical-notes/<NOTE_ID> \
+  -H 'Content-Type: application/json' -d '{"content":"changed"}' | jq .
+curl -s -b /tmp/clinical.txt -X DELETE http://localhost:5001/api/clinical-notes/<NOTE_ID> | jq .
+```
+
+**Pass:**
+
+- `POST` → `201` with author
+- Coordinator `GET` sees non-private notes
+- `PATCH`/`DELETE` → `405` immutable message
+- Family → `403`
+
+**Verified (2026-07-29):** ✅ create/list/show + private filter + 405 immutability.
 
 ### 8.2 Coordinator sees notes on episode (website)
 
@@ -462,13 +749,83 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 
 **Pass:** Co-sign recorded; visible on approval log.
 
+### 8.3b API smoke (manual — until UI)
+
+**When:** After `M3-3.4` ✅
+
+```bash
+# Clinical login (co-sign is clinical-only — not coordinator/family)
+curl -s -c /tmp/clinical.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"clinical@demo.com","password":"Password123!"}' | jq .
+
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+curl -s -c /tmp/family.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"family@demo.com","password":"Password123!"}' | jq .
+
+# Pick a submitted / approved / active plan
+PLAN_ID=<ACTIVE_OR_SUBMITTED_CARE_PLAN_ID>
+
+# Optional: confirm current status + existing logs
+curl -s -b /tmp/coord.txt "http://localhost:5001/api/care-plans/$PLAN_ID" | jq '{
+  id: .data.id,
+  status: .data.status,
+  logs: [.data.approvalLogs[] | {action, actorId, notes, createdAt}]
+}'
+
+# Co-sign — expect 201, action=clinical_cosign; plan status unchanged
+curl -s -b /tmp/clinical.txt -X POST "http://localhost:5001/api/care-plans/$PLAN_ID/cosign" \
+  -H 'Content-Type: application/json' \
+  -d '{"notes":"Clinically reviewed — goals and services appropriate"}' | jq '{
+  message,
+  action: .approvalLog.action,
+  actorId: .approvalLog.actorId,
+  notes: .approvalLog.notes,
+  status: .data.status,
+  logActions: [.data.approvalLogs[].action]
+}'
+
+# Idempotent — same clinical user again → 200 "Already co-signed."
+curl -s -b /tmp/clinical.txt -X POST "http://localhost:5001/api/care-plans/$PLAN_ID/cosign" \
+  -H 'Content-Type: application/json' \
+  -d '{"notes":"again"}' | jq '{message, action: .approvalLog.action}'
+
+# Coordinator / family → 403
+curl -s -b /tmp/coord.txt -X POST "http://localhost:5001/api/care-plans/$PLAN_ID/cosign" \
+  -H 'Content-Type: application/json' \
+  -d '{"notes":"no"}' | jq .
+curl -s -b /tmp/family.txt -X POST "http://localhost:5001/api/care-plans/$PLAN_ID/cosign" \
+  -H 'Content-Type: application/json' \
+  -d '{"notes":"no"}' | jq .
+
+# Draft plan → 422
+curl -s -b /tmp/clinical.txt -X POST "http://localhost:5001/api/care-plans/<DRAFT_PLAN_ID>/cosign" \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+**Pass:**
+
+- Clinical `POST` → `201` with `approvalLog.action === "clinical_cosign"`
+- Plan `status` unchanged (optional attestation; family approval still owns activation)
+- Co-sign visible on `GET /care-plans/:id` → `approvalLogs`
+- Same clinical user again → idempotent `"Already co-signed."`
+- Coordinator / family → `403`
+- `draft` / `rejected` / `revision_requested` / `completed` → `422`
+
+**Verified (2026-07-29):** ✅ co-sign on active plan + idempotent + role gates + draft 422.
+
 ---
 
 ## Flow 9 — Staff scheduling & availability
 
 **Accept:** `SCH1`, `SCH2`  
 **Tasks:** `M3-4.1`–`M3-4.3`, `M3-5B.7`  
-**Status:** 🔴
+**Status:** 🟡 Backend verified (website UI pending)
 
 ### 9.1 Manage availability (website)
 
@@ -478,6 +835,48 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 2. Set recurring availability for a support/clinical worker (day, start/end)
 
 **Pass:** Slots saved; visible on coordinator schedule view.
+
+### 9.1b API smoke — availability CRUD
+
+**When:** After `M3-4.1` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+# Demo support worker id (from seed) — or look up via /api/providers/matched
+SUPPORT_ID=<SUPPORT_WORKER_USER_ID>
+
+# Replace weekly slots for a staff member (coordinator)
+curl -s -b /tmp/coord.txt -X PUT "http://localhost:5001/api/availability/$SUPPORT_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "slots": [
+      {"dayOfWeek":1,"startTime":"09:00","endTime":"17:00","isAvailable":true},
+      {"dayOfWeek":3,"startTime":"10:00","endTime":"14:00","isAvailable":true}
+    ]
+  }' | jq .
+
+# List
+curl -s -b /tmp/coord.txt "http://localhost:5001/api/availability?providerId=$SUPPORT_ID" | jq .
+
+# Add one slot
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/availability \
+  -H 'Content-Type: application/json' \
+  -d '{"providerId":"'"$SUPPORT_ID"'","dayOfWeek":5,"startTime":"08:00","endTime":"12:00"}' | jq .
+
+# Patch / delete a slot
+SLOT_ID=<SLOT_ID>
+curl -s -b /tmp/coord.txt -X PATCH "http://localhost:5001/api/availability/slots/$SLOT_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"endTime":"13:00"}' | jq .
+curl -s -b /tmp/coord.txt -X DELETE "http://localhost:5001/api/availability/slots/$SLOT_ID" | jq .
+```
+
+**Pass:** Coordinator can set/list/update/delete slots for staff in their org.
+
+**Verified (2026-07-29):** ✅ PUT replace + GET list for `support@demo.com`.
 
 ### 9.2 Book / assign with conflict detection (website)
 
@@ -491,6 +890,52 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 - Valid booking succeeds
 - Conflict shows error — second booking blocked
 
+### 9.2b API smoke — book + conflict
+
+**When:** After `M3-4.2` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+EPISODE_ID=<ACTIVE_EPISODE_ID>
+SUPPORT_ID=<SUPPORT_WORKER_USER_ID>
+# Pick a future ISO time
+START=$(node -e "const d=new Date();d.setUTCDate(d.getUTCDate()+3);d.setUTCHours(10,0,0,0);console.log(d.toISOString())")
+OVERLAP=$(node -e "const d=new Date('$START');d.setUTCMinutes(30);console.log(d.toISOString())")
+
+# Book session — optionally reassign pending goal tasks to the worker
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/scheduling/sessions \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"episodeId\":\"$EPISODE_ID\",
+    \"providerId\":\"$SUPPORT_ID\",
+    \"scheduledAt\":\"$START\",
+    \"durationMinutes\":60,
+    \"type\":\"in_person\",
+    \"assignPendingTasks\":true,
+    \"notes\":\"Home visit\"
+  }" | jq .
+
+# Overlapping book → expect 409 SCHEDULING_CONFLICT
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/scheduling/sessions \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"episodeId\":\"$EPISODE_ID\",
+    \"providerId\":\"$SUPPORT_ID\",
+    \"scheduledAt\":\"$OVERLAP\",
+    \"durationMinutes\":60
+  }" | jq .
+
+# List episode sessions
+curl -s -b /tmp/coord.txt "http://localhost:5001/api/scheduling/sessions?episodeId=$EPISODE_ID" | jq .
+```
+
+**Pass:** First book `201`; overlap `409` with `details.code === "SCHEDULING_CONFLICT"`.
+
+**Verified (2026-07-29):** ✅ book + 409 conflict + assignPendingTasks.
+
 ### 9.3 Recurring appointments (website)
 
 **When:** After `M3-4.3` ✅
@@ -500,13 +945,42 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 
 **Pass:** Multiple future sessions created per recurrence rule.
 
+### 9.3b API smoke — recurring sessions
+
+**When:** After `M3-4.3` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+EPISODE_ID=<ACTIVE_EPISODE_ID>
+SUPPORT_ID=<SUPPORT_WORKER_USER_ID>
+RECUR_START=$(node -e "const d=new Date();d.setUTCDate(d.getUTCDate()+14);d.setUTCHours(14,0,0,0);console.log(d.toISOString())")
+
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/scheduling/sessions/recurring \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"episodeId\":\"$EPISODE_ID\",
+    \"providerId\":\"$SUPPORT_ID\",
+    \"scheduledAt\":\"$RECUR_START\",
+    \"durationMinutes\":45,
+    \"type\":\"home_visit\",
+    \"recurrence\":{\"frequency\":\"weekly\",\"count\":3,\"interval\":1}
+  }" | jq '{created, skipped, times:[.sessions[].scheduledAt]}'
+```
+
+**Pass:** `created >= 1` (up to `count`); conflicting occurrences listed in `skipped`.
+
+**Verified (2026-07-29):** ✅ 3 weekly sessions generated.
+
 ---
 
 ## Flow 10 — Care delivery (Support worker)
 
 **Accept:** `DEL1`, `DEL2`  
-**Tasks:** `M3-4.4`, `M3-5E.*`  
-**Status:** 🔴 placeholders at `/support/shifts`, `/support/tasks`
+**Tasks:** `M3-4.4`, `M3-4.5`, `M3-5E.*`  
+**Status:** 🟡 Backend verified (website UI pending at `/support/shifts`, `/support/tasks`)
 
 ### 10.1 Start shift and see tasks (website)
 
@@ -523,6 +997,37 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 - Tasks from approved care plan (Flow 4) visible
 - Task status updatable
 
+### 10.1b API smoke — assign tasks + support worker list
+
+**When:** After `M3-4.5` ✅
+
+```bash
+curl -s -c /tmp/coord.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coordinator@riayahplus.com","password":"Password123!"}' | jq .
+
+curl -s -c /tmp/support.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"support@demo.com","password":"Password123!"}' | jq .
+
+EPISODE_ID=<EPISODE_WITH_GOAL_TASKS>
+SUPPORT_ID=<SUPPORT_WORKER_USER_ID>
+
+# Bulk-assign pending episode tasks to support worker
+curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/tasks/assign-episode \
+  -H 'Content-Type: application/json' \
+  -d "{\"episodeId\":\"$EPISODE_ID\",\"assigneeId\":\"$SUPPORT_ID\"}" | jq .
+
+# Support worker sees assigned tasks
+curl -s -b /tmp/support.txt 'http://localhost:5001/api/tasks?assignee=me' | jq .
+# Also available under shifts helper:
+curl -s -b /tmp/support.txt http://localhost:5001/api/shifts/tasks | jq .
+```
+
+**Pass:** After assign, support `GET /tasks?assignee=me` returns the episode goal tasks.
+
+**Verified (2026-07-29):** ✅ assign via book `assignPendingTasks` + support list.
+
 ### 10.2 Complete task + upload evidence (website)
 
 **When:** After `M3-5E.3` ✅
@@ -538,20 +1043,48 @@ SELECT id, "careEpisodeId", status, "keyConcerns" FROM ai_intake_summaries ORDER
 - Evidence attached and visible to coordinator
 - Shift end time recorded
 
-### 10.3 API smoke (shifts — partial today)
+### 10.2b / 10.3 API smoke — shift + complete with evidence
+
+**When:** After `M3-4.4` ✅
 
 ```bash
-# Login support worker (after account exists)
-curl -s -c /tmp/support.txt -X POST http://localhost:5001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"<support@demo.com>","password":"Password123!"}'
+curl -s -c /tmp/support.txt -X POST http://localhost:5001/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"support@demo.com","password":"Password123!"}' | jq .
 
+# Start shift (idempotent if already active)
 curl -s -b /tmp/support.txt -X POST http://localhost:5001/api/shifts/start \
-  -H "Content-Type: application/json" -d '{}' | jq .
+  -H 'Content-Type: application/json' -d '{}' | jq .
+SHIFT_ID=$(curl -s -b /tmp/support.txt http://localhost:5001/api/shifts/active | jq -r '.data.id')
 
 curl -s -b /tmp/support.txt http://localhost:5001/api/shifts/active | jq .
-curl -s -b /tmp/support.txt http://localhost:5001/api/tasks | jq .
+curl -s -b /tmp/support.txt 'http://localhost:5001/api/tasks?assignee=me' | jq .
+TASK_ID=$(curl -s -b /tmp/support.txt 'http://localhost:5001/api/tasks?assignee=me' | jq -r '.data[]|select(.status!="completed")|.id' | head -1)
+
+# Complete with evidence URL (upload via POST /api/upload first if needed, then paste URL)
+curl -s -b /tmp/support.txt -X POST "http://localhost:5001/api/tasks/$TASK_ID/complete" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "completionEvidence":"https://example.com/evidence/photo1.jpg",
+    "notes":"Visit completed — client walked 15 min",
+    "actualDuration":55
+  }' | jq .
+
+# Or via status patch:
+# curl -s -b /tmp/support.txt -X PATCH "http://localhost:5001/api/tasks/$TASK_ID/status" \
+#   -H 'Content-Type: application/json' \
+#   -d '{"status":"completed","completionEvidence":"https://example.com/evidence/photo1.jpg"}' | jq .
+
+curl -s -b /tmp/support.txt -X POST "http://localhost:5001/api/shifts/$SHIFT_ID/end" | jq .
 ```
+
+**Pass:**
+
+- Shift start → active; end → completed + `endedAt`
+- Task `status=completed`, `completionEvidence` URL set, `completedAt` set
+- Invalid evidence (non-URL) → `422`
+
+**Verified (2026-07-29):** ✅ shift start/end + task complete with evidence URL.
 
 ---
 
@@ -589,17 +1122,18 @@ Run once through the website with **one care episode**:
 | CP5 | Family request revision | 3.3 | | | |
 | CP6 | Family reject | 3.4 | API smoke passed | | 2026-07-28 |
 | CP7 | Goals → tasks on approve | 4.1 | API smoke passed | | 2026-07-28 |
-| CP8 | Active edit → re-approval | 5.1 | | | |
-| SCH1 | Availability manageable | 9.1 | | | |
-| SCH2 | Conflict detection | 9.2 | | | |
-| DEL1 | Start shift + see tasks | 10.1 | | | |
-| DEL2 | Complete task + evidence | 10.2 | | | |
-| NOTE1 | Clinical notes immutable | 8.1 | | | |
-| NOTE2 | Notes on episode for coordinator | 8.2 | | | |
-| GOAL1 | Goal marked achieved | 4.2 | | | |
-| AI1 | Summary row after episode | 6.1 / 6.4 | | | |
-| AI2 | Coordinator sees summary | 6.1 | | | |
-| AI3 | Draft + idempotent callback | 7.1 / 7.2 | | | |
+| CP8 | Active edit → re-approval | 5.1 / 5.2 | 🧪 API | | 2026-07-29 — curl steps in §5.2 |
+| SCH1 | Availability manageable | 9.1 / 9.1b | 🧪 API | | 2026-07-29 — curl in §9.1b |
+| SCH2 | Conflict detection | 9.2 / 9.2b / 9.3b | 🧪 API | | 2026-07-29 — book + 409 + recurring |
+| DEL1 | Start shift + see tasks | 10.1 / 10.1b | 🧪 API | | 2026-07-29 — assign + list |
+| DEL2 | Complete task + evidence | 10.2 / 10.2b | 🧪 API | | 2026-07-29 — complete + evidence URL |
+| NOTE1 | Clinical notes immutable | 8.1 / 8.1b | 🧪 API | | 2026-07-29 — curl in §8.1b |
+| NOTE2 | Notes on episode for coordinator | 8.2 / 8.1b | 🧪 API | | API list works; UI pending |
+| COSIGN | Clinical co-sign on care plan | 8.3 / 8.3b | 🧪 API | | 2026-07-29 — curl in §8.3b |
+| GOAL1 | Goal marked achieved | 4.2 / 4.2b | 🧪 API | | 2026-07-29 — curl in §4.2b |
+| AI1 | Summary row after episode | 6.1 / 6.1b / 6.4 | 🧪 API | | 2026-07-29 — draft row after review |
+| AI2 | Coordinator sees summary | 6.1 / 6.2b | 🧪 API | | 2026-07-29 — GET + approve API; UI panel pending |
+| AI3 | Draft + idempotent callback | 7.1 / 7.2 / 7.2b | 🧪 API | | 2026-07-29 — callback + upsert; trigger UI still pending |
 | AI4 | Human approve before family | 7.3 | | | |
 | AI5 | Review OK when AI down | 6.3 | | | |
 

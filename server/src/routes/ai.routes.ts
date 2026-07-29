@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, optionalAuth } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import { AIChatController } from '../controllers/ai/AIChatController';
 import { AISessionController } from '../controllers/ai/AISessionController';
 import { GeminiChatService } from '../services/GeminiChatService';
@@ -8,8 +8,10 @@ import { z } from 'zod';
 
 const router = Router();
 
+// Note: POST /ai/callbacks/care-plan-draft is registered in routes/index.ts
+// BEFORE auth.routes (auth.routes' global authenticate would otherwise 401 it).
+
 // ── Public (unauthenticated) Gemini endpoint ──────────────────────────────────
-// Used for embedded widgets, landing page chatbots, etc.
 router.post('/public/chat', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { message, sessionId } = z.object({

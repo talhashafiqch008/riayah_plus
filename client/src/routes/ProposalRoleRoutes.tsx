@@ -6,7 +6,18 @@ import { ROLE_SHELLS } from '@/config/proposalRoleShells';
 import RoleShellDashboard from '@/pages/roles/RoleShellDashboard';
 import RoleShellPlaceholder from '@/pages/roles/RoleShellPlaceholder';
 import FamilyOnboardingPage from '@/pages/family/FamilyOnboardingPage';
+import FamilyCarePlansPage from '@/pages/family/FamilyCarePlansPage';
+import FamilyCarePlanReviewPage from '@/pages/family/FamilyCarePlanReviewPage';
 import CoordinatorIntakeQueuePage from '@/pages/coordinator/CoordinatorIntakeQueuePage';
+import CoordinatorCarePlansPage from '@/pages/coordinator/CoordinatorCarePlansPage';
+import CoordinatorCarePlanBuilderPage from '@/pages/coordinator/CoordinatorCarePlanBuilderPage';
+import CoordinatorCarePlanDetailPage from '@/pages/coordinator/CoordinatorCarePlanDetailPage';
+import CoordinatorSchedulePage from '@/pages/coordinator/CoordinatorSchedulePage';
+import ClinicalNotesPage from '@/pages/clinical/ClinicalNotesPage';
+import ClinicalEpisodeNotesPage from '@/pages/clinical/ClinicalEpisodeNotesPage';
+import ClinicalCarePlanPage from '@/pages/clinical/ClinicalCarePlanPage';
+import SupportShiftsPage from '@/pages/support/SupportShiftsPage';
+import SupportTasksPage from '@/pages/support/SupportTasksPage';
 import CareUnitListPage from '@/pages/care/CareUnitListPage';
 import CareUnitDetailPage from '@/pages/care/CareUnitDetailPage';
 import CarePatientDetailPage from '@/pages/care/CarePatientDetailPage';
@@ -22,12 +33,6 @@ const PageSpinner = () => (
 
 const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; description?: string }[]> = {
   family: [
-    {
-      path: 'care-plans',
-      title: 'Care Plans',
-      description:
-        'Family care-plan review and approval arrives in Milestone 3. For now, follow your Care Journey and Appointments.',
-    },
     {
       path: 'documents',
       title: 'Documents',
@@ -46,17 +51,13 @@ const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; descripti
     { path: 'messages', title: 'Messages' },
   ],
   coordinator: [
-    { path: 'plans', title: 'Care Plans' },
     { path: 'messages', title: 'Messages' },
   ],
   clinical: [
     { path: 'patients', title: 'Patients' },
-    { path: 'notes', title: 'Session Notes' },
     { path: 'messages', title: 'Messages' },
   ],
   support: [
-    { path: 'shifts', title: 'My Shifts' },
-    { path: 'tasks', title: 'Tasks' },
     { path: 'notes', title: 'Shift Notes' },
     { path: 'messages', title: 'Messages' },
   ],
@@ -152,6 +153,38 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/coordinator/episodes/:episodeId/care-plan/new"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CoordinatorCarePlanBuilderPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/plans"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CoordinatorCarePlansPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/plans/:id"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CoordinatorCarePlanDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coordinator/schedule"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <CoordinatorSchedulePage />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {shellKey === 'family' && (
@@ -212,17 +245,79 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/family/care-plans"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyCarePlansPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/care-plans/:id"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyCarePlanReviewPage />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {shellKey === 'clinical' && (
-              <Route
-                path="/clinical/schedule"
-                element={
-                  <Suspense fallback={<PageSpinner />}>
-                    <AssessmentSchedulePage mode="clinical" />
-                  </Suspense>
-                }
-              />
+              <>
+                <Route
+                  path="/clinical/schedule"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <AssessmentSchedulePage mode="clinical" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/notes"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <ClinicalNotesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/episodes/:episodeId/notes"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <ClinicalEpisodeNotesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/plans/:id"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <ClinicalCarePlanPage />
+                    </Suspense>
+                  }
+                />
+              </>
+            )}
+            {shellKey === 'support' && (
+              <>
+                <Route
+                  path="/support/shifts"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <SupportShiftsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/support/tasks"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <SupportTasksPage />
+                    </Suspense>
+                  }
+                />
+              </>
             )}
             {placeholders.map((page) => (
               <Route

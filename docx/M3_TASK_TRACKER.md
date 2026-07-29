@@ -34,9 +34,9 @@
 | **0** | Kickoff / env / Momen contract | 🟡 | **Do first** |
 | **1** | Care-plan backend gaps (signed core) | 🟡 | **Current** |
 | **2** | AI integration backend ∥ with Wave 1 | ⬜ | **∥ Parallel** Day 1 |
-| **3** | Clinical notes + goals + co-sign API | ⬜ | After Wave 1 core |
-| **4** | Scheduling + delivery backend | ⬜ | After Wave 1–3 APIs usable |
-| **5** | Frontend (coordinator → family → clinical → support) | ⬜ | After matching APIs |
+| **3** | Clinical notes + goals + co-sign API | 🟡 | Backend APIs done (UI Wave 5); optional M3-3.5 templates |
+| **4** | Scheduling + delivery backend | 🟡 | Backend verified; UI Wave 5 |
+| **5** | Frontend (coordinator → family → clinical → support) | 🟡 | Pages shipped; Wave 6 UI smoke pending |
 | **6** | Hardening, regression, acceptance | ⬜ | **Last** before client demo |
 
 ## Latest verified progress
@@ -56,9 +56,8 @@
 
 **Current next coding task:**
 
-1. `M3-1.4` — re-approval gate when editing an active plan  
-2. `M3-2.1`–`M3-2.3` — Riayah AI client + intake summarize + callback  
-3. Then Wave 3 APIs (clinical notes / goals / co-sign)
+1. Wave 6 — `M3-6.1` pass/fail checklist + `M3-6.2` M2 regression  
+2. Optional: `M3-3.5` templates (⏭ if schedule slips)
 
 **Suggested first three coding tasks (original start order):**
 
@@ -127,14 +126,14 @@ Wave 6 Acceptance + REG
 | **M3-1.1** | Run Prisma migration for `AiIntakeSummary` → table `ai_intake_summaries` | `server/prisma` | AI1 | ✅ | Migration run by user |
 | **M3-1.2** | On `CarePlanController.approve`: create one `Task` per `Goal` (link `goalId`) | `CarePlanController.ts` | CP7 | 🧪 Verified | API smoke passed; 2 approved goals created 2 pending tasks |
 | **M3-1.3** | Add `POST /care-plans/:id/reject` (family/patient); use state machine + approval log + notify coordinator | `carePlan.routes.ts` + controller | CP6 | 🧪 Verified | API smoke passed; family reject returned success |
-| **M3-1.4** | Re-approval gate: material edit of `active` plan forces re-approval path (version + status) | `CarePlanController` update/submit | CP8 | ⬜ | Versioning exists; gate incomplete |
+| **M3-1.4** | Re-approval gate: material edit of `active` plan forces re-approval path (version + status) | `CarePlanController` update/submit | CP8 | 🧪 Verified | Material edit of active → draft vN+1 + `previousVersionId`; old → `revision_requested` / not current; in-place item mutations blocked; approve now activates plan |
 | **M3-1.5** | Smoke existing flow: create → items/goals → submit → approve / request-revision | API | CP1–CP5 | 🟡 Partial | Approve + reject verified; request-revision + full regression still pending |
 
 **Wave 1 exit**
 
 - [x] Reject works  
 - [x] Approve creates tasks from goals  
-- [ ] Active-plan edit requires re-approval  
+- [x] Active-plan edit requires re-approval  
 - [x] `ai_intake_summaries` exists (even if empty)  
 
 ---
@@ -145,20 +144,20 @@ Wave 6 Acceptance + REG
 
 | ID | Task | File / area | Accept # | Status | Notes |
 |---|---|---|---|---|---|
-| **M3-2.1** | Build thin `RiayahAiClient` (`summarizeIntake`, `requestCarePlanDraft`) using `env.AI_SERVICE_*` | `server/src/services/` | — | ⬜ | Header `X-API-Key` |
-| **M3-2.2** | After `IntakeController.review` commits + episode created: call summarize; **upsert** `AiIntakeSummary`; `status: draft` | `IntakeController.ts` ~668+ | AI1, AI5 | ⬜ | try/catch — never fail review if AI down |
-| **M3-2.3** | Add idempotent `POST /ai/callbacks/care-plan-draft` (validate API key/secret; no duplicate drafts) | `ai.routes.ts` + handler | AI3 | ⬜ | Confirm payload via Postman |
-| **M3-2.4** | Add authenticated trigger: coordinator requests draft → `POST /v1/careplan/{episode_id}/draft` | route + controller | AI3 | ⬜ | Prefer explicit button, not silent auto |
-| **M3-2.5** | On callback success: persist draft `CarePlan` (or map goals/services) + `NotificationService` to coordinator | callback handler | AI3, AI4 | ⬜ | Never auto-submit to family |
-| **M3-2.6** | Coordinator API to approve AI intake summary (`draft` → approved) | new endpoint or PATCH | AI2, AI4 | ⬜ | Art. 22 / human-in-loop |
+| **M3-2.1** | Build thin `RiayahAiClient` (`summarizeIntake`, `requestCarePlanDraft`) using `env.AI_SERVICE_*` | `server/src/services/` | — | 🧪 Verified | `RiayahAiClient.ts` + unit tests; staging summarize smoke OK; fixed duplicate `.env` AI keys (dotenv used first = localhost) |
+| **M3-2.2** | After `IntakeController.review` commits + episode created: call summarize; **upsert** `AiIntakeSummary`; `status: draft` | `IntakeController.ts` + `AiIntakeSummaryService` | AI1, AI5 | 🧪 Verified | Non-blocking; staging summarize + DB row `draft` after review |
+| **M3-2.3** | Add idempotent `POST /ai/callbacks/care-plan-draft` (validate API key/secret; no duplicate drafts) | `routes/index.ts` + `AiCarePlanDraftService` | AI3 | 🧪 Verified | Mounted **before** auth.routes; `X-API-Key`; upsert by `draftKey`; replay returns same plan |
+| **M3-2.4** | Add authenticated trigger: coordinator requests draft → `POST /v1/careplan/{episode_id}/draft` | `POST /episodes/:id/ai-care-plan-draft` | AI3 | 🧪 Verified | Builds payload from episode; persists sync response; regenerate upserts same draftKey |
+| **M3-2.5** | On callback success: persist draft `CarePlan` (or map goals/services) + `NotificationService` to coordinator | callback handler | AI3, AI4 | 🧪 Verified | Done inside `AiCarePlanDraftService` (draft only; never auto-submit) |
+| **M3-2.6** | Coordinator API to approve AI intake summary (`draft` → approved) | `GET/POST .../ai-intake-summary[/approve]` | AI2, AI4 | 🧪 Verified | Human-in-loop; idempotent re-approve; family 403 |
 | **M3-2.7** | Staging smoke: summarize + draft + duplicate callback | staging | AI1–AI5 | ⬜ | With Momen if shapes differ |
 
 **Wave 2 exit**
 
 - [ ] Intake review succeeds when AI is down  
-- [ ] Summary row stored after episode create  
-- [ ] Callback idempotent  
-- [ ] AI draft never reaches family without coordinator edit/submit  
+- [x] Summary row stored after episode create  
+- [x] Callback idempotent  
+- [x] AI draft never reaches family without coordinator edit/submit  
 
 ---
 
@@ -168,17 +167,18 @@ Wave 6 Acceptance + REG
 
 | ID | Task | File / area | Accept # | Status | Notes |
 |---|---|---|---|---|---|
-| **M3-3.1** | `GET/POST /clinical-notes` scoped to episode and/or session; org/tenant guards | new routes + controller | NOTE1, NOTE2 | ⬜ | Model exists; HTTP missing |
-| **M3-3.2** | Immutability: no update/delete of saved notes (or append-only versions if required by product) | same | NOTE1 | ⬜ | Proposal: immutable history |
-| **M3-3.3** | Goal progress: at least `PATCH` status → `achieved` (+ `achievedAt`) | goals routes or nested under care-plans | GOAL1 | ⬜ | May create under plan if nested is enough |
-| **M3-3.4** | Clinical co-sign endpoint for care plans within scope | care-plan routes | — | ⬜ | Proposal requirement |
+| **M3-3.1** | `GET/POST /clinical-notes` scoped to episode and/or session; org/tenant guards | `clinicalNote.routes.ts` + controller | NOTE1, NOTE2 | 🧪 Verified | List/create/show; private notes filtered for coordinator |
+| **M3-3.2** | Immutability: no update/delete of saved notes (or append-only versions if required by product) | same | NOTE1 | 🧪 Verified | PATCH/PUT/DELETE → `405` |
+| **M3-3.3** | Goal progress: at least `PATCH` status → `achieved` (+ `achievedAt`) | goals routes or nested under care-plans | GOAL1 | 🧪 Verified | `GET/PATCH /care-plans/:id/goals/:goalId`; clinical+coordinator; no CP8 |
+| **M3-3.4** | Clinical co-sign endpoint for care plans within scope | care-plan routes | — | 🧪 Verified | `POST /care-plans/:id/cosign` → `clinical_cosign` log; clinical-only; optional |
 | **M3-3.5** | *(Optional / if time)* Reusable goal/service templates | new model/routes | — | ⬜ | Proposal mentions templates; defer only if schedule slips — mark ⏭ with note |
 
 **Wave 3 exit**
 
-- [ ] Clinical can create note; cannot silently rewrite  
-- [ ] Goals can be marked achieved  
-- [ ] Co-sign path exists (even if UI later)  
+- [x] Clinical can create note; cannot silently rewrite  
+- [ ] Coordinator can see notes on episode (API yes; UI pending)  
+- [x] Goals can be marked achieved  
+- [x] Co-sign path exists (even if UI later)  
 
 ---
 
@@ -188,17 +188,17 @@ Wave 6 Acceptance + REG
 
 | ID | Task | File / area | Accept # | Status | Notes |
 |---|---|---|---|---|---|
-| **M3-4.1** | Provider availability CRUD API (`ProviderAvailabilitySlot`) | new routes/controller | SCH1 | ⬜ | Schema exists |
-| **M3-4.2** | Slot booking / assign staff to session with **conflict detection** | booking/session services | SCH2 | ⬜ | Core scheduling engine |
-| **M3-4.3** | Recurring appointment generation | same | SCH2 | ⬜ | Proposal deliverable |
-| **M3-4.4** | Audit shift/task APIs vs delivery needs; add evidence upload wiring if missing | `shift.routes` / uploads | DEL1, DEL2 | ⬜ | Don’t rebuild what works |
-| **M3-4.5** | Ensure tasks created on plan approve are visible to assigned support workers | query filters / assignee | DEL1, CP7 | ⬜ | Ties Wave 1 → delivery |
+| **M3-4.1** | Provider availability CRUD API (`ProviderAvailabilitySlot`) | new routes/controller | SCH1 | 🧪 Verified | `GET/PUT/POST/PATCH/DELETE /api/availability` — coord can manage staff |
+| **M3-4.2** | Slot booking / assign staff to session with **conflict detection** | booking/session services | SCH2 | 🧪 Verified | `POST /api/scheduling/sessions` → 409 on overlap |
+| **M3-4.3** | Recurring appointment generation | same | SCH2 | 🧪 Verified | `POST /api/scheduling/sessions/recurring` |
+| **M3-4.4** | Audit shift/task APIs vs delivery needs; add evidence upload wiring if missing | `shift.routes` / uploads | DEL1, DEL2 | 🧪 Verified | Shift ownership + `POST /tasks/:id/complete` with evidence URL |
+| **M3-4.5** | Ensure tasks created on plan approve are visible to assigned support workers | query filters / assignee | DEL1, CP7 | 🧪 Verified | `POST /tasks/assign-episode` + book with `assignPendingTasks` |
 
 **Wave 4 exit**
 
-- [ ] Coordinator can manage availability  
-- [ ] Booking rejects conflicts  
-- [ ] Worker can start shift, see tasks, complete + evidence  
+- [x] Coordinator can manage availability  
+- [x] Booking rejects conflicts  
+- [x] Worker can start shift, see tasks, complete + evidence  
 
 ---
 
@@ -211,56 +211,56 @@ Wave 6 Acceptance + REG
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| **M3-5A.1** | Care-plan API client helpers (list/get/create/update/submit/approve/revision/reject/items) | ⬜ | New module; don’t rely on commented careseeker |
-| **M3-5A.2** | Clinical notes + goals + AI summary/draft client helpers | ⬜ | |
-| **M3-5A.3** | Reuse/extract demo atoms if useful (`StatusBadge`, `ProgressBar`, `TabNav`) | ⬜ | Optional; don’t block on perfect extraction |
-| **M3-5A.4** | Map demo statuses: `pending_approval` → `submitted_for_approval` | ⬜ | Never persist demo strings |
+| **M3-5A.1** | Care-plan API client helpers (list/get/create/update/submit/approve/revision/reject/items) | ✅ | `lib/api/carePlans.ts` |
+| **M3-5A.2** | Clinical notes + goals + AI summary/draft client helpers | ✅ | `clinicalNotes.ts` + goals in carePlans + `scheduling.ts` |
+| **M3-5A.3** | Reuse/extract demo atoms if useful (`StatusBadge`, `ProgressBar`, `TabNav`) | ⏭ | Inline badges matching product stone/teal |
+| **M3-5A.4** | Map demo statuses: `pending_approval` → `submitted_for_approval` | ✅ | `normalizeCarePlanStatus` in carePlans.ts |
 
 ### 5B — Coordinator UI (**build fresh**) — first frontend after Wave 1–2
 
 | ID | Task | Route | Status | Notes |
 |---|---|---|---|---|
-| **M3-5B.1** | Care Plans list (replace placeholder) | `/coordinator/plans` | ⬜ | |
-| **M3-5B.2** | Care Plan builder (goals + service items) | `/coordinator/episodes/:id/care-plan/new` | ⬜ | CP1 |
-| **M3-5B.3** | Care Plan detail / edit + approval log | `/coordinator/plans/:id` | ⬜ | CP2 |
-| **M3-5B.4** | Submit for family approval from UI | same | ⬜ | CP3 |
-| **M3-5B.5** | AI intake summary panel + approve summary | intake / episode detail | ⬜ | AI2, AI4 — **not** demo IntakePage |
-| **M3-5B.6** | “Generate AI Draft” button + load draft into builder | builder / detail | ⬜ | AI3, AI4 |
-| **M3-5B.7** | Schedule / availability / assignment UI + nav item | `/coordinator/schedule` | ⬜ | Needs Wave 4; can follow 5C if schedule API late |
+| **M3-5B.1** | Care Plans list (replace placeholder) | `/coordinator/plans` | ✅ | |
+| **M3-5B.2** | Care Plan builder (goals + service items) | `/coordinator/episodes/:id/care-plan/new` | ✅ | CP1 |
+| **M3-5B.3** | Care Plan detail / edit + approval log | `/coordinator/plans/:id` | ✅ | CP2 |
+| **M3-5B.4** | Submit for family approval from UI | same | ✅ | CP3 |
+| **M3-5B.5** | AI intake summary panel + approve summary | intake / episode detail | ✅ | On builder page |
+| **M3-5B.6** | “Generate AI Draft” button + load draft into builder | builder / detail | ✅ | |
+| **M3-5B.7** | Schedule / availability / assignment UI + nav item | `/coordinator/schedule` | ✅ | |
 
 ### 5C — Family UI (**adapt** demo `CareseekerPage`)
 
 | ID | Task | Route | Status | Notes |
 |---|---|---|---|---|
-| **M3-5C.1** | Care plans list (replace placeholder) | `/family/care-plans` | ⬜ | Adapt patterns |
-| **M3-5C.2** | Review page: goals, services, cost | `/family/care-plans/:id` | ⬜ | |
-| **M3-5C.3** | Wire Approve | same | ⬜ | CP4 |
-| **M3-5C.4** | Wire Request Changes | same | ⬜ | CP5 |
-| **M3-5C.5** | Wire Reject | same | ⬜ | CP6 — needs M3-1.3 |
+| **M3-5C.1** | Care plans list (replace placeholder) | `/family/care-plans` | ✅ | |
+| **M3-5C.2** | Review page: goals, services, cost | `/family/care-plans/:id` | ✅ | |
+| **M3-5C.3** | Wire Approve | same | ✅ | CP4 |
+| **M3-5C.4** | Wire Request Changes | same | ✅ | CP5 |
+| **M3-5C.5** | Wire Reject | same | ✅ | CP6 |
 
 ### 5D — Clinical UI (**build fresh**)
 
 | ID | Task | Route | Status | Notes |
 |---|---|---|---|---|
-| **M3-5D.1** | Session notes hub (replace placeholder) | `/clinical/notes` | ⬜ | |
-| **M3-5D.2** | Episode notes add/view (immutable) | `/clinical/episodes/:id/notes` | ⬜ | NOTE1, NOTE2 |
-| **M3-5D.3** | Care plan read-only + co-sign | `/clinical/plans/:id` | ⬜ | Needs M3-3.4 |
+| **M3-5D.1** | Session notes hub (replace placeholder) | `/clinical/notes` | ✅ | |
+| **M3-5D.2** | Episode notes add/view (immutable) | `/clinical/episodes/:id/notes` | ✅ | NOTE1, NOTE2 |
+| **M3-5D.3** | Care plan read-only + co-sign | `/clinical/plans/:id` | ✅ | |
 
 ### 5E — Support worker UI (**adapt** `provider/TasksPage`)
 
 | ID | Task | Route | Status | Notes |
 |---|---|---|---|---|
-| **M3-5E.1** | My Shifts (replace placeholder) | `/support/shifts` | ⬜ | Use `lib/api/shifts.ts` |
-| **M3-5E.2** | Tasks list / checklist | `/support/tasks` | ⬜ | DEL1 |
-| **M3-5E.3** | Active shift: start / complete tasks / evidence / end | embedded | ⬜ | DEL2 |
-| **M3-5E.4** | Do **not** ship product nav to `/demo/coordinator` or extend `/staff/TasksPage` as product | — | ⬜ | Policy check |
+| **M3-5E.1** | My Shifts (replace placeholder) | `/support/shifts` | ✅ | |
+| **M3-5E.2** | Tasks list / checklist | `/support/tasks` | ✅ | DEL1 |
+| **M3-5E.3** | Active shift: start / complete tasks / evidence / end | embedded | ✅ | DEL2 |
+| **M3-5E.4** | Do **not** ship product nav to `/demo/coordinator` or extend `/staff/TasksPage` as product | — | ✅ | Policy kept |
 
 **Wave 5 exit**
 
-- [ ] All M3 placeholders in §3 replaced with real pages (or intentional later note)  
-- [ ] Family can complete approve / revision / reject in UI  
-- [ ] Coordinator can build + submit plan and see AI assist  
-- [ ] Clinical notes + support shift flows usable  
+- [x] All M3 placeholders in §3 replaced with real pages (or intentional later note)  
+- [x] Family can complete approve / revision / reject in UI  
+- [x] Coordinator can build + submit plan and see AI assist  
+- [x] Clinical notes + support shift flows usable  
 
 ---
 
@@ -297,18 +297,18 @@ Tick when verified end-to-end (API + UI where applicable).
 | CP5 | Family request revision → coordinator notified | M3-5C.4 | ⬜ |
 | CP6 | Family reject | M3-1.3, M3-5C.5 | 🧪 API verified |
 | CP7 | Goals → tasks on approve | M3-1.2, M3-4.5 | 🧪 API verified |
-| CP8 | Active plan material edit needs re-approval | M3-1.4 | ⬜ |
-| SCH1 | Availability manageable | M3-4.1, M3-5B.7 | ⬜ |
-| SCH2 | Assign/book with conflict detection | M3-4.2–4.3 | ⬜ |
-| DEL1 | Worker start shift + see tasks | M3-5E.* | ⬜ |
-| DEL2 | Complete tasks + evidence | M3-4.4, M3-5E.3 | ⬜ |
-| NOTE1 | Clinical notes immutable after save | M3-3.1–3.2, M3-5D.2 | ⬜ |
-| NOTE2 | Notes visible to coordinator on episode | M3-3.1, M3-5D | ⬜ |
-| GOAL1 | Goals status / achieved | M3-3.3 | ⬜ |
-| AI1 | Summary row after review + episode | M3-1.1, M3-2.2 | ⬜ |
-| AI2 | Coordinator sees AI summary | M3-5B.5 | ⬜ |
-| AI3 | Draft trigger + idempotent callback | M3-2.3–2.5, M3-2.7 | ⬜ |
-| AI4 | Human approve/edit before family | M3-2.6, M3-5B.5–5B.6 | ⬜ |
+| CP8 | Active plan material edit needs re-approval | M3-1.4 | 🧪 |
+| SCH1 | Availability manageable | M3-4.1, M3-5B.7 | 🧪 |
+| SCH2 | Assign/book with conflict detection | M3-4.2–4.3 | 🧪 |
+| DEL1 | Worker start shift + see tasks | M3-4.5, M3-5E.* | 🧪 |
+| DEL2 | Complete tasks + evidence | M3-4.4, M3-5E.3 | 🧪 |
+| NOTE1 | Clinical notes immutable after save | M3-3.1–3.2, M3-5D.2 | 🧪 |
+| NOTE2 | Notes visible to coordinator on episode | M3-3.1, M3-5D | 🟡 |
+| GOAL1 | Goals status / achieved | M3-3.3 | 🧪 |
+| AI1 | Summary row after review + episode | M3-1.1, M3-2.2 | 🧪 |
+| AI2 | Coordinator sees AI summary | M3-5B.5 | 🟡 |
+| AI3 | Draft trigger + idempotent callback | M3-2.3–2.5, M3-2.7 | 🧪 |
+| AI4 | Human approve/edit before family | M3-2.6, M3-5B.5–5B.6 | 🟡 |
 | AI5 | Review OK when AI down | M3-2.2, M3-6.3 | ⬜ |
 | REG | M2 flows still work | M3-6.2 | ⬜ |
 
@@ -343,7 +343,7 @@ Tick when verified end-to-end (API + UI where applicable).
 
 **Current “NOW” pointer** *(edit this line each day):*
 
-> **NOW →** `M3-1.4` re-approval gate → `M3-2.1` Riayah AI client → `M3-2.2` intake summarize → `M3-2.3` idempotent callback
+> **NOW →** Wave 6 hardening (`M3-6.1` checklist + `M3-6.2` M2 regression)
 
 ---
 

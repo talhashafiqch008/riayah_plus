@@ -109,6 +109,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Patients', href: '/coordinator/patients', icon: Users },
       { name: 'Episodes', href: '/coordinator/episodes', icon: Activity },
       { name: 'Care Plans', href: '/coordinator/plans', icon: ClipboardList },
+      { name: 'Schedule', href: '/coordinator/schedule', icon: Calendar },
       { name: 'Messages', href: '/coordinator/messages', icon: MessageCircle },
     ],
     dashboard: {

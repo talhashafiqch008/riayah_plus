@@ -5,11 +5,18 @@ import { logger } from '../config/logger';
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  public readonly details?: unknown;
 
-  constructor(message: string, statusCode = 500, isOperational = true) {
+  constructor(message: string, statusCode = 500, detailsOrOperational?: unknown, isOperational = true) {
     super(message);
     this.statusCode = statusCode;
-    this.isOperational = isOperational;
+    // Back-compat: third arg was boolean isOperational
+    if (typeof detailsOrOperational === 'boolean') {
+      this.isOperational = detailsOrOperational;
+    } else {
+      this.details = detailsOrOperational;
+      this.isOperational = isOperational;
+    }
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -38,7 +45,9 @@ export function errorHandler(
     if (err.statusCode >= 500) {
       logger.error(err.message, { errorId: err.name, statusCode: err.statusCode });
     }
-    res.status(err.statusCode).json({ message: err.message });
+    const body: { message: string; details?: unknown } = { message: err.message };
+    if (err.details !== undefined) body.details = err.details;
+    res.status(err.statusCode).json(body);
     return;
   }
 

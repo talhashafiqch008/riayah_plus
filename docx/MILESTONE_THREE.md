@@ -244,15 +244,33 @@ Guard: `assertCarePlanTransition(from, to)` — throws `AppError(400)` on invali
 | PATCH | `/care-plans/:id` | Coordinator | Update → new version, old marked not-current |
 | DELETE | `/care-plans/:id` | Coordinator | Delete plan |
 | POST | `/care-plans/:id/submit` | Coordinator | Submit for family approval → notifies family |
-| POST | `/care-plans/:id/approve` | Family / patient | Approve → episode `active` (**does not** create tasks from goals) |
+| POST | `/care-plans/:id/approve` | Family / patient | Approve → episode `active` + goals → tasks |
 | POST | `/care-plans/:id/request-revision` | Family / patient | Request changes → notifies coordinator |
+| POST | `/care-plans/:id/reject` | Family / patient | Reject plan |
+| POST | `/care-plans/:id/cosign` | Clinical staff | Optional clinical co-sign → `clinical_cosign` approval log (no status change) |
+| GET | `/care-plans/:id/goals` | Plan access | List goals |
+| PATCH | `/care-plans/:id/goals/:goalId` | Clinical / coordinator | Progress: `status` → `achieved` sets `achievedAt` (no CP8) |
 | GET/POST/PATCH/DELETE | `/care-plans/:id/items…` | Coordinator (write) | Service items |
 
 **Controller:** `server/src/controllers/carePlans/CarePlanController.ts`
 
 #### Shifts & Tasks — `shift.routes.ts` + `tasks.routes.ts`
 
-Worker shift start/end/break and task CRUD are live.
+Worker shift start/end/break and task CRUD are live.  
+Also: `POST /tasks/assign-episode`, `POST /tasks/:id/complete` (evidence URL).
+
+#### Availability & Scheduling (M3 Wave 4)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/availability?providerId=` | Coord / self | List weekly slots |
+| PUT | `/availability/:providerId` | Coord / self | Replace all slots |
+| POST | `/availability` | Coord / self | Create one slot |
+| PATCH/DELETE | `/availability/slots/:slotId` | Coord / self | Update / delete slot |
+| POST | `/scheduling/sessions` | Coordinator | Book session; `409` on provider overlap |
+| POST | `/scheduling/sessions/recurring` | Coordinator | Generate daily/weekly occurrences |
+| GET | `/scheduling/sessions` | Scoped | List by episode/provider |
+| PATCH/DELETE | `/scheduling/sessions/:id` | Coordinator | Reschedule / cancel |
 
 #### AI routes today — `server/src/routes/ai.routes.ts`
 
@@ -290,14 +308,14 @@ Also documented in `server/.env.example`. Point these at staging for integration
 | ClinicalNote model (schema) | ✅ Done |
 | Clinical notes HTTP API | ❌ Missing |
 | ProviderAvailabilitySlot model | ✅ Done |
-| Slot booking / conflict / recurring engine | ❌ Missing |
+| Slot booking / conflict / recurring engine | ✅ `POST /scheduling/sessions` (+ `/recurring`); 409 on overlap |
 | AiIntakeSummary model (schema) | ✅ Done |
 | `ai_intake_summaries` table in DB | ❌ Missing (migration pending) |
-| Call Riayah AI summarize / draft | ❌ Missing |
-| Care-plan-draft callback (idempotent) | ❌ Missing |
+| Call Riayah AI summarize / draft | 🟡 Client done (`RiayahAiClient`); intake hook + callback still missing |
+| Care-plan-draft callback (idempotent) | ✅ `POST /api/ai/callbacks/care-plan-draft` + upsert draft CarePlan |
 | Care plan state machine guard | ✅ Done |
 | Re-approval gate when editing `active` plan | ❌ Incomplete (versioning without approval gate) |
-| Clinical co-sign | ❌ Missing |
+| Clinical co-sign | ✅ `POST /care-plans/:id/cosign` |
 | Reusable plan templates | ❌ Missing (nice-to-have vs signed “templates” wording) |
 
 ---
@@ -315,10 +333,10 @@ Build these before (or in parallel with) frontend work.
 | **Goal → Task on approval** | `CarePlanController.approve` must create a `Task` per `Goal` |
 | **Family reject** | `POST /care-plans/:id/reject` using existing state machine |
 | **Clinical notes routes** | `GET/POST /clinical-notes` (and immutability rules) scoped to episode/session |
-| **Staff scheduling engine** | Availability CRUD + slot booking + conflict detection + recurring generation |
-| **Goal CRUD / progress** | Independent goal read/update (status → achieved, etc.) if not only nested under plan |
-| **Clinical co-sign** | Endpoint for clinical staff within scope |
-| **Re-approval on material change** | Editing an `active` plan must force re-approval before active again |
+| **Staff scheduling engine** | ✅ Availability CRUD + session book/conflict + recurring |
+| **Goal CRUD / progress** | ✅ Nested `GET/PATCH /care-plans/:id/goals…` — status → `achieved` + `achievedAt` |
+| **Clinical co-sign** | ✅ `POST /care-plans/:id/cosign` — clinical staff; `clinical_cosign` approval log; optional / idempotent |
+| **Re-approval on material change** | ✅ Editing an `active`/`approved` plan creates a new `draft` version (`previousVersionId`); old plan marked not current; in-place item mutations blocked |
 | **Reusable templates** | Goal/service templates for common episode types (proposal feature) |
 
 ---
@@ -628,14 +646,14 @@ Per signed proposal — do **not** pull into this milestone:
 | CP5 | Family can request revision with comments → coordinator notified | | |
 | CP6 | Family can reject a submitted plan | | |
 | CP7 | Approved plan goals are converted to trackable tasks | | |
-| CP8 | Material edit to active plan requires re-approval | | |
-| SCH1 | Staff availability slots are manageable / viewable by coordinator | | |
-| SCH2 | Coordinator can book/assign with conflict detection | | |
-| DEL1 | Support worker can start shift and see task list | | |
-| DEL2 | Support worker can complete tasks and upload evidence | | |
+| CP8 | Material edit to active plan requires re-approval | 🧪 API |
+| SCH1 | Staff availability slots are manageable / viewable by coordinator | 🧪 API | |
+| SCH2 | Coordinator can book/assign with conflict detection | 🧪 API | |
+| DEL1 | Support worker can start shift and see tasks | 🧪 API | |
+| DEL2 | Support worker can complete tasks with evidence | 🧪 API | |
 | NOTE1 | Clinical staff can add session notes (immutable after save) | | |
 | NOTE2 | Notes visible on episode detail for coordinator | | |
-| GOAL1 | Goals display with status; can be marked achieved | | |
+| GOAL1 | Goals display with status; can be marked achieved | 🧪 API | |
 | AI1 | After coordinator review + episode create, row exists in `ai_intake_summaries` | | |
 | AI2 | Coordinator can see AI summary on intake / episode detail | | |
 | AI3 | AI care plan draft triggered; callback handled **idempotently** | | |

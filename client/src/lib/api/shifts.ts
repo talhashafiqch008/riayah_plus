@@ -1,93 +1,109 @@
-import { client } from "./client";
-import { extractApiError } from '@/lib/errors';
-import type { ShiftPayload, TaskPayload } from "@/types/api";
+import { client } from './client';
 
-async function startShift(data: ShiftPayload) {
-    try {
-        const response = await client.post('/shifts/start', data);
-        return response.data;
-    } catch (error) {
-        console.error('Failed to startShift', error);
-        throw extractApiError(error);
-    }
+export interface Shift {
+  id: string;
+  workerId: string;
+  bookingId?: string | null;
+  status: string;
+  startedAt: string;
+  endedAt?: string | null;
+  breakStartAt?: string | null;
+  breakEndAt?: string | null;
+  notes?: string | null;
+  tasks?: Task[];
 }
 
-async function endShift(id: string, data: ShiftPayload) {
-    try {
-        const response = await client.post(`/shifts/${id}/end`, data);
-        return response.data;
-    } catch (error) {
-        console.error('Failed to endShift', error);
-        throw extractApiError(error);
-    }
+export interface Task {
+  id: string;
+  shiftId?: string | null;
+  careEpisodeId?: string | null;
+  goalId?: string | null;
+  assignerId: string;
+  assigneeId: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  estimatedDuration?: number | null;
+  actualDuration?: number | null;
+  completionEvidence?: string | null;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  assignee?: { id: string; name: string; role?: string };
+  assigner?: { id: string; name: string };
+  goal?: { id: string; title: string; status?: string };
 }
 
-async function getActiveShift() {
-    try {
-        const response = await client.get('/shifts/active');
-        return response.data;
-    } catch (error) {
-        console.error('Failed to getActiveShift', error);
-        throw extractApiError(error);
-    }
+export async function startShift(bookingId?: string) {
+  const { data } = await client.post<{ data: Shift; message?: string }>('/shifts/start', {
+    bookingId,
+  });
+  return data;
 }
 
-async function getShiftHistory() {
-    try {
-        const response = await client.get('/shifts/history');
-        return response.data;
-    } catch (error) {
-        console.error('Failed to getShiftHistory', error);
-        throw extractApiError(error);
-    }
+export async function endShift(id: string) {
+  const { data } = await client.post<{ data: Shift }>(`/shifts/${id}/end`);
+  return data.data;
 }
 
-async function getTasks() {
-    try {
-        const response = await client.get('/tasks');
-        return response.data;
-    } catch (error) {
-        console.error('Failed to fetch tasks', error);
-        throw extractApiError(error);
-    }
+export async function getActiveShift() {
+  const { data } = await client.get<{ data: Shift | null }>('/shifts/active');
+  return data.data;
 }
 
-async function createTask(data: TaskPayload) {
-    try {
-        const response = await client.post('/tasks', data);
-        return response.data;
-    } catch (error) {
-        console.error('Failed to create task', error);
-        throw extractApiError(error);
-    }
+export async function getShiftHistory() {
+  const { data } = await client.get<{ data: Shift[] }>('/shifts/history');
+  return data.data;
 }
 
-async function updateTask(id: string, data: TaskPayload) {
-    try {
-        const response = await client.put(`/tasks/${id}`, data);
-        return response.data;
-    } catch (error) {
-        console.error('Failed to update task', error);
-        throw extractApiError(error);
-    }
+export async function listMyTasks(params?: { status?: string; episodeId?: string }) {
+  const { data } = await client.get<{ data: Task[]; meta?: { total: number } }>('/tasks', {
+    params: { assignee: 'me', ...params },
+  });
+  return data;
 }
 
-async function updateTaskStatus(id: string, status: 'PENDING' | 'COMPLETED') {
-    try {
-        const response = await client.put(`/tasks/${id}`, { status });
-        return response.data;
-    } catch (error) {
-        console.error('Failed to updateTaskStatus', error);
-        throw extractApiError(error);
-    }
+export async function assignEpisodeTasks(episodeId: string, assigneeId: string) {
+  const { data } = await client.post<{
+    message: string;
+    updated: number;
+    data: Task[];
+  }>('/tasks/assign-episode', { episodeId, assigneeId });
+  return data;
 }
 
-async function deleteTask(id: string) {
-    try {
-        const response = await client.delete(`/tasks/${id}`);
-        return response.data;
-    } catch (error) {
-        console.error('Failed to delete task', error);
-        throw extractApiError(error);
-    }
+export async function completeTask(
+  id: string,
+  payload?: { completionEvidence?: string; notes?: string; actualDuration?: number },
+) {
+  const { data } = await client.post<{ message: string; data: Task }>(
+    `/tasks/${id}/complete`,
+    payload ?? {},
+  );
+  return data;
+}
+
+export async function updateTaskStatus(
+  id: string,
+  status: string,
+  extra?: { completionEvidence?: string; actualDuration?: number },
+) {
+  const { data } = await client.patch<{ data: Task }>(`/tasks/${id}/status`, {
+    status,
+    ...extra,
+  });
+  return data.data;
+}
+
+export async function updateTask(
+  id: string,
+  payload: Partial<{
+    title: string;
+    description: string;
+    status: string;
+    assigneeId: string;
+    completionEvidence: string;
+  }>,
+) {
+  const { data } = await client.put<{ data: Task }>(`/tasks/${id}`, payload);
+  return data.data;
 }

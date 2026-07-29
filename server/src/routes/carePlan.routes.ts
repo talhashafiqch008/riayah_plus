@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { CarePlanController } from '../controllers/carePlans/CarePlanController';
+import { CarePlanController, assertPlanAllowsInPlaceMutation } from '../controllers/carePlans/CarePlanController';
 import { authenticate } from '../middleware/auth';
-import { requireCareCoordinator } from '../middleware/rbac';
+import { requireCareCoordinator, requireClinicalOrCoordinator, requireRole } from '../middleware/rbac';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { assertTenantOrgAccess } from '../middleware/tenantAccess';
@@ -49,6 +49,28 @@ router.post('/:id/submit', requireCareCoordinator, CarePlanController.submitForA
 router.post('/:id/approve', CarePlanController.approve);
 router.post('/:id/request-revision', CarePlanController.requestRevision);
 router.post('/:id/reject', CarePlanController.reject);
+router.post(
+  '/:id/cosign',
+  requireRole([
+    'clinical_staff',
+    'doctor',
+    'nurse',
+    'physiotherapist',
+    'occupational_therapist',
+    'speech_therapist',
+    'psychologist',
+    'dietitian',
+    'therapist',
+    'admin',
+    'super_admin',
+    'support_admin',
+  ]),
+  CarePlanController.clinicalCosign,
+);
+
+// Goal progress (M3-3.3) — status updates do not trigger CP8 re-approval
+router.get('/:id/goals', CarePlanController.listGoals);
+router.patch('/:id/goals/:goalId', requireClinicalOrCoordinator, CarePlanController.updateGoal);
 
 const itemSchema = z.object({
   serviceType: z.string(),
@@ -76,7 +98,8 @@ router.get('/:id/items', async (req: Request, res: Response, next: NextFunction)
 // POST /care-plans/:id/items
 router.post('/:id/items', requireCareCoordinator, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await requirePlanAccess(req, req.params.id);
+    const plan = await requirePlanAccess(req, req.params.id);
+    assertPlanAllowsInPlaceMutation(plan.status);
 
     const data = itemSchema.parse(req.body);
     const item = await prisma.carePlanItem.create({
@@ -89,7 +112,9 @@ router.post('/:id/items', requireCareCoordinator, async (req: Request, res: Resp
 // PATCH /care-plans/:id/items/:itemId
 router.patch('/:id/items/:itemId', requireCareCoordinator, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await requirePlanAccess(req, req.params.id);
+    const plan = await requirePlanAccess(req, req.params.id);
+    assertPlanAllowsInPlaceMutation(plan.status);
+
     const data = itemSchema.partial().parse(req.body);
     const item = await prisma.carePlanItem.findFirst({
       where: { id: req.params.itemId, carePlanId: req.params.id },
@@ -104,7 +129,9 @@ router.patch('/:id/items/:itemId', requireCareCoordinator, async (req: Request, 
 // DELETE /care-plans/:id/items/:itemId
 router.delete('/:id/items/:itemId', requireCareCoordinator, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await requirePlanAccess(req, req.params.id);
+    const plan = await requirePlanAccess(req, req.params.id);
+    assertPlanAllowsInPlaceMutation(plan.status);
+
     const item = await prisma.carePlanItem.findFirst({
       where: { id: req.params.itemId, carePlanId: req.params.id },
     });

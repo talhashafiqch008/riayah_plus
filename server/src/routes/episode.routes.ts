@@ -1,5 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { CareEpisodeController } from '../controllers/patients/CareEpisodeController';
+import { CarePlanDraftCallbackController } from '../controllers/ai/CarePlanDraftCallbackController';
+import { AiIntakeSummaryController } from '../controllers/ai/AiIntakeSummaryController';
 import { authenticate } from '../middleware/auth';
 import { requireCareCoordinator, requireCareUser } from '../middleware/rbac';
 import { CareSummaryPDFService } from '../services/CareSummaryPDFService';
@@ -17,6 +19,27 @@ router.get('/:id', requireCareUser, CareEpisodeController.show);
 router.patch('/:id', requireCareCoordinator, CareEpisodeController.update);
 router.patch('/:id/assign-coordinator', requireCareCoordinator, CareEpisodeController.assignCoordinator);
 router.post('/:id/submit-intake', requireCareCoordinator, CareEpisodeController.submitIntake);
+router.get(
+  '/:id/ai-intake-summary',
+  requireCareCoordinator,
+  (req: Request, res: Response, next: NextFunction) => {
+    AiIntakeSummaryController.show(req, res).catch(next);
+  },
+);
+router.post(
+  '/:id/ai-intake-summary/approve',
+  requireCareCoordinator,
+  (req: Request, res: Response, next: NextFunction) => {
+    AiIntakeSummaryController.approve(req, res).catch(next);
+  },
+);
+router.post(
+  '/:id/ai-care-plan-draft',
+  requireCareCoordinator,
+  (req: Request, res: Response, next: NextFunction) => {
+    CarePlanDraftCallbackController.trigger(req, res).catch(next);
+  },
+);
 
 // Care summary PDF — tenant + party checks (C-5)
 router.get('/:id/summary-pdf', async (req: Request, res: Response, next: NextFunction) => {

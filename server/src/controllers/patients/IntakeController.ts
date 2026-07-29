@@ -16,6 +16,7 @@ import { sanitizedString, optionalSanitizedString } from '../../utils/sanitize';
 import { NotificationService } from '../../services/NotificationService';
 import { assertTenantOrgAccess } from '../../middleware/tenantAccess';
 import { resolveEpisodePartyIds } from '../../utils/careAccess';
+import { AiIntakeSummaryService } from '../../services/AiIntakeSummaryService';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -813,6 +814,26 @@ export class IntakeController {
         : 'Your intake was validated by the care coordinator.',
       type: 'intake_reviewed',
     }).catch(() => undefined);
+
+    // M3-2.2: non-blocking AI intake summary after episode create (never fail review)
+    if (result.episode?.id) {
+      await AiIntakeSummaryService.summarizeAndPersistSafe({
+        episodeId: result.episode.id,
+        intake: {
+          reasonForCare: intake.reasonForCare,
+          urgencyLevel: intake.urgencyLevel,
+          medicalHistory: intake.medicalHistory,
+          currentMeds: intake.currentMeds,
+          diagnoses: intake.diagnoses,
+          serviceInterests: intake.serviceInterests,
+        },
+        careRecipient: {
+          dateOfBirth: intake.careRecipient.dateOfBirth,
+          gender: intake.careRecipient.gender,
+          diagnosisCodes: intake.careRecipient.diagnosisCodes,
+        },
+      });
+    }
 
     res.json({ data: result });
   }

@@ -49,16 +49,36 @@ const SENSITIVE_KEYS = new Set([
   'poc_phone',
 ]);
 
+function isDecimalLike(value: object): boolean {
+  return (
+    typeof (value as { toFixed?: unknown }).toFixed === 'function' &&
+    's' in value &&
+    'e' in value &&
+    'd' in value
+  );
+}
+
 export function redactForAudit(value: unknown, depth = 0): unknown {
   if (depth > 4) return '[TRUNCATED]';
   if (value === null || value === undefined) return value;
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value !== 'object') return value;
+  if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) {
     return value.slice(0, 20).map((item) => redactForAudit(item, depth + 1));
   }
-  if (typeof value !== 'object') return value;
+  // Prisma Decimal / decimal.js — Object.entries would expose non-JSON fields (e.g. constructor).
+  if (isDecimalLike(value)) {
+    try {
+      return Number((value as { toString: () => string }).toString());
+    } catch {
+      return String(value);
+    }
+  }
 
   const output: Record<string, unknown> = {};
   for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof nested === 'function') continue;
     if (SENSITIVE_KEYS.has(key.toLowerCase())) {
       output[key] = '[REDACTED]';
     } else {
