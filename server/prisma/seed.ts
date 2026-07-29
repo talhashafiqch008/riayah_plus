@@ -36,19 +36,19 @@ async function main() {
   const superAdmin = await prisma.user.upsert({
     where: { email: 'superadmin@riayahplus.com' },
     update: { isEmailVerified: true, emailVerifiedAt: new Date() },
-    create: { id: uuid(), name: 'Super Admin', email: 'superadmin@riayahplus.com', passwordHash, role: 'super_admin', isActive: true, emailVerifiedAt: new Date() },
+    create: { id: uuid(), name: 'Super Admin', email: 'superadmin@riayahplus.com', passwordHash, role: 'super_admin', isActive: true, isEmailVerified: true, emailVerifiedAt: new Date() },
   });
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@riayahplus.com' },
     update: { isEmailVerified: true, emailVerifiedAt: new Date() },
-    create: { id: uuid(), name: 'Platform Admin', email: 'admin@riayahplus.com', passwordHash, role: 'admin', isActive: true, emailVerifiedAt: new Date() },
+    create: { id: uuid(), name: 'Platform Admin', email: 'admin@riayahplus.com', passwordHash, role: 'admin', isActive: true, isEmailVerified: true, emailVerifiedAt: new Date() },
   });
 
   const coordinator = await prisma.user.upsert({
     where: { email: 'coordinator@riayahplus.com' },
     update: { isEmailVerified: true, emailVerifiedAt: new Date() },
-    create: { id: uuid(), name: 'Care Coordinator', email: 'coordinator@riayahplus.com', passwordHash, role: 'care_coordinator', isActive: true, emailVerifiedAt: new Date() },
+    create: { id: uuid(), name: 'Care Coordinator', email: 'coordinator@riayahplus.com', passwordHash, role: 'care_coordinator', isActive: true, isEmailVerified: true, emailVerifiedAt: new Date() },
   });
 
   // ── Organization hierarchy ───────────────────────────────────────────────────
@@ -151,6 +151,7 @@ async function main() {
       passwordHash,
       role: 'family',
       isActive: true,
+      isEmailVerified: true,
       emailVerifiedAt: new Date(),
     },
   });
@@ -165,6 +166,7 @@ async function main() {
       passwordHash,
       role: 'patient',
       isActive: true,
+      isEmailVerified: true,
       emailVerifiedAt: new Date(),
     },
   });
@@ -186,6 +188,7 @@ async function main() {
       passwordHash,
       role: 'clinical_staff',
       isActive: true,
+      isEmailVerified: true,
       emailVerifiedAt: new Date(),
       organizationId: organization.id,
       clinicId: mainClinic.id,
@@ -203,6 +206,7 @@ async function main() {
       passwordHash,
       role: 'support_worker',
       isActive: true,
+      isEmailVerified: true,
       emailVerifiedAt: new Date(),
       organizationId: organization.id,
       clinicId: homeCareClinic.id,
@@ -416,7 +420,7 @@ async function main() {
     prisma.user.upsert({
       where: { email },
       update: { isEmailVerified: true, emailVerifiedAt: new Date() },
-      create: { id: uuid(), name, email, passwordHash, role: 'client', isActive: true, emailVerifiedAt: new Date(), phone: `+97455${Math.floor(Math.random() * 900000 + 100000)}` },
+      create: { id: uuid(), name, email, passwordHash, role: 'client', isActive: true, isEmailVerified: true, emailVerifiedAt: new Date(), phone: `+97455${Math.floor(Math.random() * 900000 + 100000)}` },
     })
   ));
 
@@ -443,6 +447,7 @@ async function main() {
         passwordHash,
         role: role as any,
         isActive: true,
+        isEmailVerified: true,
         emailVerifiedAt: new Date(),
         onboardingStatus: 'complete',
         verificationStatus: 'approved',

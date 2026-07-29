@@ -19,6 +19,9 @@ Use this as the **single working brief** before coding. It answers:
 
 **Frontend one-liner:** No production M3 pages yet — replace role-shell placeholders. Adapt demo/legacy UIs where §3.1 says **Adapt**; build fresh where it says **Build fresh**.  
 
+**Task tracker (what to do first / next):** `docx/M3_TASK_TRACKER.md` — use that file to check work off; keep this file as the scope/spec.  
+**Website test flows:** `docx/MILESTONE_THREE_TEST.md` — manual QA as features ship.  
+
 ---
 
 ## Scope decision (important)

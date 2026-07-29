@@ -48,6 +48,7 @@ router.delete('/:id', requireCareCoordinator, CarePlanController.destroy);
 router.post('/:id/submit', requireCareCoordinator, CarePlanController.submitForApproval);
 router.post('/:id/approve', CarePlanController.approve);
 router.post('/:id/request-revision', CarePlanController.requestRevision);
+router.post('/:id/reject', CarePlanController.reject);
 
 const itemSchema = z.object({
   serviceType: z.string(),

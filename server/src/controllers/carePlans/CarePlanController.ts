@@ -200,29 +200,93 @@ export class CarePlanController {
   static async approve(req: Request, res: Response): Promise<void> {
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
-      include: { episode: true },
+      include: { episode: true, goals: true },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertCarePlanAccess(req, plan.episode);
 
     assertCarePlanTransition(plan.status, 'approved');
 
-    await prisma.carePlan.update({
-      where: { id: plan.id },
-      data: { status: 'approved', approvedAt: new Date(), approvedById: req.user!.userId },
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.carePlan.update({
+        where: { id: plan.id },
+        data: { status: 'approved', approvedAt: new Date(), approvedById: req.user!.userId },
+      });
 
-    await prisma.carePlanApprovalLog.create({
-      data: { carePlanId: plan.id, action: 'approved', actorId: req.user!.userId },
-    });
+      await tx.carePlanApprovalLog.create({
+        data: { carePlanId: plan.id, action: 'approved', actorId: req.user!.userId },
+      });
 
-    await prisma.careEpisode.update({
-      where: { id: plan.episodeId },
-      data: { status: 'active' },
+      await tx.careEpisode.update({
+        where: { id: plan.episodeId },
+        data: { status: 'active' },
+      });
+
+      for (const goal of plan.goals) {
+        const existing = await tx.task.findFirst({ where: { goalId: goal.id } });
+        if (existing) continue;
+
+        await tx.task.create({
+          data: {
+            title: goal.title,
+            description: goal.description ?? goal.measurableOutcome ?? undefined,
+            goalId: goal.id,
+            careEpisodeId: plan.episodeId,
+            assignerId: plan.coordinatorId,
+            assigneeId: plan.coordinatorId,
+            status: 'pending',
+            dueAt: goal.targetDate ?? undefined,
+          },
+        });
+      }
     });
 
     await AuditService.log({ userId: req.user!.userId, action: 'care_plan_approved', entity: 'CarePlan', entityId: plan.id, req });
     res.json({ message: 'Care plan approved.' });
+  }
+
+  static async reject(req: Request, res: Response): Promise<void> {
+    const { notes } = z.object({ notes: z.string().optional() }).parse(req.body);
+    const plan = await prisma.carePlan.findUnique({
+      where: { id: req.params.id },
+      include: { episode: true },
+    });
+    if (!plan) throw new AppError('Care plan not found.', 404);
+    assertCarePlanAccess(req, plan.episode);
+
+    assertCarePlanTransition(plan.status, 'rejected');
+
+    await prisma.carePlan.update({
+      where: { id: plan.id },
+      data: { status: 'rejected', rejectionNotes: notes ?? null },
+    });
+
+    await prisma.carePlanApprovalLog.create({
+      data: {
+        carePlanId: plan.id,
+        action: 'rejected',
+        actorId: req.user!.userId,
+        notes: notes ?? null,
+      },
+    });
+
+    await NotificationService.create({
+      userId: plan.coordinatorId,
+      title: 'Care Plan Rejected',
+      body: notes ?? 'The family has rejected the submitted care plan.',
+      type: 'care_plan_rejected',
+      data: { carePlanId: plan.id },
+    });
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'care_plan_rejected',
+      entity: 'CarePlan',
+      entityId: plan.id,
+      req,
+    });
+
+    res.json({ message: 'Care plan rejected.' });
   }
 
   static async requestRevision(req: Request, res: Response): Promise<void> {
