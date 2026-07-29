@@ -1,5 +1,6 @@
 /**
  * Mirrors frontend/src/middleware.ts unauthenticated redirect behavior.
+ * Retired marketplace roles (provider/careseeker) go to the family portal login.
  */
 export function getLoginRedirectForPath(pathname: string): string {
   const path = pathname.replace(/\/$/, '') || '/';
@@ -9,14 +10,13 @@ export function getLoginRedirectForPath(pathname: string): string {
     return '/admin/login';
   }
 
+  // Marketplace provider/careseeker portals retired → family login
   if (path === '/provider' || path.startsWith('/provider/')) {
-    if (path === '/provider/login' || path === '/provider/signup') return '/';
-    return '/provider/login';
+    return '/login?portal=family';
   }
 
   if (path === '/careseeker' || path.startsWith('/careseeker/')) {
-    if (path === '/careseeker/login' || path === '/careseeker/phone-login') return '/';
-    return '/careseeker/login';
+    return '/login?portal=family';
   }
 
   const proposalPrefixes = ['/family', '/patient', '/coordinator', '/clinical', '/support'];

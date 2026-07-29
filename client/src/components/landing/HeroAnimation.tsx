@@ -63,11 +63,11 @@ const HeroSection = () => {
  </MotionP>
 
  <MotionDiv variants={fadeUp} className="flex flex-col sm:flex-row gap-6 mb-16">
- <Link to="/careseeker/login" className="group relative inline-flex items-center justify-center bg-[#005B82] text-[#F2F0E9] px-8 py-5 rounded-none overflow-hidden transition-all hover:bg-[#1f2b24]">
- <span className="relative z-10 font-sans font-semibold tracking-wide text-sm">Login as Careseeker</span>
+ <Link to="/login?portal=family" className="group relative inline-flex items-center justify-center bg-[#005B82] text-[#F2F0E9] px-8 py-5 rounded-none overflow-hidden transition-all hover:bg-[#1f2b24]">
+ <span className="relative z-10 font-sans font-semibold tracking-wide text-sm">Family Portal</span>
  </Link>
- <Link to="/provider/login" className="group inline-flex items-center justify-center border border-[#1A1A1A] px-8 py-5 rounded-none overflow-hidden transition-all hover:bg-[#1A1A1A] hover:text-[#F2F0E9]">
- <span className="font-sans font-semibold tracking-wide text-sm">Login as Provider</span>
+ <Link to="/register" className="group inline-flex items-center justify-center border border-[#1A1A1A] px-8 py-5 rounded-none overflow-hidden transition-all hover:bg-[#1A1A1A] hover:text-[#F2F0E9]">
+ <span className="font-sans font-semibold tracking-wide text-sm">Create Family Account</span>
  </Link>
  </MotionDiv>
 
