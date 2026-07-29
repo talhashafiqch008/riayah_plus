@@ -20,12 +20,12 @@ const mockPost = jest.fn();
 const mockCreate = jest.fn(() => ({ post: mockPost }));
 
 jest.mock('axios', () => {
-  const actual = jest.requireActual('axios');
+  const actual = jest.requireActual('axios') as typeof import('axios');
   return {
     __esModule: true,
     default: {
-      ...actual.default,
-      create: (...args: unknown[]) => mockCreate(...args),
+      ...actual,
+      create: (...args: unknown[]) => mockCreate(...(args as Parameters<typeof mockCreate>)),
       isAxiosError: actual.isAxiosError,
     },
     isAxiosError: actual.isAxiosError,
