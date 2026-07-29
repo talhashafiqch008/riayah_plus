@@ -259,11 +259,11 @@ const CTASection = () => {
  </p>
 
  <div className="flex flex-col sm:flex-row gap-6 justify-center">
- <Link to="/careseeker/login" className="group relative inline-flex items-center justify-center bg-[#1A1A1A] text-[#F2F0E9] px-10 py-6 overflow-hidden transition-all hover:bg-[#F2F0E9] hover:text-[#1A1A1A]">
- <span className="relative z-10 font-sans font-semibold tracking-widest text-sm uppercase">Login as Careseeker</span>
+ <Link to="/login?portal=family" className="group relative inline-flex items-center justify-center bg-[#1A1A1A] text-[#F2F0E9] px-10 py-6 overflow-hidden transition-all hover:bg-[#F2F0E9] hover:text-[#1A1A1A]">
+ <span className="relative z-10 font-sans font-semibold tracking-widest text-sm uppercase">Family Portal</span>
  </Link>
- <Link to="/provider/login" className="group inline-flex items-center justify-center border border-[#1A1A1A] text-[#1A1A1A] px-10 py-6 overflow-hidden transition-all hover:bg-[#1A1A1A] hover:text-[#F2F0E9]">
- <span className="font-sans font-semibold tracking-widest text-sm uppercase">Login as Provider</span>
+ <Link to="/register" className="group inline-flex items-center justify-center border border-[#1A1A1A] text-[#1A1A1A] px-10 py-6 overflow-hidden transition-all hover:bg-[#1A1A1A] hover:text-[#F2F0E9]">
+ <span className="font-sans font-semibold tracking-widest text-sm uppercase">Create Family Account</span>
  </Link>
  </div>
  </MotionDiv>

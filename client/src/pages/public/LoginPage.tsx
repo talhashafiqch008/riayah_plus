@@ -17,8 +17,8 @@ function isProposalPortal(value: string | null): value is ProposalPortalKey {
  * Generic /login entry point.
  *
  * - ?portal=family|patient|coordinator|clinical|support → branded proposal portal login
- * - ?role=careseeker|provider|admin → redirect to legacy login pages
- * - default → /careseeker/login
+ * - ?role=admin → admin login
+ * - default / legacy careseeker|provider roles → family portal login
  */
 export default function LoginPage() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -52,9 +52,8 @@ export default function LoginPage() {
   }
 
   const role = params.get('role');
-  if (role === 'careseeker') return <Navigate to="/careseeker/login" replace />;
-  if (role === 'provider') return <Navigate to="/provider/signup" replace />;
   if (role === 'admin') return <Navigate to="/admin/login" replace />;
 
-  return <Navigate to="/careseeker/login" replace />;
+  // Default and retired marketplace roles → family portal login
+  return <Navigate to="/login?portal=family" replace />;
 }
