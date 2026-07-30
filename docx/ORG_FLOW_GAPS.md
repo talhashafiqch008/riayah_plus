@@ -1,7 +1,107 @@
 # Organization Flow — Gaps & Loopholes
 
 **Prepared:** 2026-07-24  
+**Updated:** 2026-07-30 — client-call Mermaid diagrams added  
 **Purpose:** Internal pitch document — gaps discovered during M3 testing that need to be addressed before the org/coordinator flow can work end-to-end.
+
+---
+
+## Client Call Diagrams
+
+Use these diagrams when explaining the issue to the client.
+
+### 1. The problem in one picture
+
+```mermaid
+flowchart LR
+  A[Family self-registers] --> B[Submits care request]
+  B --> C{Linked to an Organization?}
+  C -->|Demo users: Yes| D[Coordinator sees request]
+  C -->|Real users: No| E[Request disappears]
+  E --> F[Coordinator queue empty]
+```
+
+**Talking point:**  
+Demo works because users are already linked to an organization. Real signups are not, so the care request never reaches a coordinator.
+
+### 2. Current broken flow vs correct flow
+
+```mermaid
+flowchart TB
+  subgraph TODAY["TODAY — Broken for real users"]
+    A1[Family registers] --> A2[No organization assigned]
+    A2 --> A3[Care request submitted]
+    A3 --> A4[Looks successful]
+    A4 --> A5[Coordinator never sees it]
+  end
+
+  subgraph NEEDED["NEEDED — Correct flow"]
+    B1[Family registers] --> B2[Admin or Org Admin assigns to Organization]
+    B2 --> B3[Assign clinic / department]
+    B3 --> B4[Route to Coordinator]
+    B4 --> B5[Coordinator intake queue]
+    B5 --> B6[Care episode / M3 flow continues]
+  end
+```
+
+### 3. The 6 gaps as a chain
+
+```mermaid
+flowchart TD
+  G1["Gap 1<br/>Org has no login / dashboard"] --> G2["Gap 2<br/>Patient not assigned to org"]
+  G2 --> G3["Gap 3<br/>Coordinator created without org"]
+  G3 --> G4["Gap 4<br/>Org cannot manage coordinators"]
+  G4 --> G5["Gap 5<br/>No clinic / department assignment"]
+  G5 --> G6["Gap 6<br/>Care request never reaches coordinator"]
+```
+
+### 4. Who is missing from the system
+
+```mermaid
+flowchart LR
+  subgraph Platform["Platform Admin"]
+    PA[Can create Org record]
+  end
+
+  subgraph Missing["Missing today"]
+    OA[Org Admin login]
+    OD[Org Dashboard]
+    AA[Assign patient to org]
+    AC[Create coordinator with org]
+    CL[Assign clinic / department]
+  end
+
+  subgraph Result["Result"]
+    CR[Care request routing fails]
+  end
+
+  PA --> Missing
+  Missing --> CR
+```
+
+### 5. What we need to build (priority discussion)
+
+```mermaid
+flowchart TD
+  P1["1. Admin queue<br/>Unassigned patients → assign to Org"] --> P2["2. Create coordinators<br/>with Organization attached"]
+  P2 --> P3["3. Org Admin role + dashboard"]
+  P3 --> P4["4. Org manages own coordinators"]
+  P4 --> P5["5. Assign patient to clinic / department"]
+  P5 --> P6["6. Coordinator intake works<br/>as already built"]
+```
+
+### 6. Decision for client
+
+```mermaid
+flowchart TD
+  Q["Who assigns a new family to an Organization?"] --> A["Option A<br/>Platform Admin"]
+  Q --> B["Option B<br/>Org Admin"]
+  Q --> C["Option C<br/>Both<br/>Admin first, then Org manages"]
+
+  A --> R1[Faster temporary fix]
+  B --> R2[Better long-term org ownership]
+  C --> R3[Recommended path]
+```
 
 ---
 
