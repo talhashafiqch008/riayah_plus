@@ -1,8 +1,10 @@
 # Milestone 3 — Website Test Guide
 
 **Created:** 2026-07-27  
+**Last updated:** 2026-07-31  
 **Spec:** `docx/MILESTONE_THREE.md`  
 **Task tracker:** `docx/M3_TASK_TRACKER.md`  
+**Overall test status:** 🟢 Signed M3 flows smoke-verified (General Hospital dry-run). Deferred: formal AI-down kill-switch, Momen handshake.  
 **How to use:** Run flows **after** the linked task IDs are marked ✅ in the tracker. If a flow says **Not built yet**, skip until that wave ships.
 
 ---
@@ -32,7 +34,17 @@ Password (all roles): Password123!
 | Care Coordinator | `coordinator@riayahplus.com` | `/coordinator` |
 | Family | `family@demo.com` | `/family` |
 | Clinical Staff | `clinical@demo.com` | `/clinical` |
-| Support Worker | *(create in admin)* | `/support` |
+| Support Worker | `support@demo.com` | `/support` |
+
+**General Hospital dry-run accounts (2026-07-31):**
+
+| Role | Email |
+|---|---|
+| Org admin | `shahbaztayyab1386@gmail.com` |
+| Coordinator | `coordinator-general@mailinator.com` |
+| Clinical | `clinical.general.1785496835@mailinator.com` |
+| Support | `support.general.1785496839@mailinator.com` |
+| Family | Faraz Tayyab — `zzohaib953@gmail.com` |
 
 ### Test status legend
 
@@ -118,7 +130,7 @@ Test in this sequence so each flow has data from the previous step:
 
 **Accept:** `CP1`, `CP2`  
 **Tasks:** `M3-5B.1`–`M3-5B.3`  
-**Status:** 🔴 UI not built · 🟡 API exists
+**Status:** 🟢 Website UI verified (2026-07-31)
 
 ### 1.1 Create care plan with goals and services (website)
 
@@ -179,7 +191,7 @@ curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/care-plans \
 
 **Accept:** `CP3`  
 **Tasks:** `M3-5B.4`  
-**Status:** 🔴 UI · 🟡 API (`POST /care-plans/:id/submit`)
+**Status:** 🟢 Website UI verified (2026-07-31)
 
 ### 2.1 Submit plan (website)
 
@@ -209,7 +221,7 @@ curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID>
 
 **Accept:** `CP4`, `CP5`, `CP6`  
 **Tasks:** `M3-5C.*`, `M3-1.3` (reject API)  
-**Status:** 🔴 UI (placeholder at `/family/care-plans`) · 🟡 API partial (`approve` + `reject` verified; `request-revision` still needs smoke)
+**Status:** 🟢 Website UI verified (2026-07-31) — approve / request changes / reject
 
 ### 3.1 Family sees submitted plan (website)
 
@@ -288,7 +300,7 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<PLAN_ID
 
 **Accept:** `CP7`, `GOAL1`  
 **Tasks:** `M3-1.2`, `M3-3.3`, `M3-4.5`  
-**Status:** 🟡 backend verified (`goal` → `task` + goal achieved API) · website UI still not built
+**Status:** 🟢 Verified — goals → tasks on approve; goal progress API
 
 ### 4.1 Tasks created after family approves (website)
 
@@ -363,7 +375,7 @@ curl -s -b /tmp/clinical.txt -X PATCH "http://localhost:5001/api/care-plans/$PLA
 
 **Accept:** `CP8`  
 **Tasks:** `M3-1.4`  
-**Status:** 🟡 Backend verified (website UI pending)
+**Status:** 🟢 Website UI verified (2026-07-31)
 
 ### 5.1 Material edit forces re-approval (website)
 
@@ -440,7 +452,7 @@ curl -s -b /tmp/family.txt -X POST http://localhost:5001/api/care-plans/<NEW_PLA
 
 **Accept:** `AI1`, `AI2`, `AI5`  
 **Tasks:** `M3-1.1`, `M3-2.1`, `M3-2.2`, `M3-5B.5`  
-**Status:** 🟡 Backend summarize + approve verified (UI panel pending)
+**Status:** 🟢 Verified — AI summary panel + approve
 
 ### 6.1 Summary generated after intake review (backend + UI)
 
@@ -559,7 +571,7 @@ LIMIT 5;
 
 **Accept:** `AI3`, `AI4`  
 **Tasks:** `M3-2.3`–`M3-2.5`, `M3-2.4`, `M3-5B.6`  
-**Status:** 🟡 Backend trigger + callback verified (website button pending)
+**Status:** 🟢 Verified — Generate AI Draft + callback
 
 ### 7.1 Generate draft (website)
 
@@ -673,7 +685,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:5001/api/ai/ca
 
 **Accept:** `NOTE1`, `NOTE2`  
 **Tasks:** `M3-3.1`–`M3-3.2`, `M3-3.4`, `M3-5D.*`  
-**Status:** 🟡 Backend API verified (notes + co-sign); website UI pending
+**Status:** 🟢 Website UI verified (2026-07-31) — notes hub + episode notes + care plan co-sign
 
 ### 8.1 Add session note (website)
 
@@ -825,7 +837,7 @@ curl -s -b /tmp/clinical.txt -X POST "http://localhost:5001/api/care-plans/<DRAF
 
 **Accept:** `SCH1`, `SCH2`  
 **Tasks:** `M3-4.1`–`M3-4.3`, `M3-5B.7`  
-**Status:** 🟡 Backend verified (website UI pending)
+**Status:** 🟢 Website UI verified (2026-07-31)
 
 ### 9.1 Manage availability (website)
 
@@ -980,7 +992,7 @@ curl -s -b /tmp/coord.txt -X POST http://localhost:5001/api/scheduling/sessions/
 
 **Accept:** `DEL1`, `DEL2`  
 **Tasks:** `M3-4.4`, `M3-4.5`, `M3-5E.*`  
-**Status:** 🟡 Backend verified (website UI pending at `/support/shifts`, `/support/tasks`)
+**Status:** 🟢 Website UI verified (2026-07-31) — `/support/shifts`, `/support/tasks`
 
 ### 10.1 Start shift and see tasks (website)
 

@@ -15,6 +15,7 @@ enum UserRole {
   admin
   super_admin
   support_admin
+  org_admin
   care_coordinator
   clinical_staff
   support_worker
@@ -316,6 +317,10 @@ model User {
   isActive              Boolean          @default(true)
   processingRestricted  Boolean          @default(false)
   onboardingStatus      OnboardingStatus @default(pending)
+  mustSetPassword       Boolean          @default(false)
+  assignedCoordinatorId String?
+  assignedCoordinator   User?            @relation("AssignedFamilies", fields: [assignedCoordinatorId], references: [id])
+  assignedFamilies      User[]           @relation("AssignedFamilies")
   twoFactorSecret  String?
   twoFactorEnabled Boolean          @default(false)
   createdAt        DateTime         @default(now())
@@ -415,6 +420,7 @@ model User {
   @@index([organizationId])
   @@index([clinicId])
   @@index([departmentId])
+  @@index([assignedCoordinatorId])
   @@map("users")
 }
 

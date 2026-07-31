@@ -26,6 +26,7 @@ import { AuditService } from '../../services/AuditService';
 import { sendEmailVerificationForUser } from '../../utils/emailVerification';
 import { persistRefreshToken, findRefreshTokenByPlain, revokeRefreshTokenByPlain } from '../../utils/refreshTokenStore';
 import { formatDeviceLabel } from '../../utils/deviceInfo';
+import { INVITE_TOKEN_TYPE } from '../../utils/inviteUser';
 
 const resendVerificationPublicSchema = z.object({ email: z.string().email() });
 
@@ -43,6 +44,14 @@ const resetSchema = z.object({
   token: z.string(),
   password: z.string().min(8),
 });
+
+const setPasswordSchema = z.object({
+  email: z.string().email(),
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+
+const FAMILY_ROLES = new Set(['family', 'patient', 'client', 'consumer']);
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -93,6 +102,21 @@ export class AuthController {
 
     if (!user.isActive) {
       throw new AppError('Your account has been suspended.', 403);
+    }
+
+    if (user.mustSetPassword) {
+      throw new AppError(
+        'Please set your password using the invite link sent to your email before logging in.',
+        403,
+      );
+    }
+
+    // Family/patient accounts cannot log in until a platform admin assigns an organization.
+    if (FAMILY_ROLES.has(user.role) && !user.organizationId) {
+      throw new AppError(
+        'Your account is awaiting organization assignment. You will be able to log in once an administrator links you to a care organization.',
+        403,
+      );
     }
 
     // Enforce email verification before allowing login.
@@ -330,6 +354,78 @@ export class AuthController {
     });
 
     res.json({ message: 'Password reset successfully.' });
+  }
+
+  /** Magic-link invite: set password for org_admin / coordinator invites. */
+  static async setPasswordFromInvite(req: Request, res: Response): Promise<void> {
+    const { email, token, password } = setPasswordSchema.parse(req.body);
+
+    const record = await prisma.otpVerification.findFirst({
+      where: {
+        identifier: email,
+        otp: token,
+        type: INVITE_TOKEN_TYPE,
+        verifiedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!record?.userId) throw new AppError('Invalid or expired invite link.', 422);
+
+    const userId = record.userId;
+    const hashed = await bcrypt.hash(password, env.BCRYPT_ROUNDS);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash: hashed,
+          mustSetPassword: false,
+          isEmailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      await tx.otpVerification.deleteMany({
+        where: { userId, type: INVITE_TOKEN_TYPE },
+      });
+      return updated;
+    });
+
+    await AuditService.log({
+      userId,
+      action: 'invite_password_set',
+      entity: 'User',
+      entityId: userId,
+      req,
+    });
+
+    const CLINICAL_ROLES = new Set([
+      'clinical_staff',
+      'doctor',
+      'nurse',
+      'physiotherapist',
+      'occupational_therapist',
+      'speech_therapist',
+      'psychologist',
+      'dietitian',
+      'therapist',
+    ]);
+    const redirectPath =
+      user.role === 'org_admin'
+        ? '/org'
+        : user.role === 'care_coordinator'
+          ? '/coordinator'
+          : user.role === 'support_worker'
+            ? '/support'
+            : CLINICAL_ROLES.has(user.role)
+              ? '/clinical'
+              : '/';
+
+    res.json({
+      message: 'Password set successfully. You can now log in.',
+      redirectPath,
+      role: user.role,
+    });
   }
 
   static async enable2fa(req: Request, res: Response): Promise<void> {

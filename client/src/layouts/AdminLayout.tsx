@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { badgeLabel, fetchAdminNavBadges, type NavBadgeMap } from '@/lib/api/navBadges';
 
 interface NavItem {
   name: string;
@@ -32,6 +33,7 @@ const NAVIGATION: NavGroup[] = [
     title: 'Users',
     items: [
       { name: 'Users', href: '/admin/users', icon: Users },
+      { name: 'Families', href: '/admin/families', icon: Users },
       { name: 'Providers', href: '/admin/providers', icon: UserCheck },
       { name: 'Staff', href: '/admin/staff', icon: Building2 },
       { name: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
@@ -72,6 +74,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navBadges, setNavBadges] = useState<NavBadgeMap>({});
   const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.adminSidebarExpanded);
@@ -80,6 +83,23 @@ export function AdminLayout() {
       return ['overview', 'users', 'operations', 'config'];
     }
   });
+
+  const refreshNavBadges = useCallback(() => {
+    void fetchAdminNavBadges()
+      .then(setNavBadges)
+      .catch(() => setNavBadges({}));
+  }, []);
+
+  useEffect(() => {
+    refreshNavBadges();
+    const id = window.setInterval(refreshNavBadges, 60_000);
+    const onFocus = () => refreshNavBadges();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshNavBadges, pathname]);
 
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -194,6 +214,7 @@ export function AdminLayout() {
                 <div className={`space-y-0.5 ${isExpanded ? 'block' : 'hidden'}`}>
                   {group.items.map((item) => {
                     const active = isActiveRoute(item.href);
+                    const count = item.badge ?? navBadges[item.href] ?? 0;
                     return (
                       <Link
                         key={item.name}
@@ -207,9 +228,14 @@ export function AdminLayout() {
                       >
                         <item.icon className="size-4 shrink-0" />
                         <span className="flex-1">{item.name}</span>
-                        {item.badge ? (
-                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${active ? 'bg-white/20 text-white' : 'bg-red-100 text-red-600'}`}>
-                            {item.badge}
+                        {count > 0 ? (
+                          <span
+                            className={`min-w-5 px-1.5 py-0.5 text-center text-[9px] font-bold rounded-full ${
+                              active ? 'bg-white text-red-600' : 'bg-red-600 text-white'
+                            }`}
+                            title={`${count} need attention`}
+                          >
+                            {badgeLabel(count)}
                           </span>
                         ) : null}
                       </Link>

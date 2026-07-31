@@ -31,6 +31,14 @@ export interface Task {
   assignee?: { id: string; name: string; role?: string };
   assigner?: { id: string; name: string };
   goal?: { id: string; title: string; status?: string };
+  careEpisode?: {
+    id: string;
+    title: string;
+    status?: string;
+    patient?: { id: string; name: string } | null;
+    careRecipient?: { id: string; name: string } | null;
+    coordinator?: { id: string; name: string } | null;
+  } | null;
 }
 
 export async function startShift(bookingId?: string) {

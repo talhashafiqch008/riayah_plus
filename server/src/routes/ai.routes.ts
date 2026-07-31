@@ -4,6 +4,7 @@ import { AIChatController } from '../controllers/ai/AIChatController';
 import { AISessionController } from '../controllers/ai/AISessionController';
 import { GeminiChatService } from '../services/GeminiChatService';
 import aiDoctorController from '../controllers/AIDoctorController';
+import { publicAiLimiter, aiLimiter } from '../middleware/rateLimiter';
 import { z } from 'zod';
 
 const router = Router();
@@ -12,7 +13,7 @@ const router = Router();
 // BEFORE auth.routes (auth.routes' global authenticate would otherwise 401 it).
 
 // ── Public (unauthenticated) Gemini endpoint ──────────────────────────────────
-router.post('/public/chat', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/public/chat', publicAiLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { message, sessionId } = z.object({
       message: z.string().min(1).max(1000),
@@ -28,8 +29,8 @@ router.post('/public/chat', async (req: Request, res: Response, next: NextFuncti
 });
 
 // ── Authenticated chat ────────────────────────────────────────────────────────
-router.post('/chat', authenticate, AIChatController.sendMessage);
-router.post('/chat/stream', authenticate, AIChatController.streamMessage);
+router.post('/chat', aiLimiter, authenticate, AIChatController.sendMessage);
+router.post('/chat/stream', aiLimiter, authenticate, AIChatController.streamMessage);
 router.get('/chat/history', authenticate, AIChatController.history);
 router.delete('/chat', authenticate, AIChatController.clearConversation);
 
@@ -39,10 +40,10 @@ router.post('/sessions', authenticate, AISessionController.create);
 router.get('/sessions/:id', authenticate, AISessionController.show);
 router.patch('/sessions/:id', authenticate, AISessionController.update);
 router.delete('/sessions/:id', authenticate, AISessionController.delete);
-router.post('/sessions/:id/message', authenticate, AISessionController.sendMessage);
+router.post('/sessions/:id/message', aiLimiter, authenticate, AISessionController.sendMessage);
 
 // ── AI Doctor (clinical system prompt) ────────────────────────────────────────
-router.post('/doctor-chat', authenticate, aiDoctorController.doctorChat.bind(aiDoctorController));
+router.post('/doctor-chat', aiLimiter, authenticate, aiDoctorController.doctorChat.bind(aiDoctorController));
 
 // ── Legacy session API ─────────────────────────────────────────────────────────
 router.post('/session/start', authenticate, aiDoctorController.startSession.bind(aiDoctorController));

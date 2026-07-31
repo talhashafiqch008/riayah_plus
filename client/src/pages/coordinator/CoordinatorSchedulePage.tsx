@@ -1,26 +1,54 @@
-import { useState } from 'react';
-import { CalendarPlus, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CalendarPlus, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { isApiError } from '@/lib/errors';
+import { extractApiError } from '@/lib/errors';
+import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
 import {
   bookRecurringSessions,
   bookSession,
   dayOfWeekLabel,
   listAvailability,
+  listScheduleStaff,
   listSessions,
   replaceAvailability,
+  scheduleStaffRoleLabel,
   type AvailabilitySlot,
   type CareSession,
+  type ScheduleStaffOption,
 } from '@/lib/api/scheduling';
+import {
+  RolePageHeader,
+  RolePageShell,
+  btnPrimaryClass,
+  btnSecondaryClass,
+  fieldClass,
+} from '@/components/care/RolePageChrome';
 
 type SlotDraft = { dayOfWeek: number; startTime: string; endTime: string; isAvailable: boolean };
 
+const DEFAULT_SLOTS: SlotDraft[] = [
+  { dayOfWeek: 1, startTime: '09:00', endTime: '17:00', isAvailable: true },
+];
+
+function episodeOptionLabel(ep: CareEpisode): string {
+  const patient = ep.careRecipient?.name || ep.patient?.name;
+  const status = ep.status.replace(/_/g, ' ');
+  return patient ? `${ep.title} · ${patient} (${status})` : `${ep.title} (${status})`;
+}
+
+function staffOptionLabel(s: ScheduleStaffOption): string {
+  return `${s.name} · ${scheduleStaffRoleLabel(s.role)}`;
+}
+
 export default function CoordinatorSchedulePage() {
+  const [staff, setStaff] = useState<ScheduleStaffOption[]>([]);
+  const [episodes, setEpisodes] = useState<CareEpisode[]>([]);
+  const [bootLoading, setBootLoading] = useState(true);
+
   const [providerId, setProviderId] = useState('');
-  const [slots, setSlots] = useState<SlotDraft[]>([
-    { dayOfWeek: 1, startTime: '09:00', endTime: '17:00', isAvailable: true },
-  ]);
+  const [slots, setSlots] = useState<SlotDraft[]>(DEFAULT_SLOTS);
   const [loadedSlots, setLoadedSlots] = useState<AvailabilitySlot[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   const [episodeId, setEpisodeId] = useState('');
   const [scheduledLocal, setScheduledLocal] = useState('');
@@ -30,42 +58,105 @@ export default function CoordinatorSchedulePage() {
   const [sessions, setSessions] = useState<CareSession[]>([]);
   const [busy, setBusy] = useState(false);
 
-  async function loadAvailability() {
-    if (!providerId.trim()) {
-      toast.error('Enter a provider / support worker user id');
+  const selectedStaff = useMemo(
+    () => staff.find((s) => s.id === providerId) ?? null,
+    [staff, providerId],
+  );
+
+  const boot = useCallback(async () => {
+    setBootLoading(true);
+    try {
+      const [staffRows, epResult] = await Promise.all([
+        listScheduleStaff(),
+        listEpisodes({ limit: 50 }),
+      ]);
+      setStaff(staffRows);
+      setEpisodes(epResult.data);
+      setProviderId((current) => current || (staffRows.length === 1 ? staffRows[0].id : ''));
+      setEpisodeId((current) => current || (epResult.data.length === 1 ? epResult.data[0].id : ''));
+    } catch (error: unknown) {
+      toast.error(extractApiError(error).message || 'Failed to load schedule options');
+    } finally {
+      setBootLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void boot();
+  }, [boot]);
+
+  const loadAvailability = useCallback(
+    async (id: string, quiet = false) => {
+      if (!id) return;
+      setAvailabilityLoading(true);
+      try {
+        const data = await listAvailability(id);
+        setLoadedSlots(data.slots);
+        if (data.slots.length) {
+          setSlots(
+            data.slots.map((s) => ({
+              dayOfWeek: s.dayOfWeek,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              isAvailable: s.isAvailable,
+            })),
+          );
+        } else {
+          setSlots(DEFAULT_SLOTS);
+        }
+        if (!quiet) toast.success(`Loaded ${data.slots.length} slot(s)`);
+      } catch (error: unknown) {
+        toast.error(extractApiError(error).message || 'Failed to load availability');
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!providerId) {
+      setLoadedSlots([]);
+      setSlots(DEFAULT_SLOTS);
+      return;
+    }
+    void loadAvailability(providerId, true);
+  }, [providerId, loadAvailability]);
+
+  const loadSessions = useCallback(async (id: string, quiet = false) => {
+    if (!id) {
+      setSessions([]);
       return;
     }
     try {
-      const data = await listAvailability(providerId.trim());
-      setLoadedSlots(data.slots);
-      if (data.slots.length) {
-        setSlots(
-          data.slots.map((s) => ({
-            dayOfWeek: s.dayOfWeek,
-            startTime: s.startTime,
-            endTime: s.endTime,
-            isAvailable: s.isAvailable,
-          })),
-        );
-      }
-      toast.success(`Loaded ${data.slots.length} slot(s)`);
+      const rows = await listSessions({ episodeId: id });
+      setSessions(rows);
+      if (!quiet) toast.success(`${rows.length} session(s)`);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load availability');
+      toast.error(extractApiError(error).message || 'Failed to list sessions');
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!episodeId) {
+      setSessions([]);
+      return;
+    }
+    void loadSessions(episodeId, true);
+  }, [episodeId, loadSessions]);
 
   async function saveAvailability() {
-    if (!providerId.trim()) {
-      toast.error('Enter provider id');
+    if (!providerId) {
+      toast.error('Select a staff member');
       return;
     }
     setBusy(true);
     try {
-      const data = await replaceAvailability(providerId.trim(), slots);
+      const data = await replaceAvailability(providerId, slots);
       setLoadedSlots(data.slots);
-      toast.success('Availability saved');
+      toast.success(`Saved availability for ${selectedStaff?.name ?? 'staff'}`);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Save failed');
+      toast.error(extractApiError(error).message || 'Save failed');
     } finally {
       setBusy(false);
     }
@@ -78,8 +169,8 @@ export default function CoordinatorSchedulePage() {
   }
 
   async function onBook() {
-    if (!episodeId.trim() || !providerId.trim() || !scheduledLocal) {
-      toast.error('Episode, provider, and time are required');
+    if (!episodeId || !providerId || !scheduledLocal) {
+      toast.error('Select episode, staff, and start time');
       return;
     }
     setBusy(true);
@@ -87,8 +178,8 @@ export default function CoordinatorSchedulePage() {
       const scheduledAt = toIso(scheduledLocal);
       if (recurCount > 1) {
         const result = await bookRecurringSessions({
-          episodeId: episodeId.trim(),
-          providerId: providerId.trim(),
+          episodeId,
+          providerId,
           scheduledAt,
           durationMinutes: duration,
           assignPendingTasks: assignTasks,
@@ -100,72 +191,100 @@ export default function CoordinatorSchedulePage() {
         }
       } else {
         await bookSession({
-          episodeId: episodeId.trim(),
-          providerId: providerId.trim(),
+          episodeId,
+          providerId,
           scheduledAt,
           durationMinutes: duration,
           assignPendingTasks: assignTasks,
         });
-        toast.success('Session booked');
+        toast.success(
+          assignTasks
+            ? 'Session booked — pending tasks assigned to this worker'
+            : 'Session booked',
+        );
       }
-      await loadSessions();
+      await loadSessions(episodeId, true);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Booking failed');
+      toast.error(extractApiError(error).message || 'Booking failed');
     } finally {
       setBusy(false);
     }
   }
 
-  async function loadSessions() {
-    if (!episodeId.trim()) return;
-    try {
-      const rows = await listSessions({ episodeId: episodeId.trim() });
-      setSessions(rows);
-    } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to list sessions');
-    }
+  if (bootLoading) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="size-6 animate-spin text-teal-600" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <div>
-        <h2 className="text-2xl font-semibold text-stone-900">Schedule</h2>
-        <p className="mt-1 text-stone-600">
-          Manage staff availability and book care sessions with conflict detection.
-        </p>
-      </div>
+    <RolePageShell>
+      <RolePageHeader
+        title="Schedule"
+        description="Set staff availability and book care sessions — pick people and episodes from your org."
+        actions={
+          <button type="button" onClick={() => void boot()} className={btnSecondaryClass}>
+            <RefreshCw className="size-4" /> Refresh lists
+          </button>
+        }
+      />
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
+      <section className="space-y-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-semibold text-stone-900">Staff availability</h3>
         <label className="block space-y-1">
-          <span className="text-sm text-stone-600">Provider / support worker user ID</span>
-          <input
+          <span className="text-sm font-medium text-stone-700">Staff member</span>
+          <select
             value={providerId}
             onChange={(e) => setProviderId(e.target.value)}
-            className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-mono"
-            placeholder="uuid"
-          />
+            className={fieldClass}
+          >
+            <option value="">Select staff…</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {staffOptionLabel(s)}
+              </option>
+            ))}
+          </select>
+          {staff.length === 0 && (
+            <p className="text-xs text-amber-700">
+              No schedulable staff in your organization yet. Invite support or clinical staff from
+              the Org portal.
+            </p>
+          )}
+          {selectedStaff?.email ? (
+            <p className="text-xs text-stone-500">{selectedStaff.email}</p>
+          ) : null}
         </label>
-        <div className="flex gap-2">
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <button
             type="button"
-            onClick={() => void loadAvailability()}
-            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold"
+            disabled={!providerId || availabilityLoading}
+            onClick={() => void loadAvailability(providerId)}
+            className={btnSecondaryClass}
           >
-            <RefreshCw className="size-4" /> Load
+            {availabilityLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}{' '}
+            Reload slots
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !providerId}
             onClick={() => void saveAvailability()}
-            className="rounded-xl bg-teal-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className={btnPrimaryClass}
           >
             Save slots
           </button>
         </div>
+
         <div className="space-y-2">
           {slots.map((s, i) => (
-            <div key={i} className="grid grid-cols-3 gap-2">
+            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <select
                 value={s.dayOfWeek}
                 onChange={(e) =>
@@ -173,7 +292,7 @@ export default function CoordinatorSchedulePage() {
                     rows.map((r, j) => (j === i ? { ...r, dayOfWeek: Number(e.target.value) } : r)),
                   )
                 }
-                className="rounded-lg border border-stone-200 px-2 py-2 text-sm"
+                className={fieldClass}
               >
                 {[0, 1, 2, 3, 4, 5, 6].map((d) => (
                   <option key={d} value={d}>
@@ -189,7 +308,7 @@ export default function CoordinatorSchedulePage() {
                     rows.map((r, j) => (j === i ? { ...r, startTime: e.target.value } : r)),
                   )
                 }
-                className="rounded-lg border border-stone-200 px-2 py-2 text-sm"
+                className={fieldClass}
               />
               <input
                 type="time"
@@ -199,7 +318,7 @@ export default function CoordinatorSchedulePage() {
                     rows.map((r, j) => (j === i ? { ...r, endTime: e.target.value } : r)),
                   )
                 }
-                className="rounded-lg border border-stone-200 px-2 py-2 text-sm"
+                className={fieldClass}
               />
             </div>
           ))}
@@ -211,7 +330,7 @@ export default function CoordinatorSchedulePage() {
                 { dayOfWeek: 1, startTime: '09:00', endTime: '12:00', isAvailable: true },
               ])
             }
-            className="text-sm text-teal-700 font-medium"
+            className="min-h-11 text-sm font-medium text-teal-700"
           >
             + Add row
           </button>
@@ -221,35 +340,69 @@ export default function CoordinatorSchedulePage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
-        <h3 className="font-semibold text-stone-900 flex items-center gap-2">
+      <section className="space-y-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+        <h3 className="flex items-center gap-2 font-semibold text-stone-900">
           <CalendarPlus className="size-5 text-teal-700" /> Book session
         </h3>
+
         <label className="block space-y-1">
-          <span className="text-sm text-stone-600">Episode ID</span>
-          <input
+          <span className="text-sm font-medium text-stone-700">Care episode</span>
+          <select
             value={episodeId}
             onChange={(e) => setEpisodeId(e.target.value)}
-            className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-mono"
-          />
+            className={fieldClass}
+          >
+            <option value="">Select episode…</option>
+            {episodes.map((ep) => (
+              <option key={ep.id} value={ep.id}>
+                {episodeOptionLabel(ep)}
+              </option>
+            ))}
+          </select>
+          {episodes.length === 0 && (
+            <p className="text-xs text-amber-700">
+              No episodes yet. Complete intake review to create a care journey first.
+            </p>
+          )}
         </label>
+
         <label className="block space-y-1">
-          <span className="text-sm text-stone-600">Start (local)</span>
+          <span className="text-sm font-medium text-stone-700">Assign to staff</span>
+          <select
+            value={providerId}
+            onChange={(e) => setProviderId(e.target.value)}
+            className={fieldClass}
+          >
+            <option value="">Select staff…</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {staffOptionLabel(s)}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-stone-500">
+            Same staff list as availability — prefer a support worker for in-home delivery tasks.
+          </p>
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-sm font-medium text-stone-700">Start (local)</span>
           <input
             type="datetime-local"
             value={scheduledLocal}
             onChange={(e) => setScheduledLocal(e.target.value)}
-            className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+            className={fieldClass}
           />
         </label>
-        <div className="grid grid-cols-2 gap-3">
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block space-y-1">
             <span className="text-sm text-stone-600">Duration (min)</span>
             <input
               type="number"
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value) || 60)}
-              className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+              className={fieldClass}
             />
           </label>
           <label className="block space-y-1">
@@ -260,10 +413,11 @@ export default function CoordinatorSchedulePage() {
               max={52}
               value={recurCount}
               onChange={(e) => setRecurCount(Number(e.target.value) || 1)}
-              className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+              className={fieldClass}
             />
           </label>
         </div>
+
         <label className="inline-flex items-center gap-2 text-sm text-stone-700">
           <input
             type="checkbox"
@@ -272,24 +426,30 @@ export default function CoordinatorSchedulePage() {
           />
           Assign pending episode tasks to this worker
         </label>
-        <div className="flex gap-2">
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !episodeId || !providerId || !scheduledLocal}
             onClick={() => void onBook()}
-            className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className={btnPrimaryClass}
           >
             Book
           </button>
           <button
             type="button"
-            onClick={() => void loadSessions()}
-            className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold"
+            disabled={!episodeId}
+            onClick={() => void loadSessions(episodeId)}
+            className={btnSecondaryClass}
           >
-            List sessions
+            Refresh sessions
           </button>
         </div>
+
         <ul className="divide-y divide-stone-100">
+          {sessions.length === 0 && episodeId && (
+            <li className="py-2 text-sm text-stone-500">No sessions booked for this episode yet.</li>
+          )}
           {sessions.map((s) => (
             <li key={s.id} className="py-2 text-sm">
               <span className="font-medium text-stone-900">
@@ -306,6 +466,6 @@ export default function CoordinatorSchedulePage() {
           ))}
         </ul>
       </section>
-    </div>
+    </RolePageShell>
   );
 }

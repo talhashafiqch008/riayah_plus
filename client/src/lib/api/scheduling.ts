@@ -92,3 +92,19 @@ export async function cancelSession(id: string) {
   );
   return data;
 }
+
+export interface ScheduleStaffOption {
+  id: string;
+  name: string;
+  email?: string;
+  role: string;
+}
+
+export async function listScheduleStaff() {
+  const { data } = await client.get<{ data: ScheduleStaffOption[] }>('/scheduling/staff');
+  return data.data;
+}
+
+export function scheduleStaffRoleLabel(role: string): string {
+  return role.replace(/_/g, ' ');
+}

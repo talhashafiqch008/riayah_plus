@@ -138,6 +138,19 @@ export function requireCareCoordinator(req: Request, res: Response, next: NextFu
   next();
 }
 
+export function requireOrgAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({ message: 'Unauthenticated.' });
+    return;
+  }
+  const allowed: UserRole[] = ['org_admin', ...ADMIN_ROLES];
+  if (!allowed.includes(req.user.role)) {
+    res.status(403).json({ message: 'Organization admin access required.' });
+    return;
+  }
+  next();
+}
+
 /** Family account holders + coordinators/admins (care-unit write surface). */
 export function requireFamilyOrCoordinator(
   req: Request,

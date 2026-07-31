@@ -3,9 +3,18 @@ import { z } from 'zod';
 import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { assertTenantOrgAccess } from '../middleware/tenantAccess';
 
 const router = Router();
 router.use(authenticate);
+
+const SHIFT_START_ROLES = [
+  'support_worker',
+  'clinical_staff',
+  'admin',
+  'super_admin',
+  'support_admin',
+];
 
 async function loadOwnShiftOrThrow(req: Request, shiftId: string) {
   const shift = await prisma.shift.findUnique({ where: { id: shiftId } });
@@ -19,6 +28,10 @@ async function loadOwnShiftOrThrow(req: Request, shiftId: string) {
 
 router.post('/start', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (!SHIFT_START_ROLES.includes(req.user!.role)) {
+      throw new AppError('Only support or clinical staff can start a shift.', 403);
+    }
+
     const { bookingId } = z.object({ bookingId: z.string().optional() }).parse(req.body ?? {});
 
     const existing = await prisma.shift.findFirst({
@@ -119,6 +132,11 @@ router.get('/tasks', async (req: Request, res: Response, next: NextFunction) => 
 
 router.post('/tasks', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const allowed = ['care_coordinator', 'admin', 'super_admin', 'support_admin'];
+    if (!allowed.includes(req.user!.role)) {
+      throw new AppError('Forbidden. Use /api/tasks for task management.', 403);
+    }
+
     const data = z
       .object({
         title: z.string(),
@@ -128,6 +146,14 @@ router.post('/tasks', async (req: Request, res: Response, next: NextFunction) =>
         dueAt: z.string().optional(),
       })
       .parse(req.body);
+
+    const assignee = await prisma.user.findFirst({
+      where: { id: data.assigneeId, deletedAt: null, isActive: true },
+      select: { id: true, organizationId: true },
+    });
+    if (!assignee) throw new AppError('Assignee not found.', 404);
+    assertTenantOrgAccess(req, assignee.organizationId);
+
     const task = await prisma.task.create({
       data: {
         ...data,

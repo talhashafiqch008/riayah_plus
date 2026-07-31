@@ -55,6 +55,7 @@ export const ADMIN_NAVIGATION: NavGroup[] = [
     title: 'User Management',
     items: [
       { name: 'Users', href: '/admin/users', icon: Users },
+      { name: 'Families', href: '/admin/families', icon: Users },
       { name: 'Providers', href: '/admin/providers', icon: UserCheck },
       { name: 'Staff', href: '/admin/staff', icon: Shield },
     ],

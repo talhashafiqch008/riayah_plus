@@ -1,13 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, RefreshCw, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { isApiError } from '@/lib/errors';
+import { extractApiError } from '@/lib/errors';
 import {
   listAssessments,
   updateAssessment,
   type Assessment,
 } from '@/lib/api/assessments';
 import { familyAssessmentStatusLabel } from '@/lib/familyLanguage';
+import {
+  RolePageHeader,
+  RolePageShell,
+  btnDangerClass,
+  btnPrimaryClass,
+  btnSecondaryClass,
+  fieldClass,
+} from '@/components/care/RolePageChrome';
 
 function statusClass(status: string) {
   switch (status) {
@@ -44,6 +52,7 @@ export default function AssessmentSchedulePage({
   const [summary, setSummary] = useState('');
   const [recommendations, setRecommendations] = useState('');
   const [reportUrl, setReportUrl] = useState('');
+  const detailRef = useRef<HTMLDivElement>(null);
 
   const title = isFamily ? 'Appointments' : 'Assessment Schedule';
   const description = isFamily
@@ -63,8 +72,10 @@ export default function AssessmentSchedulePage({
       setRows(result.data);
       setTotal(result.total);
     } catch (error: unknown) {
-      if (isApiError(error)) toast.error(error.message);
-      else toast.error(isFamily ? 'Failed to load appointments' : 'Failed to load assessments');
+      toast.error(
+        extractApiError(error).message ||
+          (isFamily ? 'Failed to load appointments' : 'Failed to load assessments'),
+      );
     } finally {
       setLoading(false);
     }
@@ -81,6 +92,9 @@ export default function AssessmentSchedulePage({
     setSummary('');
     setRecommendations('');
     setReportUrl('');
+    window.setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const handleComplete = async () => {
@@ -110,34 +124,46 @@ export default function AssessmentSchedulePage({
       setSelected(null);
       await load();
     } catch (error: unknown) {
-      if (isApiError(error)) toast.error(error.message);
-      else toast.error('Complete failed');
+      const apiError = extractApiError(error);
+      const fieldHint = apiError.fieldErrors
+        ? Object.entries(apiError.fieldErrors)
+            .map(([k, v]) => `${k}: ${v.join(', ')}`)
+            .join('; ')
+        : '';
+      toast.error(fieldHint || apiError.message || 'Complete failed');
     } finally {
       setCompleting(false);
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-stone-900">{title}</h2>
-          <p className="mt-1 text-stone-600">{description}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-        >
-          <RefreshCw className="size-4" /> Refresh
-        </button>
-      </div>
+  const selectRow = (row: Assessment) => {
+    if (mode === 'clinical' && row.status === 'scheduled') {
+      openComplete(row);
+      return;
+    }
+    setSelected(row);
+    window.setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
 
-      <div className="flex flex-wrap gap-3 items-center">
+  return (
+    <RolePageShell>
+      <RolePageHeader
+        title={title}
+        description={description}
+        actions={
+          <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
+            <RefreshCw className="size-4" /> Refresh
+          </button>
+        }
+      />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+          className={`${fieldClass} sm:max-w-xs`}
         >
           <option value="">All statuses</option>
           <option value="scheduled">{isFamily ? 'Consultation booked' : 'Scheduled'}</option>
@@ -150,8 +176,12 @@ export default function AssessmentSchedulePage({
         </span>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-2 rounded-2xl border bg-white shadow-sm overflow-hidden divide-y">
+      <div className="grid gap-4 lg:grid-cols-5 lg:gap-6">
+        <div
+          className={`divide-y overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm lg:col-span-2 ${
+            selected ? 'hidden lg:block' : ''
+          }`}
+        >
           {loading ? (
             <div className="flex justify-center py-16">
               <Loader2 className="size-6 animate-spin text-teal-600" />
@@ -167,29 +197,25 @@ export default function AssessmentSchedulePage({
               <button
                 key={row.id}
                 type="button"
-                onClick={() =>
-                  mode === 'clinical' && row.status === 'scheduled'
-                    ? openComplete(row)
-                    : setSelected(row)
-                }
-                className={`w-full text-left p-4 hover:bg-teal-50/40 transition-colors ${
+                onClick={() => selectRow(row)}
+                className={`w-full p-4 text-left transition-colors hover:bg-teal-50/40 active:bg-teal-50/60 ${
                   selected?.id === row.id ? 'bg-teal-50/60' : ''
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-teal-50 p-2 text-teal-700">
+                  <div className="mt-0.5 shrink-0 rounded-xl bg-teal-50 p-2 text-teal-700">
                     <CalendarClock className="size-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-stone-900 capitalize">{row.type}</p>
+                      <p className="font-semibold capitalize text-stone-900">{row.type}</p>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(row.status)}`}
                       >
                         {statusLabel(row.status)}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-sm text-stone-500 truncate">
+                    <p className="mt-0.5 truncate text-sm text-stone-500">
                       {row.episode?.title || (isFamily ? 'Care journey' : 'Episode')}
                     </p>
                     <p className="mt-0.5 text-xs text-stone-400">
@@ -203,10 +229,13 @@ export default function AssessmentSchedulePage({
           )}
         </div>
 
-        <div className="lg:col-span-3 rounded-2xl border bg-white shadow-sm p-5 min-h-[320px]">
+        <div
+          ref={detailRef}
+          className="min-h-[280px] rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-3 lg:min-h-[320px]"
+        >
           {!selected ? (
-            <div className="h-full flex flex-col items-center justify-center text-stone-400 py-16">
-              <CalendarClock className="size-10 mb-3 opacity-40" />
+            <div className="flex h-full flex-col items-center justify-center py-16 text-stone-400">
+              <CalendarClock className="mb-3 size-10 opacity-40" />
               <p className="text-sm">
                 {isFamily
                   ? 'Select an appointment to view details.'
@@ -215,13 +244,22 @@ export default function AssessmentSchedulePage({
             </div>
           ) : mode === 'clinical' && selected.status === 'scheduled' ? (
             <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-stone-900 capitalize">
-                  Complete {selected.type} assessment
-                </h3>
-                <p className="text-sm text-stone-500 mt-1">
-                  {selected.episode?.title} · {new Date(selected.scheduledAt).toLocaleString()}
-                </p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold capitalize text-stone-900">
+                    Complete {selected.type} assessment
+                  </h3>
+                  <p className="mt-1 break-words text-sm text-stone-500">
+                    {selected.episode?.title} · {new Date(selected.scheduledAt).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-stone-500 hover:bg-stone-100 lg:hidden"
+                >
+                  Back
+                </button>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -230,7 +268,7 @@ export default function AssessmentSchedulePage({
                   <input
                     value={mobility}
                     onChange={(e) => setMobility(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2"
+                    className={`mt-1 ${fieldClass}`}
                     placeholder="e.g. needs walker indoors"
                   />
                 </label>
@@ -239,45 +277,45 @@ export default function AssessmentSchedulePage({
                   <input
                     value={pain}
                     onChange={(e) => setPain(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2"
+                    className={`mt-1 ${fieldClass}`}
                     placeholder="e.g. 4/10 knee"
                   />
                 </label>
-                <label className="sm:col-span-2 text-sm">
+                <label className="text-sm sm:col-span-2">
                   <span className="text-xs font-semibold text-stone-500">Summary metrics / notes</span>
                   <textarea
                     value={summary}
                     onChange={(e) => setSummary(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 min-h-[72px]"
+                    className={`mt-1 min-h-[72px] ${fieldClass}`}
                   />
                 </label>
-                <label className="sm:col-span-2 text-sm">
+                <label className="text-sm sm:col-span-2">
                   <span className="text-xs font-semibold text-stone-500">Recommendations</span>
                   <textarea
                     value={recommendations}
                     onChange={(e) => setRecommendations(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 min-h-[64px]"
+                    className={`mt-1 min-h-[64px] ${fieldClass}`}
                   />
                 </label>
-                <label className="sm:col-span-2 text-sm">
+                <label className="text-sm sm:col-span-2">
                   <span className="text-xs font-semibold text-stone-500">
                     Report URL (optional if recommendations set)
                   </span>
                   <input
                     value={reportUrl}
                     onChange={(e) => setReportUrl(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2"
+                    className={`mt-1 ${fieldClass}`}
                     placeholder="https://…"
                   />
                 </label>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button
                   type="button"
                   disabled={completing}
                   onClick={() => void handleComplete()}
-                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-2"
+                  className={btnPrimaryClass}
                 >
                   {completing && <Loader2 className="size-4 animate-spin" />}
                   Mark completed
@@ -292,10 +330,10 @@ export default function AssessmentSchedulePage({
                       setSelected(null);
                       await load();
                     } catch (error: unknown) {
-                      if (isApiError(error)) toast.error(error.message);
+                      toast.error(extractApiError(error).message);
                     }
                   }}
-                  className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                  className={btnDangerClass}
                 >
                   Cancel assessment
                 </button>
@@ -303,20 +341,31 @@ export default function AssessmentSchedulePage({
             </div>
           ) : (
             <div className="space-y-4 text-sm">
-              <div>
-                <h3 className="text-lg font-semibold text-stone-900 capitalize">{selected.type}</h3>
-                <span
-                  className={`inline-block mt-2 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(selected.status)}`}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-semibold capitalize text-stone-900">{selected.type}</h3>
+                  <span
+                    className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(selected.status)}`}
+                  >
+                    {statusLabel(selected.status)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-stone-500 hover:bg-stone-100 lg:hidden"
                 >
-                  {statusLabel(selected.status)}
-                </span>
+                  Back
+                </button>
               </div>
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">
                     {isFamily ? 'Care journey' : 'Episode'}
                   </dt>
-                  <dd className="mt-0.5 text-stone-900">{selected.episode?.title || '—'}</dd>
+                  <dd className="mt-0.5 break-words text-stone-900">
+                    {selected.episode?.title || '—'}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">Scheduled</dt>
@@ -338,7 +387,7 @@ export default function AssessmentSchedulePage({
                     {selected.reportUrl ? (
                       <a
                         href={selected.reportUrl}
-                        className="text-teal-700 underline"
+                        className="break-all text-teal-700 underline"
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -352,18 +401,18 @@ export default function AssessmentSchedulePage({
               </dl>
               {selected.findings && (
                 <div>
-                  <p className="text-xs font-semibold text-stone-500 mb-2">
+                  <p className="mb-2 text-xs font-semibold text-stone-500">
                     {isFamily ? 'Visit notes' : 'Findings'}
                   </p>
-                  <dl className="grid gap-3 sm:grid-cols-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <dl className="grid gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-2">
                     {Object.entries(selected.findings)
                       .filter(([, value]) => value != null && String(value).trim() !== '')
                       .map(([key, value]) => (
                         <div key={key}>
-                          <dt className="text-xs font-semibold text-stone-500 capitalize">
+                          <dt className="text-xs font-semibold capitalize text-stone-500">
                             {key.replace(/_/g, ' ')}
                           </dt>
-                          <dd className="mt-0.5 text-sm text-stone-900 whitespace-pre-wrap">
+                          <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-stone-900">
                             {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                           </dd>
                         </div>
@@ -373,14 +422,16 @@ export default function AssessmentSchedulePage({
               )}
               {selected.recommendations && (
                 <div>
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Recommendations</p>
-                  <p className="text-stone-800 whitespace-pre-wrap">{selected.recommendations}</p>
+                  <p className="mb-1 text-xs font-semibold text-stone-500">Recommendations</p>
+                  <p className="whitespace-pre-wrap break-words text-stone-800">
+                    {selected.recommendations}
+                  </p>
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-    </div>
+    </RolePageShell>
   );
 }

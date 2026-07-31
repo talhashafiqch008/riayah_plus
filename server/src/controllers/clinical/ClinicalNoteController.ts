@@ -109,6 +109,7 @@ export class ClinicalNoteController {
         author: { select: { id: true, name: true, role: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
     const visible = notes.filter((n) =>

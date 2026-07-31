@@ -46,9 +46,13 @@ router.get('/:id', CarePlanController.show);
 router.patch('/:id', requireCareCoordinator, CarePlanController.update);
 router.delete('/:id', requireCareCoordinator, CarePlanController.destroy);
 router.post('/:id/submit', requireCareCoordinator, CarePlanController.submitForApproval);
-router.post('/:id/approve', CarePlanController.approve);
-router.post('/:id/request-revision', CarePlanController.requestRevision);
-router.post('/:id/reject', CarePlanController.reject);
+router.post('/:id/approve', requireRole([...FAMILY_ROLES]), CarePlanController.approve);
+router.post(
+  '/:id/request-revision',
+  requireRole([...FAMILY_ROLES]),
+  CarePlanController.requestRevision,
+);
+router.post('/:id/reject', requireRole([...FAMILY_ROLES]), CarePlanController.reject);
 router.post(
   '/:id/cosign',
   requireRole([

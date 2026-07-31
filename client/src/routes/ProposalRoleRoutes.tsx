@@ -15,9 +15,14 @@ import CoordinatorCarePlanDetailPage from '@/pages/coordinator/CoordinatorCarePl
 import CoordinatorSchedulePage from '@/pages/coordinator/CoordinatorSchedulePage';
 import ClinicalNotesPage from '@/pages/clinical/ClinicalNotesPage';
 import ClinicalEpisodeNotesPage from '@/pages/clinical/ClinicalEpisodeNotesPage';
+import ClinicalCarePlansPage from '@/pages/clinical/ClinicalCarePlansPage';
 import ClinicalCarePlanPage from '@/pages/clinical/ClinicalCarePlanPage';
 import SupportShiftsPage from '@/pages/support/SupportShiftsPage';
 import SupportTasksPage from '@/pages/support/SupportTasksPage';
+import OrgFamiliesPage from '@/pages/org/OrgFamiliesPage';
+import OrgCoordinatorsPage from '@/pages/org/OrgCoordinatorsPage';
+import OrgPendingRequestsPage from '@/pages/org/OrgPendingRequestsPage';
+import OrgStaffPage from '@/pages/org/OrgStaffPage';
 import CareUnitListPage from '@/pages/care/CareUnitListPage';
 import CareUnitDetailPage from '@/pages/care/CareUnitDetailPage';
 import CarePatientDetailPage from '@/pages/care/CarePatientDetailPage';
@@ -54,7 +59,6 @@ const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; descripti
     { path: 'messages', title: 'Messages' },
   ],
   clinical: [
-    { path: 'patients', title: 'Patients' },
     { path: 'messages', title: 'Messages' },
   ],
   support: [
@@ -274,6 +278,34 @@ export const proposalRoleRouteElements = (
                   }
                 />
                 <Route
+                  path="/clinical/patients"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeListPage
+                        basePath="/clinical/patients"
+                        title="Patients"
+                        description="Care episodes in your organization — open one for details, or use Session Notes to document."
+                      />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/patients/:episodeId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeDetailPage basePath="/clinical/patients" />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/episodes/:episodeId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <EpisodeDetailPage basePath="/clinical/patients" />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/clinical/notes"
                   element={
                     <Suspense fallback={<PageSpinner />}>
@@ -286,6 +318,14 @@ export const proposalRoleRouteElements = (
                   element={
                     <Suspense fallback={<PageSpinner />}>
                       <ClinicalEpisodeNotesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/plans"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <ClinicalCarePlansPage />
                     </Suspense>
                   }
                 />
@@ -314,6 +354,42 @@ export const proposalRoleRouteElements = (
                   element={
                     <Suspense fallback={<PageSpinner />}>
                       <SupportTasksPage />
+                    </Suspense>
+                  }
+                />
+              </>
+            )}
+            {shellKey === 'org' && (
+              <>
+                <Route
+                  path="/org/pending"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <OrgPendingRequestsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/org/families"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <OrgFamiliesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/org/coordinators"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <OrgCoordinatorsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/org/staff"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <OrgStaffPage />
                     </Suspense>
                   }
                 />

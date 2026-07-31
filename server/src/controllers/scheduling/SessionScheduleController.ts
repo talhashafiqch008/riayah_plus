@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { assertTenantOrgAccess } from '../../middleware/tenantAccess';
@@ -94,6 +95,58 @@ async function assertProviderInOrg(providerId: string, organizationId: string | 
 }
 
 export class SessionScheduleController {
+  /**
+   * GET /scheduling/staff — org-scoped workers/clinicians for availability + booking pickers.
+   */
+  static async listStaff(req: Request, res: Response): Promise<void> {
+    const role = req.user!.role;
+    const allowed = [
+      'care_coordinator',
+      'admin',
+      'super_admin',
+      'support_admin',
+      'clinical_staff',
+    ];
+    if (!allowed.includes(role)) {
+      throw new AppError('Forbidden.', 403);
+    }
+
+    const schedulableRoles: UserRole[] = [
+      'support_worker',
+      'clinical_staff',
+      'doctor',
+      'nurse',
+      'physiotherapist',
+      'occupational_therapist',
+      'speech_therapist',
+      'psychologist',
+      'dietitian',
+      'therapist',
+      'caregiver',
+      'companion',
+    ];
+
+    const where: Prisma.UserWhereInput = {
+      role: { in: schedulableRoles },
+      isActive: true,
+      deletedAt: null,
+    };
+
+    const orgId = req.tenant?.organizationId;
+    if (orgId) {
+      where.organizationId = orgId;
+    }
+
+    const data = await prisma.user.findMany({
+      where,
+      select: { id: true, name: true, role: true },
+      orderBy: [{ role: 'asc' }, { name: 'asc' }],
+      take: 200,
+    });
+
+    res.json({ data });
+  }
+
   /** GET /scheduling/sessions?episodeId=&providerId= */
   static async index(req: Request, res: Response): Promise<void> {
     const episodeId = typeof req.query.episodeId === 'string' ? req.query.episodeId : undefined;
@@ -114,11 +167,10 @@ export class SessionScheduleController {
     } else if (FAMILY_ROLES.includes(req.user!.role)) {
       where.clientId = req.user!.userId;
     } else {
-      // coordinator: scope via episodes in org
+      // coordinator/admin: scope via episodes in org — never return unscoped sessions
       const orgId = req.tenant?.organizationId;
-      if (orgId) {
-        where.episode = { organizationId: orgId };
-      }
+      if (!orgId) throw new AppError('No organization assigned to this account.', 403);
+      where.episode = { organizationId: orgId };
     }
 
     const sessions = await prisma.session.findMany({

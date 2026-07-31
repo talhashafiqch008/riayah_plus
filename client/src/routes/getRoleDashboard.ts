@@ -23,7 +23,16 @@ const PROPOSAL_DASHBOARDS: Record<string, string> = {
   patient: '/patient',
   care_coordinator: '/coordinator',
   clinical_staff: '/clinical',
+  doctor: '/clinical',
+  nurse: '/clinical',
+  physiotherapist: '/clinical',
+  occupational_therapist: '/clinical',
+  speech_therapist: '/clinical',
+  psychologist: '/clinical',
+  dietitian: '/clinical',
+  therapist: '/clinical',
   support_worker: '/support',
+  org_admin: '/org',
 };
 
 export function getRoleDashboard(role: string): string {
@@ -33,6 +42,7 @@ export function getRoleDashboard(role: string): string {
     return PROPOSAL_DASHBOARDS[r];
   }
 
+  // Remaining marketplace-only provider roles (cleaner, gardener, etc.)
   if (PROVIDER_ROLES.includes(r as typeof PROVIDER_ROLES[number])) {
     return '/provider/dashboard';
   }

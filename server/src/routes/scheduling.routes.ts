@@ -5,6 +5,10 @@ import { SessionScheduleController } from '../controllers/scheduling/SessionSche
 const router = Router();
 router.use(authenticate);
 
+router.get('/staff', (req, res, next) => {
+  SessionScheduleController.listStaff(req, res).catch(next);
+});
+
 router.get('/sessions', (req, res, next) => {
   SessionScheduleController.index(req, res).catch(next);
 });

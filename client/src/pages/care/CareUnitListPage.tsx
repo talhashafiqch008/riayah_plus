@@ -43,7 +43,7 @@ export default function CareUnitListPage({
   }, [load]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full min-w-0 max-w-5xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-stone-900">{title}</h2>

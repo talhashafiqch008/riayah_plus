@@ -13,6 +13,9 @@ router.use(authenticate);
 
 router.post('/', IntakeController.submit);
 router.get('/queue', requireCareCoordinator, IntakeController.queue);
+router.get('/nav-badges', requireCareCoordinator, (req, res, next) => {
+  IntakeController.navBadges(req, res).catch(next);
+});
 
 router.post('/documents/presign', documentLimiter, (req, res, next) => {
   IntakeDocumentController.presign(req, res).catch(next);

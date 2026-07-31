@@ -41,6 +41,8 @@ const createSchema = z.object({
 const findingsSchema = z
   .object({
     summary: z.string().max(4000).optional().nullable(),
+    mobility: z.string().max(2000).optional().nullable(),
+    pain: z.string().max(2000).optional().nullable(),
     functionalStatus: z.string().max(2000).optional().nullable(),
     risks: z.string().max(2000).optional().nullable(),
     goals: z.string().max(2000).optional().nullable(),

@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
+import {
+  INVITE_PASSWORD_PLACEHOLDER,
+  sendInviteSetPassword,
+} from '../../utils/inviteUser';
 
 function slugify(value: string): string {
   return value
@@ -29,12 +33,18 @@ const organizationCreateSchema = z.object({
   logoUrl: z.string().url().optional().nullable(),
   address: z.string().max(500).optional().nullable(),
   phone: z.string().max(40).optional().nullable(),
-  email: z.string().email().optional().nullable(),
+  email: z.string().email(),
+  adminName: z.string().min(2).max(120).optional(),
   website: z.string().url().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
-const organizationUpdateSchema = organizationCreateSchema.partial();
+const organizationUpdateSchema = organizationCreateSchema
+  .omit({ adminName: true })
+  .partial()
+  .extend({
+    email: z.string().email().optional().nullable(),
+  });
 
 const clinicCreateSchema = z.object({
   name: z.string().min(2).max(120),
@@ -111,20 +121,50 @@ export class OrganizationController {
       const nameTaken = await prisma.organization.findFirst({ where: { name: body.name } });
       if (nameTaken) throw new AppError('An organization with this name already exists.', 409);
 
+      const emailTaken = await prisma.user.findUnique({ where: { email: body.email } });
+      if (emailTaken) throw new AppError('An account with this email already exists.', 409);
+
       const baseSlug = slugify(body.slug ?? body.name);
       const slug = await uniqueOrgSlug(baseSlug);
+      const adminName = body.adminName?.trim() || `${body.name} Admin`;
 
-      const organization = await prisma.organization.create({
-        data: {
-          name: body.name,
-          slug,
-          logoUrl: body.logoUrl ?? undefined,
-          address: body.address ?? undefined,
-          phone: body.phone ?? undefined,
-          email: body.email ?? undefined,
-          website: body.website ?? undefined,
-          isActive: body.isActive ?? true,
-        },
+      const { organization, orgAdmin } = await prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name: body.name,
+            slug,
+            logoUrl: body.logoUrl ?? undefined,
+            address: body.address ?? undefined,
+            phone: body.phone ?? undefined,
+            email: body.email,
+            website: body.website ?? undefined,
+            isActive: body.isActive ?? true,
+          },
+        });
+
+        const orgAdmin = await tx.user.create({
+          data: {
+            name: adminName,
+            email: body.email,
+            passwordHash: INVITE_PASSWORD_PLACEHOLDER,
+            role: 'org_admin',
+            organizationId: organization.id,
+            mustSetPassword: true,
+            isEmailVerified: true,
+            emailVerifiedAt: new Date(),
+            verificationStatus: 'approved',
+            isActive: true,
+          },
+        });
+
+        return { organization, orgAdmin };
+      });
+
+      await sendInviteSetPassword({
+        id: orgAdmin.id,
+        email: orgAdmin.email,
+        name: orgAdmin.name,
+        role: orgAdmin.role,
       });
 
       await AuditService.log({
@@ -132,11 +172,50 @@ export class OrganizationController {
         action: 'organization_created',
         entity: 'Organization',
         entityId: organization.id,
-        after: organization,
+        after: { ...organization, orgAdminId: orgAdmin.id },
         req,
       });
 
-      res.status(201).json({ success: true, data: organization });
+      res.status(201).json({
+        success: true,
+        data: organization,
+        orgAdmin: { id: orgAdmin.id, email: orgAdmin.email, name: orgAdmin.name },
+        inviteSent: true,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /** Resend set-password invite to the org's org_admin user. */
+  static async resendOrgAdminInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+      if (!org) throw new AppError('Organization not found.', 404);
+
+      const orgAdmin = await prisma.user.findFirst({
+        where: {
+          organizationId: org.id,
+          role: 'org_admin',
+          deletedAt: null,
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!orgAdmin) throw new AppError('No organization admin found for this organization.', 404);
+
+      await prisma.user.update({
+        where: { id: orgAdmin.id },
+        data: { mustSetPassword: true, passwordHash: INVITE_PASSWORD_PLACEHOLDER },
+      });
+
+      await sendInviteSetPassword({
+        id: orgAdmin.id,
+        email: orgAdmin.email,
+        name: orgAdmin.name,
+        role: orgAdmin.role,
+      });
+
+      res.json({ success: true, message: 'Invite resent.', email: orgAdmin.email });
     } catch (err) {
       next(err);
     }

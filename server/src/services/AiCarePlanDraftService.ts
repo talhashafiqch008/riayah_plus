@@ -236,8 +236,30 @@ export class AiCarePlanDraftService {
     const nextVersion = (maxVersion._max.version ?? 0) + 1;
 
     const created = await prisma.$transaction(async (tx) => {
-      await tx.carePlan.updateMany({
+      const currentPlans = await tx.carePlan.findMany({
         where: { episodeId: episode.id, isCurrentVersion: true },
+        select: { id: true, notes: true, status: true },
+      });
+
+      const blocking = currentPlans.find(
+        (p) =>
+          p.status !== 'draft' || !(p.notes ?? '').includes(AI_DRAFT_MARKER),
+      );
+      if (blocking) {
+        throw new AppError(
+          'A care plan already exists for this episode. Finish, reject, or supersede it before accepting a new AI draft.',
+          409,
+        );
+      }
+
+      // Only demote other AI draft rows (idempotent regenerate path).
+      await tx.carePlan.updateMany({
+        where: {
+          episodeId: episode.id,
+          isCurrentVersion: true,
+          status: 'draft',
+          notes: { contains: AI_DRAFT_MARKER },
+        },
         data: { isCurrentVersion: false },
       });
 
@@ -325,17 +347,45 @@ export class AiCarePlanDraftService {
       outputLanguage: params.outputLanguage,
     });
 
-    let aiResponse: CarePlanResponse;
-    try {
-      aiResponse = await RiayahAiClient.requestCarePlanDraft(episode.id, payload);
-    } catch (err) {
-      if (err instanceof RiayahAiError) {
-        throw new AppError(
-          err.message || 'AI care plan draft request failed.',
-          err.statusCode && err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502,
-        );
+    let aiResponse: CarePlanResponse | null = null;
+    let lastAiError: RiayahAiError | null = null;
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        aiResponse = await RiayahAiClient.requestCarePlanDraft(episode.id, payload);
+        break;
+      } catch (err) {
+        if (!(err instanceof RiayahAiError)) throw err;
+        lastAiError = err;
+        const detail = err.message || '';
+        const schemaEcho =
+          err.statusCode === 422 &&
+          detail.includes('familyConsultationNotes') &&
+          detail.includes('Extra inputs are not permitted');
+        if (!schemaEcho || attempt === maxAttempts) break;
+        logger.warn('AI care plan draft schema echo — retrying', {
+          episodeId: episode.id,
+          attempt,
+          detail: detail.slice(0, 200),
+        });
       }
-      throw err;
+    }
+
+    if (!aiResponse) {
+      const detail = lastAiError?.message || 'AI care plan draft request failed.';
+      const schemaEcho =
+        lastAiError?.statusCode === 422 &&
+        detail.includes('familyConsultationNotes') &&
+        detail.includes('Extra inputs are not permitted');
+      throw new AppError(
+        schemaEcho
+          ? 'AI draft failed due to an upstream schema issue (familyConsultationNotes echoed into the draft). Please retry, or create the care plan manually.'
+          : detail,
+        lastAiError?.statusCode && lastAiError.statusCode >= 400 && lastAiError.statusCode < 600
+          ? lastAiError.statusCode
+          : 502,
+      );
     }
 
     if (!aiResponse.draft) {
@@ -433,14 +483,21 @@ function buildCarePlanPayloadFromEpisode(
   return {
     profileName: 'careplan_draft',
     outputLanguage: options?.outputLanguage ?? 'en',
-    familyConsultationNotes: options?.familyConsultationNotes ?? null,
+    // Keep top-level notes null — staging LLM sometimes echoes a string notes field
+    // into CarePlanDraft (additionalProperties: false) and returns 422.
+    familyConsultationNotes: null,
+    metadata: {
+      ...(options?.familyConsultationNotes?.trim()
+        ? { familyConsultationNotes: options.familyConsultationNotes.trim() }
+        : {}),
+    },
     patient: {
       dateOfBirth: episode.careRecipient?.dateOfBirth
         ? episode.careRecipient.dateOfBirth.toISOString().slice(0, 10)
         : null,
       gender: episode.careRecipient?.gender ?? null,
       diagnoses,
-      medicalHistory: episode.medicalHistory,
+      ...(episode.medicalHistory ? { medicalHistory: episode.medicalHistory } : {}),
     },
     episode: {
       title: episode.title,
@@ -449,7 +506,7 @@ function buildCarePlanPayloadFromEpisode(
         ? URGENCY_TO_AI[episode.urgencyLevel] ?? episode.urgencyLevel
         : null,
       serviceInterests: episode.serviceInterests,
-      medicalHistory: episode.medicalHistory,
+      ...(episode.medicalHistory ? { medicalHistory: episode.medicalHistory } : {}),
       currentMeds: episode.currentMeds
         ? episode.currentMeds.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
         : [],

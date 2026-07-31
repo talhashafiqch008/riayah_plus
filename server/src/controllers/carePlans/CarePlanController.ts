@@ -10,6 +10,14 @@ import { assertCarePlanTransition } from '../../utils/stateMachine';
 
 const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
 
+/** Prefer patient account; fall back to care-unit family when patientId is unset. */
+function familyNotifyUserId(episode: {
+  patientId: string | null;
+  careUnit?: { familyUserId: string | null } | null;
+}): string | null {
+  return episode.patientId ?? episode.careUnit?.familyUserId ?? null;
+}
+
 /** Material edits to these statuses must create a new draft version for re-approval (CP8). */
 const REAPPROVAL_STATUSES: CarePlanStatus[] = ['active', 'approved'];
 
@@ -77,10 +85,17 @@ type ItemInput = z.infer<typeof itemSchema>;
 
 function assertCarePlanAccess(
   req: Request,
-  episode: { patientId: string; organizationId: string | null },
+  episode: {
+    patientId: string;
+    organizationId: string | null;
+    careUnit?: { familyUserId: string } | null;
+  },
 ): void {
   if (FAMILY_ROLES.includes(req.user!.role)) {
-    if (episode.patientId !== req.user!.userId) {
+    const owns =
+      episode.patientId === req.user!.userId ||
+      episode.careUnit?.familyUserId === req.user!.userId;
+    if (!owns) {
       throw new AppError('Forbidden.', 403);
     }
     return;
@@ -287,7 +302,14 @@ export class CarePlanController {
         goals: true,
         items: true,
         approvalLogs: true,
-        episode: { select: { id: true, organizationId: true, patientId: true } },
+        episode: {
+          select: {
+            id: true,
+            organizationId: true,
+            patientId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
       },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
@@ -303,7 +325,13 @@ export class CarePlanController {
       include: {
         goals: true,
         items: true,
-        episode: { select: { organizationId: true, patientId: true } },
+        episode: {
+          select: {
+            organizationId: true,
+            patientId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
       },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
@@ -399,13 +427,16 @@ export class CarePlanController {
         return created;
       });
 
-      await NotificationService.create({
-        userId: plan.episode.patientId,
-        title: 'Care Plan Being Revised',
-        body: 'Your care coordinator updated the care plan. You will be asked to approve the new version once it is submitted.',
-        type: 'care_plan_revision',
-        data: { carePlanId: newPlan.id, previousCarePlanId: plan.id },
-      });
+      const revisionNotifyUserId = familyNotifyUserId(plan.episode);
+      if (revisionNotifyUserId) {
+        await NotificationService.create({
+          userId: revisionNotifyUserId,
+          title: 'Care Plan Being Revised',
+          body: 'Your care coordinator updated the care plan. You will be asked to approve the new version once it is submitted.',
+          type: 'care_plan_revision',
+          data: { carePlanId: newPlan.id, previousCarePlanId: plan.id },
+        });
+      }
 
       await AuditService.log({
         userId: req.user!.userId,
@@ -480,7 +511,11 @@ export class CarePlanController {
   static async submitForApproval(req: Request, res: Response): Promise<void> {
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
-      include: { episode: true },
+      include: {
+        episode: {
+          include: { careUnit: { select: { familyUserId: true } } },
+        },
+      },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertTenantOrgAccess(req, plan.episode.organizationId);
@@ -496,14 +531,17 @@ export class CarePlanController {
       data: { carePlanId: plan.id, action: 'submitted', actorId: req.user!.userId },
     });
 
-    // Notify family/patient
-    await NotificationService.create({
-      userId: plan.episode.patientId,
-      title: 'Care Plan Ready for Your Review',
-      body: 'Your care coordinator has submitted a care plan for your approval.',
-      type: 'care_plan_submitted',
-      data: { carePlanId: plan.id },
-    });
+    // Notify family/patient (patientId may be null when only careUnit.familyUserId is set)
+    const submitNotifyUserId = familyNotifyUserId(plan.episode);
+    if (submitNotifyUserId) {
+      await NotificationService.create({
+        userId: submitNotifyUserId,
+        title: 'Care Plan Ready for Your Review',
+        body: 'Your care coordinator has submitted a care plan for your approval.',
+        type: 'care_plan_submitted',
+        data: { carePlanId: plan.id },
+      });
+    }
 
     res.json({ message: 'Care plan submitted for approval.' });
   }
@@ -511,7 +549,17 @@ export class CarePlanController {
   static async approve(req: Request, res: Response): Promise<void> {
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
-      include: { episode: true, goals: true },
+      include: {
+        episode: {
+          select: {
+            id: true,
+            patientId: true,
+            organizationId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
+        goals: true,
+      },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertCarePlanAccess(req, plan.episode);
@@ -570,7 +618,17 @@ export class CarePlanController {
     const { notes } = z.object({ notes: z.string().optional() }).parse(req.body);
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
-      include: { episode: true },
+      include: {
+        episode: {
+          select: {
+            id: true,
+            patientId: true,
+            organizationId: true,
+            coordinatorId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
+      },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertCarePlanAccess(req, plan.episode);
@@ -612,7 +670,18 @@ export class CarePlanController {
 
   static async requestRevision(req: Request, res: Response): Promise<void> {
     const { notes } = z.object({ notes: z.string() }).parse(req.body);
-    const plan = await prisma.carePlan.findUnique({ where: { id: req.params.id }, include: { episode: true } });
+    const plan = await prisma.carePlan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        episode: {
+          select: {
+            patientId: true,
+            organizationId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
+      },
+    });
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertCarePlanAccess(req, plan.episode);
 
@@ -647,6 +716,19 @@ export class CarePlanController {
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertTenantOrgAccess(req, plan.episode.organizationId);
 
+    const blocked: CarePlanStatus[] = [
+      'submitted_for_approval',
+      'approved',
+      'active',
+      'completed',
+    ];
+    if (blocked.includes(plan.status)) {
+      throw new AppError(
+        `Cannot delete a care plan with status "${plan.status}". Only draft or rejected plans can be deleted.`,
+        422,
+      );
+    }
+
     await prisma.carePlan.delete({ where: { id: req.params.id } });
     res.json({ message: 'Care plan deleted.' });
   }
@@ -656,7 +738,13 @@ export class CarePlanController {
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
       include: {
-        episode: { select: { patientId: true, organizationId: true } },
+        episode: {
+          select: {
+            patientId: true,
+            organizationId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
         goals: { orderBy: { createdAt: 'asc' } },
       },
     });
@@ -678,7 +766,15 @@ export class CarePlanController {
 
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
-      include: { episode: { select: { patientId: true, organizationId: true } } },
+      include: {
+        episode: {
+          select: {
+            patientId: true,
+            organizationId: true,
+            careUnit: { select: { familyUserId: true } },
+          },
+        },
+      },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertCarePlanAccess(req, plan.episode);

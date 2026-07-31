@@ -216,18 +216,36 @@ export class RiayahAiClient {
   /**
    * POST /v1/careplan/{episode_id}/draft
    * AI may also POST the draft to our callback asynchronously.
+   *
+   * Staging quirk: the model sometimes echoes `familyConsultationNotes` into the
+   * CarePlanDraft output (which forbids extra keys) → 422. We keep that field as
+   * `null` on the wire and put real notes under `metadata` instead.
    */
   static async requestCarePlanDraft(
     episodeId: string,
     payload: CarePlanPayload = {},
   ): Promise<CarePlanResponse> {
+    const notes =
+      typeof payload.familyConsultationNotes === 'string'
+        ? payload.familyConsultationNotes.trim()
+        : '';
+    const safePayload: CarePlanPayload = {
+      ...payload,
+      // Always send null — non-null / omitted both trigger intermittent 422s upstream.
+      familyConsultationNotes: null,
+      metadata: {
+        ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}),
+        ...(notes ? { familyConsultationNotes: notes } : {}),
+      },
+    };
+
     try {
       const { data } = await this.getHttp().post<CarePlanResponse>(
         `/v1/careplan/${encodeURIComponent(episodeId)}/draft`,
         {
           profileName: 'careplan_draft',
           outputLanguage: 'en',
-          ...payload,
+          ...safePayload,
         },
       );
       return data;

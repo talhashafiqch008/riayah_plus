@@ -167,7 +167,7 @@ async function loadIntakeOrThrow(id: string) {
     include: {
       careUnit: true,
       careRecipient: true,
-      familyUser: { select: { id: true, name: true, email: true } },
+      familyUser: { select: { id: true, name: true, email: true, assignedCoordinatorId: true } },
       reviewer: { select: { id: true, name: true, email: true } },
       careEpisode: true,
       documents: true,
@@ -179,13 +179,28 @@ async function loadIntakeOrThrow(id: string) {
 
 function assertIntakeAccess(
   req: Request,
-  intake: { familyUserId: string; organizationId: string | null },
+  intake: {
+    familyUserId: string;
+    organizationId: string | null;
+    familyUser?: { assignedCoordinatorId: string | null } | null;
+  },
 ): void {
   const role = req.user!.role;
   if (isFamily(role) && intake.familyUserId === req.user!.userId) return;
 
   // Platform admins may access any intake.
   if (isAdmin(role)) return;
+
+  if (role === 'org_admin') {
+    const tw = tenantWhere(req);
+    if (!tw.organizationId || tw.organizationId === '__no_tenant__') {
+      throw new AppError('No organization assigned to this account.', 403);
+    }
+    if (!intake.organizationId || intake.organizationId !== tw.organizationId) {
+      throw new AppError('Forbidden.', 403);
+    }
+    return;
+  }
 
   if (role === 'care_coordinator') {
     const tw = tenantWhere(req);
@@ -194,6 +209,11 @@ function assertIntakeAccess(
     }
     // M-1 / M-13: reject null-org intakes for coordinators
     if (!intake.organizationId || intake.organizationId !== tw.organizationId) {
+      throw new AppError('Forbidden.', 403);
+    }
+    // Assigned-only: coordinator may only see families assigned to them
+    const assignedTo = intake.familyUser?.assignedCoordinatorId;
+    if (assignedTo !== req.user!.userId) {
       throw new AppError('Forbidden.', 403);
     }
     return;
@@ -249,6 +269,13 @@ export class IntakeController {
 
     const familyUserId = isFamily(role) ? req.user!.userId : unit.familyUserId;
     const organizationId = unit.organizationId ?? req.tenant?.organizationId ?? null;
+
+    if (!organizationId) {
+      throw new AppError(
+        'This care unit is not linked to a care organization, so the request cannot be routed. Contact your clinic or ask an administrator to assign an organization.',
+        422,
+      );
+    }
 
     // Immutable consent capture (Privacy + Treatment required)
     const consentRecords = [];
@@ -510,6 +537,30 @@ export class IntakeController {
   }
 
   /** Coordinator queue with status / urgency filters + tenant scope. */
+  /** Sidebar badge: open intakes in this coordinator's assigned queue. */
+  static async navBadges(req: Request, res: Response): Promise<void> {
+    if (!isCoordinator(req.user!.role)) {
+      throw new AppError('Care coordinator access required.', 403);
+    }
+
+    const tw = tenantWhere(req);
+    const where: Prisma.IntakeRecordWhereInput = {
+      status: { in: OPEN_STATUSES },
+    };
+    if (tw.organizationId) {
+      where.organizationId = tw.organizationId;
+    }
+    if (where.organizationId === '__no_tenant__') {
+      throw new AppError('No organization assigned to this account.', 403);
+    }
+    if (req.user!.role === 'care_coordinator') {
+      where.familyUser = { assignedCoordinatorId: req.user!.userId };
+    }
+
+    const pendingIntake = await prisma.intakeRecord.count({ where });
+    res.json({ data: { pendingIntake } });
+  }
+
   static async queue(req: Request, res: Response): Promise<void> {
     if (!isCoordinator(req.user!.role)) {
       throw new AppError('Care coordinator access required.', 403);
@@ -534,6 +585,11 @@ export class IntakeController {
       throw new AppError('No organization assigned to this account.', 403);
     }
 
+    // Assigned-only: care_coordinator sees only their assigned families' intakes
+    if (req.user!.role === 'care_coordinator') {
+      where.familyUser = { assignedCoordinatorId: req.user!.userId };
+    }
+
     if (status) {
       where.status = status as IntakeStatus;
     }
@@ -549,7 +605,7 @@ export class IntakeController {
           careRecipient: {
             select: { id: true, name: true, externalRef: true, diagnosisCodes: true },
           },
-          familyUser: { select: { id: true, name: true, email: true } },
+          familyUser: { select: { id: true, name: true, email: true, assignedCoordinatorId: true } },
         },
         orderBy: [{ urgencyLevel: 'desc' }, { submittedAt: 'asc' }],
         skip,
@@ -736,7 +792,10 @@ export class IntakeController {
 
         const episode = await tx.careEpisode.create({
           data: {
-            coordinatorId: review.coordinatorId ?? req.user!.userId,
+            coordinatorId:
+              review.coordinatorId ??
+              intake.familyUser?.assignedCoordinatorId ??
+              req.user!.userId,
             // Account party = CareRecipient.userId (family guardian in M2). Clinical patient = careRecipientId (C-1).
             patientId: party.patientId,
             careRecipientId: party.careRecipientId,

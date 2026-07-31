@@ -5,6 +5,12 @@ import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
 import { familyEpisodeStatusLabel } from '@/lib/familyLanguage';
+import {
+  RolePageHeader,
+  RolePageShell,
+  btnSecondaryClass,
+  fieldClass,
+} from '@/components/care/RolePageChrome';
 
 type Props = {
   basePath: string;
@@ -85,26 +91,22 @@ export default function EpisodeListPage({
   }, [load]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-stone-900">{title}</h2>
-          <p className="mt-1 text-stone-600">{description}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-        >
-          <RefreshCw className="size-4" /> Refresh
-        </button>
-      </div>
+    <RolePageShell>
+      <RolePageHeader
+        title={title}
+        description={description}
+        actions={
+          <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
+            <RefreshCw className="size-4" /> Refresh
+          </button>
+        }
+      />
 
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+          className={`${fieldClass} sm:max-w-xs`}
         >
           {statusFilters.map((o) => (
             <option key={o.value || 'all'} value={o.value}>
@@ -118,13 +120,13 @@ export default function EpisodeListPage({
         </span>
       </div>
 
-      <div className="rounded-2xl border bg-white shadow-sm overflow-hidden divide-y">
+      <div className="divide-y divide-stone-100 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="size-6 animate-spin text-teal-600" />
           </div>
         ) : rows.length === 0 ? (
-          <p className="p-8 text-center text-stone-500 text-sm">
+          <p className="p-8 text-center text-sm text-stone-500">
             {familyFacing
               ? 'No care journeys yet. After you submit a care request, your care team will start one.'
               : 'No episodes yet. Complete intake review to create one.'}
@@ -134,9 +136,9 @@ export default function EpisodeListPage({
             <Link
               key={ep.id}
               to={`${basePath}/${ep.id}`}
-              className="flex items-start gap-4 p-4 hover:bg-teal-50/40 transition-colors"
+              className="flex items-start gap-3 p-4 transition-colors hover:bg-teal-50/40 active:bg-teal-50/60 sm:gap-4"
             >
-              <div className="mt-0.5 rounded-xl bg-teal-50 p-2.5 text-teal-700">
+              <div className="mt-0.5 shrink-0 rounded-xl bg-teal-50 p-2.5 text-teal-700">
                 <Activity className="size-5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -156,13 +158,15 @@ export default function EpisodeListPage({
                   {ep.createdAt ? ` · ${new Date(ep.createdAt).toLocaleDateString()}` : ''}
                 </p>
                 {ep.reasonForCare && (
-                  <p className="mt-1 text-sm text-stone-600 line-clamp-1">{ep.reasonForCare}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-stone-600 sm:line-clamp-1">
+                    {ep.reasonForCare}
+                  </p>
                 )}
               </div>
             </Link>
           ))
         )}
       </div>
-    </div>
+    </RolePageShell>
   );
 }

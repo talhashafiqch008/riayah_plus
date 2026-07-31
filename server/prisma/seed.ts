@@ -140,10 +140,40 @@ async function main() {
     data: { organizationId: organization.id },
   });
 
+  const orgAdmin = await prisma.user.upsert({
+    where: { email: 'orgadmin@riayahplus.com' },
+    update: {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      role: 'org_admin',
+      organizationId: organization.id,
+      mustSetPassword: false,
+      passwordHash,
+    },
+    create: {
+      id: uuid(),
+      name: 'Org Admin Demo',
+      email: 'orgadmin@riayahplus.com',
+      passwordHash,
+      role: 'org_admin',
+      isActive: true,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      organizationId: organization.id,
+      mustSetPassword: false,
+    },
+  });
+  void orgAdmin;
+
   // ── Proposal role demo accounts (M1 UI shells) ───────────────────────────────
   const familyUser = await prisma.user.upsert({
     where: { email: 'family@demo.com' },
-    update: { isEmailVerified: true, emailVerifiedAt: new Date(), role: 'family' },
+    update: {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      role: 'family',
+      assignedCoordinatorId: coordinator.id,
+    },
     create: {
       id: uuid(),
       name: 'Demo Family',
@@ -153,6 +183,7 @@ async function main() {
       isActive: true,
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
+      assignedCoordinatorId: coordinator.id,
     },
   });
 
@@ -651,6 +682,7 @@ async function main() {
   console.log('\n📧 Test credentials (password: Password123!):');
   console.log('   Super Admin    : superadmin@riayahplus.com');
   console.log('   Admin          : admin@riayahplus.com');
+  console.log('   Org Admin      : orgadmin@riayahplus.com     → /org');
   console.log('   Coordinator    : coordinator@riayahplus.com  → /coordinator');
   console.log('   Coordinator B  : coordinator.b@riayahplus.com (Partner Care Org)');
   console.log('   Family         : family@demo.com             → /family');

@@ -60,6 +60,8 @@ router.post('/login', loginLimiter, AuthController.login);
 router.post('/auth/login', loginLimiter, AuthController.login);
 router.post('/forgot-password', otpLimiter, AuthController.forgotPassword);
 router.post('/reset-password', AuthController.resetPassword);
+router.post('/set-password', AuthController.setPasswordFromInvite);
+router.post('/auth/set-password', AuthController.setPasswordFromInvite);
 router.post('/email/resend-verification', otpLimiter, AuthController.resendVerificationPublic);
 router.post('/2fa/verify', loginLimiter, AuthController.verify2faLogin);
 router.post('/auth/2fa-verify', loginLimiter, AuthController.verify2faLogin);

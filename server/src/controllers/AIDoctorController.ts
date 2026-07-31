@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { z } from 'zod';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
@@ -17,12 +18,15 @@ IMPORTANT CONSTRAINTS:
 - Use clear, compassionate language appropriate for patients
 - Reference clinical guidelines where relevant (NICE, WHO, local Qatar MOH guidelines)`;
 
+const doctorChatSchema = z.object({
+  message: z.string().min(1).max(2000),
+});
+
 export class AIDoctorController {
   // POST /ai/doctor-chat
   async doctorChat(req: Request, res: Response, next: NextFunction) {
     try {
-      const { message, sessionId, context } = req.body;
-      if (!message) throw new AppError('message is required', 400);
+      const { message } = doctorChatSchema.parse(req.body);
 
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
@@ -33,7 +37,7 @@ export class AIDoctorController {
       const result = await chat.sendMessage(message);
       const reply = result.response.text();
 
-      res.json({ data: { reply, sessionId } });
+      res.json({ data: { reply } });
     } catch (err) {
       next(err);
     }

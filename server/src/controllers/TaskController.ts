@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { assertTenantOrgAccess } from '../middleware/tenantAccess';
 import { z } from 'zod';
 import { AuditService } from '../services/AuditService';
 
@@ -87,6 +88,16 @@ export class TaskController {
             assigner: { select: { id: true, name: true } },
             assignee: { select: { id: true, name: true, role: true } },
             goal: { select: { id: true, title: true, status: true } },
+            careEpisode: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                patient: { select: { id: true, name: true } },
+                careRecipient: { select: { id: true, name: true } },
+                coordinator: { select: { id: true, name: true } },
+              },
+            },
           },
           orderBy: { dueAt: 'asc' },
         }),
@@ -102,6 +113,25 @@ export class TaskController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = createTaskSchema.parse(req.body);
+
+      if (parsed.careEpisodeId) {
+        const episode = await prisma.careEpisode.findUnique({
+          where: { id: parsed.careEpisodeId },
+          select: { id: true, organizationId: true },
+        });
+        if (!episode) throw new AppError('Care episode not found.', 404);
+        assertTenantOrgAccess(req, episode.organizationId);
+      }
+
+      const assignee = await prisma.user.findFirst({
+        where: { id: parsed.assigneeId, deletedAt: null, isActive: true },
+        select: { id: true, organizationId: true },
+      });
+      if (!assignee) throw new AppError('Assignee not found.', 404);
+      if (assignee.organizationId) {
+        assertTenantOrgAccess(req, assignee.organizationId);
+      }
+
       const task = await prisma.task.create({
         data: {
           ...parsed,
@@ -134,12 +164,21 @@ export class TaskController {
         select: { id: true, organizationId: true },
       });
       if (!episode) throw new AppError('Care episode not found.', 404);
+      assertTenantOrgAccess(req, episode.organizationId);
 
       const assignee = await prisma.user.findFirst({
         where: { id: body.assigneeId, deletedAt: null, isActive: true },
-        select: { id: true, name: true, role: true },
+        select: { id: true, name: true, role: true, organizationId: true },
       });
       if (!assignee) throw new AppError('Assignee not found.', 404);
+      if (
+        episode.organizationId &&
+        assignee.organizationId &&
+        assignee.organizationId !== episode.organizationId
+      ) {
+        throw new AppError('Assignee does not belong to the episode organization.', 403);
+      }
+      assertTenantOrgAccess(req, assignee.organizationId);
 
       const result = await prisma.task.updateMany({
         where: {

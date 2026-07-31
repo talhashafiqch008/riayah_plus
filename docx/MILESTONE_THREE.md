@@ -1,9 +1,9 @@
 # Milestone 3 — Care Planning, Scheduling & Care Delivery (+ AI Integration)
 
-**Status:** 🔴 Ready to start — core backend partially built; production M3 shells are placeholders; demo/legacy UI exists for reuse (§3.1); AI service ready on staging (integration pending)  
+**Status:** 🟢 Complete — signed M3 + AI integration shipped and smoke-verified (2026-07-31). Deferred: Momen staging handshake (§9), formal AI-down retest (AI5), optional plan templates.  
 **Budget (signed):** $700  
 **Timeline:** Weeks 3–4  
-**Last updated:** 2026-07-23  
+**Last updated:** 2026-07-31  
 **Sources:** `Riayah_Plus_Proposal_v2.pdf` § Milestone 3 · §5.2 Excluded · Momen Walied staging handoff · this codebase audit
 
 ---
@@ -17,7 +17,7 @@ Use this as the **single working brief** before coding. It answers:
 3. What already exists vs what is still missing in **this** repo (backend §1–2, frontend §3 + §3.1)  
 4. Exact integration contract + recommended build order + pass/fail checks  
 
-**Frontend one-liner:** No production M3 pages yet — replace role-shell placeholders. Adapt demo/legacy UIs where §3.1 says **Adapt**; build fresh where it says **Build fresh**.  
+**Frontend one-liner:** Production M3 pages shipped under `/family`, `/coordinator`, `/clinical`, `/support` (see `M3_TASK_TRACKER.md` Wave 5).  
 
 **Task tracker (what to do first / next):** `docx/M3_TASK_TRACKER.md` — use that file to check work off; keep this file as the scope/spec.  
 **Website test flows:** `docx/MILESTONE_THREE_TEST.md` — manual QA as features ship.  
@@ -298,77 +298,83 @@ Also documented in `server/.env.example`. Point these at staging for integration
 | Submit for family approval + notification | ✅ Done |
 | Family approve → episode `active` | ✅ Done |
 | Family request revision + notify coordinator | ✅ Done |
-| Family reject endpoint | ❌ Missing |
+| Family reject endpoint | ✅ Done |
 | Approval log trail | ✅ Done |
 | Tenant/org scoping on plan routes | ✅ Done |
 | Shift start / end / break | ✅ Done |
 | Task CRUD + status update | ✅ Done |
 | Goal model (schema) | ✅ Done |
-| Goal → Task on approve | ❌ Missing |
+| Goal → Task on approve | ✅ Done |
 | ClinicalNote model (schema) | ✅ Done |
-| Clinical notes HTTP API | ❌ Missing |
+| Clinical notes HTTP API | ✅ Done |
 | ProviderAvailabilitySlot model | ✅ Done |
 | Slot booking / conflict / recurring engine | ✅ `POST /scheduling/sessions` (+ `/recurring`); 409 on overlap |
 | AiIntakeSummary model (schema) | ✅ Done |
-| `ai_intake_summaries` table in DB | ❌ Missing (migration pending) |
-| Call Riayah AI summarize / draft | 🟡 Client done (`RiayahAiClient`); intake hook + callback still missing |
+| `ai_intake_summaries` table in DB | ✅ Done |
+| Call Riayah AI summarize / draft | ✅ `RiayahAiClient` + intake hook + draft trigger |
 | Care-plan-draft callback (idempotent) | ✅ `POST /api/ai/callbacks/care-plan-draft` + upsert draft CarePlan |
 | Care plan state machine guard | ✅ Done |
-| Re-approval gate when editing `active` plan | ❌ Incomplete (versioning without approval gate) |
+| Re-approval gate when editing `active` plan | ✅ Done |
 | Clinical co-sign | ✅ `POST /care-plans/:id/cosign` |
-| Reusable plan templates | ❌ Missing (nice-to-have vs signed “templates” wording) |
+| Reusable plan templates | ⏭ Deferred (optional) |
+| Schedule staff picker API | ✅ `GET /scheduling/staff` |
 
 ---
 
 ## 2. What Is Missing on the Backend ❌
 
-Build these before (or in parallel with) frontend work.
+**As of 2026-07-31:** signed M3 backend gaps below are **closed**. Remaining optional / external:
 
 | Gap | Detail |
 |---|---|
-| **`AiIntakeSummary` migration** | Run `npx prisma migrate dev --name ai_intake_summary` — table confirmed absent |
-| **AI Intake Summary integration** | After successful episode create in `IntakeController.review` (~line 668+), call `POST /v1/intake/{episode_id}/summarize`, upsert `AiIntakeSummary` |
-| **AI callback endpoint** | `POST /ai/callbacks/care-plan-draft` — **idempotent** |
-| **AI Care Plan draft trigger** | Coordinator action (preferred) or post-create hook → `POST /v1/careplan/{episode_id}/draft` with `X-API-Key` |
-| **Goal → Task on approval** | `CarePlanController.approve` must create a `Task` per `Goal` |
-| **Family reject** | `POST /care-plans/:id/reject` using existing state machine |
-| **Clinical notes routes** | `GET/POST /clinical-notes` (and immutability rules) scoped to episode/session |
-| **Staff scheduling engine** | ✅ Availability CRUD + session book/conflict + recurring |
-| **Goal CRUD / progress** | ✅ Nested `GET/PATCH /care-plans/:id/goals…` — status → `achieved` + `achievedAt` |
-| **Clinical co-sign** | ✅ `POST /care-plans/:id/cosign` — clinical staff; `clinical_cosign` approval log; optional / idempotent |
-| **Re-approval on material change** | ✅ Editing an `active`/`approved` plan creates a new `draft` version (`previousVersionId`); old plan marked not current; in-place item mutations blocked |
-| **Reusable templates** | Goal/service templates for common episode types (proposal feature) |
+| **Reusable plan templates** | ⏭ Optional (`M3-3.5`) — not required to ship signed M3 |
+| **Momen staging handshake** | Confirm Postman shapes + public callback URL (§9) — integration already works with current staging |
+
+~~Historical gap list (kept for audit trail; all ✅ now):~~
+
+| Gap | Detail |
+|---|---|
+| **`AiIntakeSummary` migration** | ✅ |
+| **AI Intake Summary integration** | ✅ Non-blocking after episode create |
+| **AI callback endpoint** | ✅ Idempotent |
+| **AI Care Plan draft trigger** | ✅ Coordinator action |
+| **Goal → Task on approval** | ✅ |
+| **Family reject** | ✅ |
+| **Clinical notes routes** | ✅ Immutable |
+| **Staff scheduling engine** | ✅ + `GET /scheduling/staff` |
+| **Goal CRUD / progress** | ✅ |
+| **Clinical co-sign** | ✅ |
+| **Re-approval on material change** | ✅ |
 
 ---
 
-## 3. Frontend — Production M3 Not Built ❌ (demo/legacy reusable ✅)
+## 3. Frontend — Production M3 Shipped ✅ (2026-07-31)
 
-**Verdict:** Ship product UI by **replacing role-shell placeholders**. Do **not** treat demo or careseeker pages as done M3 work. Use §3.1 to decide **Adapt** vs **Build fresh**.
+**Verdict:** Role-shell placeholders for signed M3 routes are **replaced**. Demo/legacy pages remain reference only — product UX lives under proposal shells.
 
 | Layer | Status |
 |---|---|
-| Proposal role shells (`/family`, `/coordinator`, `/clinical`, `/support`) | Nav exists; M3 destinations are mostly `RoleShellPlaceholder` |
-| Production care-plan / clinical-notes / scheduling UI | ❌ Not built |
-| Demo coordinator (`/demo/coordinator/*`) | ✅ Present — mock only; patterns to adapt |
-| Legacy `/provider/tasks`, `/staff/*` | ✅ Present — partial/mock; not the proposal shell |
+| Proposal role shells (`/family`, `/coordinator`, `/clinical`, `/support`) | ✅ M3 destinations wired |
+| Production care-plan / clinical-notes / scheduling UI | ✅ Shipped + smoke-verified |
+| Demo coordinator (`/demo/coordinator/*`) | Present — mock only; not product |
+| Legacy `/provider/tasks`, `/staff/*` | Present — not the proposal shell |
 
-### Current surfaces (do not confuse with finished M3)
+### Current surfaces (product)
 
-| Existing surface | Reality |
+| Surface | Reality |
 |---|---|
-| `client/src/pages/careseeker/CarePlansPage.tsx` | Legacy careseeker page: calls `getCarePlans()` and also renders subscription tier pricing (Basic / Standard / Premium). **Not** the clinical builder or family approval flow. |
-| `client/src/lib/api/careseeker.ts` | `getCarePlans` is live; `createCarePlan`, `updateCarePlan`, `deleteCarePlan` are commented out. Prefer new role-scoped API helpers for M3. |
-| `/family/care-plans` | `RoleShellPlaceholder` — *"Family care-plan review and approval arrives in Milestone 3."* |
-| `/coordinator/plans` | `RoleShellPlaceholder` — title "Care Plans" only |
-| `/clinical/notes` | `RoleShellPlaceholder` — title "Session Notes" only |
-| `/support/shifts`, `/support/tasks`, `/support/notes` | All `RoleShellPlaceholder` |
-| `/patient/care-plan` | Placeholder (patient shell; family portal is the primary M3 approval surface) |
-| `/demo/coordinator/*` | Mock data, no API. Reusable patterns — **§3.1** |
-| Legacy `/staff/shifts`, `/staff/tasks`, `/provider/tasks` | Older layouts outside proposal shells; mine for UI, ship under `/support/*` |
+| `/coordinator/plans` (+ builder / detail) | ✅ Care plan list / build / submit / AI assist |
+| `/coordinator/schedule` | ✅ Staff + episode pickers; availability + book + assign tasks |
+| `/family/care-plans` (+ `/:id`) | ✅ Approve / request changes / reject |
+| `/clinical/notes`, `/clinical/episodes/:id/notes` | ✅ Episode picker + immutable notes |
+| `/clinical/plans` (+ `/:id`) | ✅ List + read-only + co-sign |
+| `/support/shifts`, `/support/tasks` | ✅ Shift clock + tasks with client/episode context |
+| `/support/notes`, `*/messages` | Intentional placeholders (later milestone) |
+| `/demo/coordinator/*` | Mock only |
 
 **Path rule for M3 product:** use proposal shell hrefs from `client/src/config/proposalRoleShells.ts` (`/family`, `/coordinator`, `/clinical`, `/support`). Do not add new primary UX under `/staff` or `/careseeker` unless bridging legacy users.
 
-### Pages to build (target routes)
+### Pages built (target routes) — historical build guide
 
 Align list/detail routes with existing nav placeholders so links light up when pages land.
 
@@ -639,27 +645,27 @@ Per signed proposal — do **not** pull into this milestone:
 
 | # | Check | Pass | Fail |
 |---|---|---|---|
-| CP1 | Coordinator can create care plan with goals and service items | | |
-| CP2 | Editing a plan creates a new version; old version marked not-current | | |
-| CP3 | Coordinator submits plan → family receives in-app notification | | |
-| CP4 | Family can approve care plan → episode status changes to `active` | | |
-| CP5 | Family can request revision with comments → coordinator notified | | |
-| CP6 | Family can reject a submitted plan | | |
-| CP7 | Approved plan goals are converted to trackable tasks | | |
-| CP8 | Material edit to active plan requires re-approval | 🧪 API |
-| SCH1 | Staff availability slots are manageable / viewable by coordinator | 🧪 API | |
-| SCH2 | Coordinator can book/assign with conflict detection | 🧪 API | |
-| DEL1 | Support worker can start shift and see tasks | 🧪 API | |
-| DEL2 | Support worker can complete tasks with evidence | 🧪 API | |
-| NOTE1 | Clinical staff can add session notes (immutable after save) | | |
-| NOTE2 | Notes visible on episode detail for coordinator | | |
-| GOAL1 | Goals display with status; can be marked achieved | 🧪 API | |
-| AI1 | After coordinator review + episode create, row exists in `ai_intake_summaries` | | |
-| AI2 | Coordinator can see AI summary on intake / episode detail | | |
-| AI3 | AI care plan draft triggered; callback handled **idempotently** | | |
-| AI4 | Coordinator must approve/edit AI content before family submission | | |
-| AI5 | Intake review still succeeds when AI service is down | | |
-| REG | M2 flows still work: intake → coordinator review → episode → assessment | | |
+| CP1 | Coordinator can create care plan with goals and service items | 🧪 2026-07-31 | |
+| CP2 | Editing a plan creates a new version; old version marked not-current | 🧪 | |
+| CP3 | Coordinator submits plan → family receives in-app notification | 🧪 | |
+| CP4 | Family can approve care plan → episode status changes to `active` | 🧪 | |
+| CP5 | Family can request revision with comments → coordinator notified | 🧪 | |
+| CP6 | Family can reject a submitted plan | 🧪 | |
+| CP7 | Approved plan goals are converted to trackable tasks | 🧪 | |
+| CP8 | Material edit to active plan requires re-approval | 🧪 | |
+| SCH1 | Staff availability slots are manageable / viewable by coordinator | 🧪 UI | |
+| SCH2 | Coordinator can book/assign with conflict detection | 🧪 | |
+| DEL1 | Support worker can start shift and see tasks | 🧪 UI | |
+| DEL2 | Support worker can complete tasks with evidence | 🧪 UI | |
+| NOTE1 | Clinical staff can add session notes (immutable after save) | 🧪 UI | |
+| NOTE2 | Notes visible on episode detail for coordinator | 🧪 | |
+| GOAL1 | Goals display with status; can be marked achieved | 🧪 | |
+| AI1 | After coordinator review + episode create, row exists in `ai_intake_summaries` | 🧪 | |
+| AI2 | Coordinator can see AI summary on intake / episode detail | 🧪 | |
+| AI3 | AI care plan draft triggered; callback handled **idempotently** | 🧪 | |
+| AI4 | Coordinator must approve/edit AI content before family submission | 🧪 | |
+| AI5 | Intake review still succeeds when AI service is down | 🟡 Coded; formal retest deferred | |
+| REG | M2 flows still work: intake → coordinator review → episode → assessment | 🧪 2026-07-31 | |
 
 ---
 
@@ -671,6 +677,8 @@ Per signed proposal — do **not** pull into this milestone:
 4. Whether draft callback creates a full `CarePlan` or returns structured goals/services for us to map.  
 5. Commercial confirmation that AI integration is accepted inside M3 delivery (signed §5.2 excluded it; client+Momen directed it in).  
 
+**Note (2026-07-31):** Integration against current staging shapes is working in-repo. §9 items remain for formal Momen/ops confirmation — they do not block signed M3 feature completion.
+
 ---
 
-*End of M3 working brief — update this file when migrations land or when Momen’s contract differs from the staging note above.*
+*End of M3 working brief — updated 2026-07-31 when Wave 5/6 smoke completed.*

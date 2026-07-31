@@ -105,7 +105,8 @@ describe('RiayahAiClient', () => {
     expect(mockPost).toHaveBeenCalledWith('/v1/careplan/ep-2/draft', {
       profileName: 'careplan_draft',
       outputLanguage: 'en',
-      familyConsultationNotes: 'Family prefers mornings',
+      familyConsultationNotes: null,
+      metadata: { familyConsultationNotes: 'Family prefers mornings' },
     });
     expect(result.draft?.goals[0].title).toBe('Walk daily');
   });

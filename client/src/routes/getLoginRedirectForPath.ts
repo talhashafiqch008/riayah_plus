@@ -19,7 +19,7 @@ export function getLoginRedirectForPath(pathname: string): string {
     return '/login?portal=family';
   }
 
-  const proposalPrefixes = ['/family', '/patient', '/coordinator', '/clinical', '/support'];
+  const proposalPrefixes = ['/family', '/patient', '/coordinator', '/clinical', '/support', '/org'];
   const match = proposalPrefixes.find((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   if (match) {
     return `/login?portal=${match.slice(1)}`;
@@ -39,6 +39,7 @@ export function isProtectedPath(pathname: string): boolean {
     '/coordinator',
     '/clinical',
     '/support',
+    '/org',
     '/staff',
     '/trainer',
     '/dashboard',

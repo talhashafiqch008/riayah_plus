@@ -16,7 +16,7 @@ function isProposalPortal(value: string | null): value is ProposalPortalKey {
 /**
  * Generic /login entry point.
  *
- * - ?portal=family|patient|coordinator|clinical|support → branded proposal portal login
+ * - ?portal=family|patient|coordinator|clinical|support|org → branded proposal portal login
  * - ?role=admin → admin login
  * - default / legacy careseeker|provider roles → family portal login
  */

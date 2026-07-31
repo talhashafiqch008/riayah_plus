@@ -17,6 +17,7 @@ import adminDocController from '../controllers/admin/AdminDocumentController';
 import adminPayoutController from '../controllers/admin/AdminPayoutController';
 import adminProviderController from '../controllers/admin/AdminProviderController';
 import { OrganizationController } from '../controllers/admin/OrganizationController';
+import { AdminFamilyController } from '../controllers/admin/AdminFamilyController';
 
 const router = Router();
 router.use(authenticate, requireAdmin, adminLimiter);
@@ -451,9 +452,23 @@ router.post('/incidents/:id/suspend-provider', requireEdit('user'), adminProvide
 // ── Service management ─────────────────────────────────────────────────────────
 router.put('/services/:id/deactivate', requireEdit('organization'), adminProviderController.deactivateService.bind(adminProviderController));
 
+// ── Family org assignment queue ───────────────────────────────────────────────
+router.get('/families', requireView('user'), AdminFamilyController.list);
+router.get('/nav-badges', requireView('user'), AdminFamilyController.navBadges);
+router.patch(
+  '/families/:id/organization',
+  requireEdit('user'),
+  AdminFamilyController.assignOrganization,
+);
+
 // ── Organization hierarchy (granular permission gates — extend in M2+) ─────────
 router.get('/organizations', requireView('organization'), OrganizationController.listOrganizations);
 router.post('/organizations', requireCreate('organization'), OrganizationController.createOrganization);
+router.post(
+  '/organizations/:id/resend-invite',
+  requireEdit('organization'),
+  OrganizationController.resendOrgAdminInvite,
+);
 router.get(
   '/organizations/:orgId/clinics',
   requireView('clinic'),

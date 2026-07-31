@@ -34,6 +34,8 @@ const PublicProviderPage  = lazy(() => import('@/pages/public/PublicProviderPage
 const RegisterPage        = lazy(() => import('@/pages/public/RegisterPage'));
 const ForgotPasswordPage  = lazy(() => import('@/pages/public/ForgotPasswordPage'));
 const ResetPasswordPage   = lazy(() => import('@/pages/public/ResetPasswordPage'));
+const SetPasswordPage     = lazy(() => import('@/pages/public/SetPasswordPage'));
+const AdminFamiliesPage   = lazy(() => import('@/pages/admin/FamiliesPage'));
 const VerifyEmailPendingPage = lazy(() => import('@/pages/public/VerifyEmailPendingPage'));
 const PrivacyPage         = lazy(() => import('@/pages/public/PrivacyPage'));
 const TermsPage           = lazy(() => import('@/pages/public/TermsPage'));
@@ -135,6 +137,7 @@ export function AppRoutes() {
         <Route path="/register"        element={<S><RegisterPage /></S>} />
         <Route path="/forgot-password" element={<S><ForgotPasswordPage /></S>} />
         <Route path="/reset-password"  element={<S><ResetPasswordPage /></S>} />
+        <Route path="/set-password"    element={<S><SetPasswordPage /></S>} />
         <Route path="/verify-email"    element={<S><VerifyEmailPendingPage /></S>} />
         <Route path="/privacy"         element={<S><PrivacyPage /></S>} />
         <Route path="/terms"           element={<S><TermsPage /></S>} />
@@ -166,6 +169,7 @@ export function AppRoutes() {
             <Route path="/admin/providers"          element={<S><AdminProvidersPage /></S>} />
             <Route path="/admin/providers/pending"  element={<S><AdminProvidersPendingPage /></S>} />
             <Route path="/admin/providers/:id"      element={<S><AdminProviderDetailPage /></S>} />
+            <Route path="/admin/families"           element={<S><AdminFamiliesPage /></S>} />
             <Route path="/admin/services"           element={<S><AdminServicesPage /></S>} />
             <Route path="/admin/sessions"           element={<S><AdminSessionsPage /></S>} />
             <Route path="/admin/settings"           element={<S><AdminSettingsPage /></S>} />

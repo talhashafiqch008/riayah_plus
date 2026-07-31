@@ -13,6 +13,8 @@ import {
   BookOpen,
   ClipboardPlus,
   Activity,
+  UserPlus,
+  Briefcase,
 } from 'lucide-react';
 
 export interface RoleShellNavItem {
@@ -134,12 +136,25 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
     portalTitle: 'Clinical Staff',
     roleBadge: 'Clinical Staff',
     basePath: '/clinical',
-    allowedRoles: ['clinical_staff', 'admin', 'super_admin'],
+    allowedRoles: [
+      'clinical_staff',
+      'doctor',
+      'nurse',
+      'physiotherapist',
+      'occupational_therapist',
+      'speech_therapist',
+      'psychologist',
+      'dietitian',
+      'therapist',
+      'admin',
+      'super_admin',
+    ],
     navigation: [
       { name: 'Dashboard', href: '/clinical', icon: LayoutDashboard },
       { name: 'Schedule', href: '/clinical/schedule', icon: Calendar },
       { name: 'Patients', href: '/clinical/patients', icon: Users },
       { name: 'Session Notes', href: '/clinical/notes', icon: Stethoscope },
+      { name: 'Care Plans', href: '/clinical/plans', icon: BookOpen },
       { name: 'Messages', href: '/clinical/messages', icon: MessageCircle },
     ],
     dashboard: {
@@ -184,6 +199,35 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
         'Check in to your next shift',
         'Complete assigned tasks',
         'Submit shift notes after visits',
+      ],
+    },
+  },
+  org: {
+    key: 'org',
+    portalTitle: 'Organization',
+    roleBadge: 'Org Admin',
+    basePath: '/org',
+    allowedRoles: ['org_admin', 'admin', 'super_admin'],
+    navigation: [
+      { name: 'Dashboard', href: '/org', icon: LayoutDashboard },
+      { name: 'Pending requests', href: '/org/pending', icon: Inbox },
+      { name: 'Families', href: '/org/families', icon: Users },
+      { name: 'Coordinators', href: '/org/coordinators', icon: UserPlus },
+      { name: 'Staff', href: '/org/staff', icon: Briefcase },
+    ],
+    dashboard: {
+      title: 'Organization Dashboard',
+      description:
+        'Manage families linked to your organization, invite coordinators and clinical staff, and route care requests.',
+      stats: [
+        { label: 'Families', value: '—' },
+        { label: 'Coordinators', value: '—' },
+        { label: 'Pending requests', value: '—' },
+      ],
+      nextSteps: [
+        'Assign coordinators to new families',
+        'Invite clinical and support staff',
+        'Route pending care requests',
       ],
     },
   },

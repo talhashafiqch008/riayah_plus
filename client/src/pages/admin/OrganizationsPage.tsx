@@ -60,6 +60,7 @@ type ModalMode =
 
 const emptyOrgForm = {
   name: '',
+  adminName: '',
   email: '',
   phone: '',
   address: '',
@@ -131,6 +132,7 @@ export default function AdminOrganizationsPage() {
   const openOrgEdit = (org: Organization) => {
     setForm({
       name: org.name,
+      adminName: '',
       email: org.email ?? '',
       phone: org.phone ?? '',
       address: org.address ?? '',
@@ -176,15 +178,21 @@ export default function AdminOrganizationsPage() {
     setSaving(true);
     try {
       if (modal.type === 'org-create') {
+        if (!form.email.trim()) {
+          toast.error('Admin email is required to invite the organization admin');
+          setSaving(false);
+          return;
+        }
         await adminApi.post('/admin/organizations', {
           name: form.name.trim(),
-          email: form.email || undefined,
+          adminName: form.adminName.trim() || undefined,
+          email: form.email.trim(),
           phone: form.phone || undefined,
           address: form.address || undefined,
           website: form.website || undefined,
           logoUrl: form.logoUrl || undefined,
         });
-        toast.success('Organization created');
+        toast.success('Organization created. Invite email sent to the org admin.');
       } else if (modal.type === 'org-edit') {
         await adminApi.patch(`/admin/organizations/${modal.org.id}`, {
           name: form.name.trim(),
@@ -569,9 +577,23 @@ export default function AdminOrganizationsPage() {
               </div>
               {showOrgOnlyFields && (
                 <>
+                  {modal.type === 'org-create' && (
+                    <div>
+                      <label htmlFor="org-admin-name" className="block text-sm font-medium text-stone-700 mb-1">
+                        Org admin name
+                      </label>
+                      <input
+                        id="org-admin-name"
+                        value={form.adminName}
+                        onChange={(e) => setForm((prev) => ({ ...prev, adminName: e.target.value }))}
+                        placeholder="Defaults to Organization Admin"
+                        className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="org-email" className="block text-sm font-medium text-stone-700 mb-1">
-                      Email
+                      {modal.type === 'org-create' ? 'Org admin email (invite)' : 'Email'}
                     </label>
                     <input
                       id="org-email"
@@ -579,6 +601,7 @@ export default function AdminOrganizationsPage() {
                       value={form.email}
                       onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                       className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                      required={modal.type === 'org-create'}
                     />
                   </div>
                   <div>

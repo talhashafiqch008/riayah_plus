@@ -265,13 +265,15 @@ export class CareEpisodeController {
       },
     });
 
-    const notifyUserId = episode.careUnit?.familyUserId ?? episode.patientId;
-    await NotificationService.create({
-      userId: notifyUserId,
-      title: 'Your intake has been reviewed',
-      body: 'Your care coordinator has reviewed your intake and your episode is now active.',
-      type: 'episode_validated',
-    });
+    const notifyUserId = episode.careUnit?.familyUserId ?? episode.patientId ?? null;
+    if (notifyUserId) {
+      await NotificationService.create({
+        userId: notifyUserId,
+        title: 'Your intake has been reviewed',
+        body: 'Your care coordinator has reviewed your intake and your episode is now active.',
+        type: 'episode_validated',
+      });
+    }
 
     res.json({ data: updated });
   }

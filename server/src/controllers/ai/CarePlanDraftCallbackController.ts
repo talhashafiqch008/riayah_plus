@@ -77,7 +77,13 @@ export class CarePlanDraftCallbackController {
         ? 'AI care plan draft generated. Review and edit before submitting to family.'
         : 'AI care plan draft updated. Review and edit before submitting to family.',
       data: {
-        ...result,
+        carePlanId: result.carePlanId,
+        episodeId: result.episodeId,
+        created: result.created,
+        idempotentReplay: result.idempotentReplay,
+        status: result.status,
+        version: result.version,
+        ai: { status: result.ai.status },
         carePlan: plan,
       },
     });

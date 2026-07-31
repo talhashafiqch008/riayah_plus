@@ -68,6 +68,16 @@ export class AISessionController {
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
       const { title } = z.object({ title: z.string().min(1) }).parse(req.body);
+      const userId = req.user!.userId;
+
+      const existing = await prisma.conversation.findUnique({
+        where: { id: req.params.id },
+        include: { participantLinks: true },
+      });
+      if (!existing) throw new AppError('AI session not found.', 404);
+      const isParticipant = existing.participantLinks.some((p) => p.userId === userId);
+      if (!isParticipant) throw new AppError('Forbidden.', 403);
+
       const session = await prisma.conversation.update({
         where: { id: req.params.id },
         data: { title },

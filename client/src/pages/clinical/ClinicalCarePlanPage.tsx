@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, PenLine } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { isApiError } from '@/lib/errors';
+import { extractApiError } from '@/lib/errors';
 import {
   carePlanStatusBadgeClass,
   carePlanStatusLabel,
@@ -10,6 +10,11 @@ import {
   getCarePlan,
   type CarePlan,
 } from '@/lib/api/carePlans';
+import {
+  RolePageShell,
+  btnPrimaryClass,
+  fieldClass,
+} from '@/components/care/RolePageChrome';
 
 export default function ClinicalCarePlanPage() {
   const { id = '' } = useParams();
@@ -23,7 +28,7 @@ export default function ClinicalCarePlanPage() {
     try {
       setPlan(await getCarePlan(id));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load plan');
+      toast.error(extractApiError(error).message || 'Failed to load plan');
     } finally {
       setLoading(false);
     }
@@ -40,7 +45,7 @@ export default function ClinicalCarePlanPage() {
       setPlan(result.data);
       toast.success(result.message);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Co-sign failed');
+      toast.error(extractApiError(error).message || 'Co-sign failed');
     } finally {
       setBusy(false);
     }
@@ -49,7 +54,7 @@ export default function ClinicalCarePlanPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <div className="animate-spin rounded-full size-10 border-b-2 border-teal-600" />
+        <div className="size-10 animate-spin rounded-full border-b-2 border-teal-600" />
       </div>
     );
   }
@@ -60,64 +65,78 @@ export default function ClinicalCarePlanPage() {
     plan.approvalLogs?.some((l) => l.action === 'clinical_cosign') ?? false;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <RolePageShell>
       <Link
-        to="/clinical/notes"
-        className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
+        to="/clinical/plans"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:underline"
       >
-        <ArrowLeft className="size-4" /> Back
+        <ArrowLeft className="size-4" /> Care plans
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold text-stone-900">{plan.title}</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="break-words text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+            {plan.title}
+          </h2>
           <p className="mt-1 text-sm text-stone-500">Read-only clinical review · v{plan.version}</p>
         </div>
         <span
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${carePlanStatusBadgeClass(plan.status)}`}
+          className={`w-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${carePlanStatusBadgeClass(plan.status)}`}
         >
           {carePlanStatusLabel(plan.status)}
         </span>
       </div>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-2">
+      <section className="space-y-2 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-semibold text-stone-900">Goals</h3>
-        {(plan.goals ?? []).map((g) => (
-          <p key={g.id} className="text-sm text-stone-700">
-            • {g.title}
-            {g.status === 'achieved' ? ' (achieved)' : ''}
-          </p>
-        ))}
+        {(plan.goals ?? []).length === 0 ? (
+          <p className="text-sm text-stone-500">No goals.</p>
+        ) : (
+          (plan.goals ?? []).map((g) => (
+            <p key={g.id} className="break-words text-sm text-stone-700">
+              • {g.title}
+              {g.status === 'achieved' ? ' (achieved)' : ''}
+            </p>
+          ))
+        )}
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-2">
+      <section className="space-y-2 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-semibold text-stone-900">Services</h3>
-        {(plan.items ?? []).map((i) => (
-          <p key={i.id} className="text-sm text-stone-700">
-            • {i.serviceType}
-            {i.frequency ? ` · ${i.frequency}` : ''}
-          </p>
-        ))}
+        {(plan.items ?? []).length === 0 ? (
+          <p className="text-sm text-stone-500">No services.</p>
+        ) : (
+          (plan.items ?? []).map((i) => (
+            <p key={i.id} className="break-words text-sm text-stone-700">
+              • {i.serviceType}
+              {i.frequency ? ` · ${i.frequency}` : ''}
+            </p>
+          ))
+        )}
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-900 mb-3">Approval log</h3>
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+        <h3 className="mb-3 font-semibold text-stone-900">Approval log</h3>
         <ul className="space-y-2 text-sm">
-          {(plan.approvalLogs ?? []).map((log) => (
-            <li key={log.id} className="text-stone-700">
-              <span className="font-medium">{log.action}</span>
-              <span className="text-stone-500">
-                {' '}
-                · {new Date(log.createdAt).toLocaleString()}
-              </span>
-              {log.notes && <p className="text-stone-600">{log.notes}</p>}
-            </li>
-          ))}
+          {(plan.approvalLogs ?? []).length === 0 ? (
+            <li className="text-stone-500">No approval events yet.</li>
+          ) : (
+            (plan.approvalLogs ?? []).map((log) => (
+              <li key={log.id} className="text-stone-700">
+                <span className="font-medium break-words">{log.action}</span>
+                <span className="text-stone-500">
+                  {' '}
+                  · {new Date(log.createdAt).toLocaleString()}
+                </span>
+                {log.notes && <p className="break-words text-stone-600">{log.notes}</p>}
+              </li>
+            ))
+          )}
         </ul>
       </section>
 
-      <section className="rounded-xl border border-teal-100 bg-teal-50/40 p-5 space-y-3">
-        <h3 className="font-semibold text-stone-900 inline-flex items-center gap-2">
+      <section className="space-y-3 rounded-2xl border border-teal-100 bg-teal-50/40 p-4 sm:p-5">
+        <h3 className="inline-flex items-center gap-2 font-semibold text-stone-900">
           <PenLine className="size-4 text-teal-700" /> Clinical co-sign
         </h3>
         <p className="text-sm text-stone-600">
@@ -129,17 +148,12 @@ export default function ClinicalCarePlanPage() {
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           placeholder="Optional co-sign notes"
-          className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+          className={fieldClass}
         />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onCosign()}
-          className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
+        <button type="button" disabled={busy} onClick={() => void onCosign()} className={btnPrimaryClass}>
           {already ? 'Co-sign again (idempotent)' : 'Co-sign plan'}
         </button>
       </section>
-    </div>
+    </RolePageShell>
   );
 }

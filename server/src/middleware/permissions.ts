@@ -58,6 +58,15 @@ const ROLE_PERMISSIONS: Partial<Record<UserRole, RoleMatrix>> = {
     booking: { view: true, edit: true },
     profile: { view: true },
   },
+  org_admin: {
+    organization: { view: true },
+    clinic: { view: true },
+    department: { view: true },
+    patient: { view: true, edit: true },
+    user: { view: true, create: true, edit: true },
+    care_episode: { view: true },
+    profile: { view: true, edit: true },
+  },
   clinical_staff: {
     patient: { view: true },
     care_episode: { view: true },

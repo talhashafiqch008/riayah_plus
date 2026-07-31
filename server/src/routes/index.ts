@@ -15,6 +15,7 @@ import documentRoutes from './document.routes';
 import shiftRoutes from './shift.routes';
 import walletRoutes from './wallet.routes';
 import adminRoutes from './admin.routes';
+import orgRoutes from './org.routes';
 import whatsappRoutes from './whatsapp.routes';
 import publicRoutes from './public.routes';
 import disputeRoutes from './dispute.routes';
@@ -43,6 +44,7 @@ import storageRoutes from './storage.routes';
 import uploadRoutes from './upload.routes';
 import careSummaryRoutes from './care-summary.routes';
 import tasksRoutes from './tasks.routes';
+import shellNavBadgesRoutes from './shellNavBadges.routes';
 import receiptsRoutes from './receipts.routes';
 import { auditMiddleware } from '../middleware/auditMiddleware';
 import { authenticate } from '../middleware/auth';
@@ -83,6 +85,7 @@ router.use('/care-plans', carePlanRoutes);
 router.use('/care-units', careUnitRoutes);
 router.use('/intake', intakeRoutes);
 router.use('/assessments', assessmentRoutes);
+router.use('/shells', shellNavBadgesRoutes);
 router.get('/coordinator/intake-queue', authenticate, requireCareCoordinator, IntakeController.queue);
 
 // Telehealth & GPS (M4–M5)
@@ -164,6 +167,7 @@ router.use('/', meetingsRoutes); // livekit webhook at /livekit/webhook
 
 // Admin (prefixed)
 router.use('/admin', adminRoutes);
+router.use('/org', orgRoutes);
 
 // WhatsApp — webhook + user-facing + admin routes
 router.use('/webhook/whatsapp', whatsappRoutes);

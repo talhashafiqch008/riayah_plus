@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { RoleShellConfig } from '@/config/proposalRoleShells';
 import { getShellNavLabel } from '@/config/proposalRoleShells';
+import { badgeLabel, fetchNavBadgesForShell, type NavBadgeMap } from '@/lib/api/navBadges';
 
 interface HealthRoleLayoutProps {
   config: RoleShellConfig;
@@ -14,6 +15,22 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [badges, setBadges] = useState<NavBadgeMap>({});
+
+  const refreshBadges = useCallback(() => {
+    void fetchNavBadgesForShell(config.key).then(setBadges);
+  }, [config.key]);
+
+  useEffect(() => {
+    refreshBadges();
+    const id = window.setInterval(refreshBadges, 60_000);
+    const onFocus = () => refreshBadges();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshBadges, pathname]);
 
   useEffect(() => {
     const role = user?.role?.toLowerCase();
@@ -74,6 +91,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
         <nav className="flex-1 overflow-y-auto p-3 space-y-0.5 min-h-0">
           {config.navigation.map((item) => {
             const active = isActive(item.href);
+            const count = badges[item.href] ?? 0;
             return (
               <Link
                 key={item.href}
@@ -84,7 +102,17 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
                 }`}
               >
                 <item.icon className="size-4 shrink-0" />
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {count > 0 ? (
+                  <span
+                    className={`min-w-5 px-1.5 py-0.5 text-center text-[10px] font-bold rounded-full ${
+                      active ? 'bg-white text-red-600' : 'bg-red-600 text-white'
+                    }`}
+                    title={`${count} need attention`}
+                  >
+                    {badgeLabel(count)}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

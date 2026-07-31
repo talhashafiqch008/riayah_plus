@@ -1,144 +1,106 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Stethoscope } from 'lucide-react';
+import { Loader2, RefreshCw, Stethoscope, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { isApiError } from '@/lib/errors';
+import { extractApiError } from '@/lib/errors';
+import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
 import {
-  createClinicalNote,
-  listClinicalNotes,
-  type ClinicalNote,
-} from '@/lib/api/clinicalNotes';
+  RolePageHeader,
+  RolePageShell,
+  btnSecondaryClass,
+} from '@/components/care/RolePageChrome';
+
+function statusClass(status: string) {
+  switch (status) {
+    case 'active':
+      return 'bg-emerald-50 text-emerald-800';
+    case 'validated':
+      return 'bg-teal-50 text-teal-800';
+    case 'on_hold':
+      return 'bg-amber-50 text-amber-800';
+    case 'closed':
+      return 'bg-stone-100 text-stone-600';
+    default:
+      return 'bg-stone-100 text-stone-700';
+  }
+}
 
 export default function ClinicalNotesPage() {
-  const [episodeId, setEpisodeId] = useState('');
-  const [content, setContent] = useState('');
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [notes, setNotes] = useState<ClinicalNote[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [episodes, setEpisodes] = useState<CareEpisode[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  async function loadNotes() {
-    if (!episodeId.trim()) {
-      toast.error('Enter an episode id');
-      return;
-    }
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const rows = await listClinicalNotes({ episodeId: episodeId.trim() });
-      setNotes(rows);
+      const result = await listEpisodes({ limit: 50 });
+      setEpisodes(result.data);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load notes');
-    }
-  }
-
-  async function onCreate() {
-    if (!episodeId.trim() || !content.trim()) {
-      toast.error('Episode and note content are required');
-      return;
-    }
-    setBusy(true);
-    try {
-      await createClinicalNote({
-        episodeId: episodeId.trim(),
-        content: content.trim(),
-        noteType: 'session_note',
-        isPrivate,
-      });
-      toast.success('Note saved (immutable)');
-      setContent('');
-      await loadNotes();
-    } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Create failed');
+      toast.error(extractApiError(error).message || 'Failed to load episodes');
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h2 className="text-2xl font-semibold text-stone-900">Session Notes</h2>
-        <p className="mt-1 text-stone-600">
-          Clinical documentation is immutable after save — no edit or delete.
-        </p>
-      </div>
+    <RolePageShell>
+      <RolePageHeader
+        title="Session Notes"
+        description="Choose a care episode to view or add clinical notes. Notes are immutable after save."
+        actions={
+          <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
+            <RefreshCw className="size-4" /> Refresh
+          </button>
+        }
+      />
 
-      <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium text-stone-700">Episode ID</span>
-          <div className="flex gap-2">
-            <input
-              value={episodeId}
-              onChange={(e) => setEpisodeId(e.target.value)}
-              className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => void loadNotes()}
-              className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold whitespace-nowrap"
-            >
-              Load
-            </button>
-          </div>
-          {episodeId.trim() && (
-            <Link
-              to={`/clinical/episodes/${episodeId.trim()}/notes`}
-              className="text-xs text-teal-700 hover:underline"
-            >
-              Open dedicated episode notes page
-            </Link>
-          )}
-        </label>
-        <label className="block space-y-1">
-          <span className="text-sm font-medium text-stone-700">Note</span>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={4}
-            className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
-            placeholder="Session findings, interventions, plan…"
-          />
-        </label>
-        <label className="inline-flex items-center gap-2 text-sm text-stone-700">
-          <input
-            type="checkbox"
-            checked={isPrivate}
-            onChange={(e) => setIsPrivate(e.target.checked)}
-          />
-          Private (hidden from coordinator)
-        </label>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onCreate()}
-          className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Save note
-        </button>
-      </div>
-
-      <section className="space-y-3">
-        <h3 className="font-semibold text-stone-900 flex items-center gap-2">
-          <Stethoscope className="size-5 text-teal-700" /> Notes
-        </h3>
-        {notes.length === 0 ? (
-          <p className="text-sm text-stone-500">No notes loaded.</p>
-        ) : (
-          notes.map((n) => (
-            <article
-              key={n.id}
-              className="rounded-xl border border-stone-100 bg-white p-4 shadow-sm"
-            >
-              <div className="flex justify-between gap-2 text-xs text-stone-500">
-                <span>
-                  {n.author?.name ?? 'Author'}
-                  {n.isPrivate ? ' · private' : ''}
-                </span>
-                <span>{new Date(n.createdAt).toLocaleString()}</span>
-              </div>
-              <p className="mt-2 text-sm text-stone-800 whitespace-pre-wrap">{n.content}</p>
-            </article>
-          ))
-        )}
-      </section>
-    </div>
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-teal-600" />
+        </div>
+      ) : episodes.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-5 py-10 text-center sm:p-10">
+          <Stethoscope className="mx-auto size-10 text-stone-300" />
+          <p className="mt-3 text-stone-600">No episodes available yet.</p>
+          <p className="mt-1 text-sm text-stone-500">
+            Episodes appear after a coordinator starts a care journey for a patient in your
+            organization.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-stone-100 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+          {episodes.map((ep) => (
+            <li key={ep.id}>
+              <Link
+                to={`/clinical/episodes/${ep.id}/notes`}
+                className="flex items-center gap-3 p-4 transition-colors hover:bg-teal-50/40 active:bg-teal-50/60"
+              >
+                <div className="shrink-0 rounded-xl bg-teal-50 p-2.5 text-teal-700">
+                  <Stethoscope className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate font-semibold text-stone-900">{ep.title}</p>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(ep.status)}`}
+                    >
+                      {ep.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-stone-500">
+                    {ep.patient?.name || ep.careRecipient?.name || 'Patient'}
+                    {ep.coordinator?.name ? ` · Coord: ${ep.coordinator.name}` : ''}
+                  </p>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-stone-400" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </RolePageShell>
   );
 }

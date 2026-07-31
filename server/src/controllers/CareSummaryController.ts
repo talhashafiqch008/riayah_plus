@@ -81,13 +81,14 @@ export class CareSummaryController {
   async getTimeline(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.userId;
-      const { limit = '20' } = req.query as Record<string, string>;
+      const { limit: limitRaw = '20' } = req.query as Record<string, string>;
+      const limit = Math.min(Math.max(Number(limitRaw) || 20, 1), 200);
 
       const [bookings, episodes, notes] = await Promise.all([
         prisma.booking.findMany({
           where: { clientId: userId },
           orderBy: { scheduledAt: 'desc' },
-          take: parseInt(limit),
+          take: limit,
           select: {
             id: true, status: true, scheduledAt: true, serviceType: true,
             provider: { select: { name: true } },
@@ -102,7 +103,7 @@ export class CareSummaryController {
         prisma.clinicalNote.findMany({
           where: { episode: { patientId: userId }, isPrivate: false },
           orderBy: { createdAt: 'desc' },
-          take: parseInt(limit),
+          take: limit,
           select: {
             id: true, content: true, noteType: true, createdAt: true,
             author: { select: { name: true, role: true } },
@@ -114,7 +115,7 @@ export class CareSummaryController {
         ...bookings.map((b) => ({ type: 'booking', date: b.scheduledAt, data: b })),
         ...episodes.map((e) => ({ type: 'episode', date: e.createdAt, data: e })),
         ...notes.map((n) => ({ type: 'note', date: n.createdAt, data: n })),
-      ].sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()).slice(0, parseInt(limit));
+      ].sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()).slice(0, limit);
 
       res.json({ data: timeline });
     } catch (err) {

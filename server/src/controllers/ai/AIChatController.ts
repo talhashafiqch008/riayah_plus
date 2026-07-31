@@ -73,7 +73,7 @@ export class AIChatController {
   static async history(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.userId;
-      const limit = Number(req.query.limit) || 50;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 500);
 
       const conversation = await prisma.conversation.findFirst({
         where: { type: 'ai', participantLinks: { some: { userId } } },

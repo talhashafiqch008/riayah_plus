@@ -46,6 +46,14 @@ export const aiLimiter = rateLimit({
   message: { message: 'AI rate limit exceeded.' },
 });
 
+/** Tighter cap for unauthenticated Gemini endpoints. */
+export const publicAiLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  store: makeStore('ai-public'),
+  message: { message: 'AI rate limit exceeded.' },
+});
+
 export const adminLimiter = rateLimit({
   windowMs: 60_000,
   max: 30,
