@@ -1,6 +1,5 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
-import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 declare global {
     interface Window {
@@ -10,11 +9,6 @@ declare global {
 
 if (typeof window !== 'undefined') {
     window.Pusher = Pusher;
-}
-
-function getAccessToken(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(STORAGE_KEYS.apiToken);
 }
 
 let echoInstance: Echo<any> | null = null;
@@ -79,20 +73,17 @@ function createEchoInstance(): Echo<any> | null {
         minReconnectDelay: 1000,
         authorizer: (channel: { name: string }) => ({
             authorize: (socketId: string, callback: (error: Error | null, data: unknown) => void) => {
+                // Cookie session — no Bearer from localStorage (M1)
                 const headers: Record<string, string> = {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 };
 
-                const token = getAccessToken();
-                if (token) {
-                    headers.Authorization = `Bearer ${token}`;
-                }
-
                 fetch(`${baseUrl}/api/broadcasting/auth`, {
                     method: 'POST',
                     headers,
+                    credentials: 'include',
                     body: JSON.stringify({
                         socket_id: socketId,
                         channel_name: channel.name,

@@ -598,12 +598,25 @@ export class IntakeController {
     const [data, total] = await Promise.all([
       prisma.intakeRecord.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          status: true,
+          urgencyLevel: true,
+          reasonForCare: true,
+          serviceInterests: true,
+          submittedAt: true,
+          createdAt: true,
+          organizationId: true,
+          careUnitId: true,
+          careRecipientId: true,
+          familyUserId: true,
           careUnit: { select: { id: true, name: true } },
           careRecipient: {
-            select: { id: true, name: true, externalRef: true, diagnosisCodes: true },
+            select: { id: true, name: true, externalRef: true },
           },
-          familyUser: { select: { id: true, name: true, email: true, assignedCoordinatorId: true } },
+          familyUser: {
+            select: { id: true, name: true, email: true, assignedCoordinatorId: true },
+          },
         },
         orderBy: [{ urgencyLevel: 'desc' }, { submittedAt: 'asc' }],
         skip,

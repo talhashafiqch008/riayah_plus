@@ -45,9 +45,28 @@ export async function anonymizeUser(userId: string): Promise<void> {
       data: { specializations: [], languages: [] },
     });
 
+    await tx.providerProfile.updateMany({
+      where: { userId },
+      data: {
+        bio: null,
+        specialties: [],
+        dateOfBirth: null,
+        gender: null,
+        nationality: null,
+        languages: [],
+        qatarId: null,
+        certifications: [],
+        emergencyContactName: null,
+        emergencyContactPhone: null,
+        availabilitySchedule: Prisma.JsonNull,
+        serviceAreas: [],
+        mohLicenseNumber: null,
+      },
+    });
+
     await tx.message.updateMany({
       where: { OR: [{ senderId: userId }, { receiverId: userId }] },
-      data: { content: redacted },
+      data: { content: redacted, fileUrl: null },
     });
     await tx.notification.updateMany({
       where: { userId },
@@ -69,6 +88,27 @@ export async function anonymizeUser(userId: string): Promise<void> {
       data: { comment: redacted },
     });
 
+    await tx.booking.updateMany({
+      where: { OR: [{ clientId: userId }, { providerId: userId }] },
+      data: {
+        notes: null,
+        providerNotes: null,
+        cancelReason: null,
+        cancellationReason: null,
+      },
+    });
+
+    await tx.familyMember.updateMany({
+      where: { managerId: userId },
+      data: {
+        name: 'Anonymized Contact',
+        email: null,
+        phone: null,
+        relationship: null,
+        role: null,
+      },
+    });
+
     const units = await tx.careUnit.findMany({
       where: { familyUserId: userId },
       select: { id: true },
@@ -86,6 +126,27 @@ export async function anonymizeUser(userId: string): Promise<void> {
           primaryCaregiverPhone: null,
           primaryCaregiverRelation: null,
           deletedAt: new Date(),
+        },
+      });
+    }
+
+    const recipients = await tx.careRecipient.findMany({
+      where: {
+        OR: [
+          { userId },
+          ...(unitIds.length > 0 ? [{ careUnitId: { in: unitIds } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    const recipientIds = recipients.map((r) => r.id);
+
+    if (recipientIds.length > 0) {
+      await tx.careRecipientRevision.updateMany({
+        where: { careRecipientId: { in: recipientIds } },
+        data: {
+          snapshot: { anonymized: true },
+          changeSummary: redacted,
         },
       });
     }
@@ -125,17 +186,44 @@ export async function anonymizeUser(userId: string): Promise<void> {
       },
     });
 
-    await tx.careEpisode.updateMany({
-      where: { OR: [{ patientId: userId }, { coordinatorId: userId }] },
-      data: {
-        reasonForCare: redacted,
-        medicalHistory: null,
-        currentMeds: null,
-        diagnoses: [],
-        intakeSummary: { anonymized: true },
-        title: 'Anonymized Episode',
+    const episodes = await tx.careEpisode.findMany({
+      where: {
+        OR: [
+          { patientId: userId },
+          { coordinatorId: userId },
+          ...(unitIds.length > 0 ? [{ careUnitId: { in: unitIds } }] : []),
+        ],
       },
+      select: { id: true },
     });
+    const episodeIds = episodes.map((e) => e.id);
+
+    if (episodeIds.length > 0) {
+      await tx.careEpisode.updateMany({
+        where: { id: { in: episodeIds } },
+        data: {
+          reasonForCare: redacted,
+          medicalHistory: null,
+          currentMeds: null,
+          diagnoses: [],
+          intakeSummary: { anonymized: true },
+          title: 'Anonymized Episode',
+        },
+      });
+
+      await tx.aiIntakeSummary.updateMany({
+        where: { careEpisodeId: { in: episodeIds } },
+        data: {
+          keyConcerns: [],
+          urgencyIndicators: [],
+          suggestedServiceCategories: [],
+          flaggedRiskFactors: Prisma.JsonNull,
+          clinicalImpressions: null,
+          confidence: null,
+          status: 'anonymized',
+        },
+      });
+    }
 
     await tx.assessment.updateMany({
       where: { OR: [{ patientId: userId }, { assessorId: userId }] },
@@ -144,6 +232,36 @@ export async function anonymizeUser(userId: string): Promise<void> {
         recommendations: null,
         notes: null,
         reportUrl: null,
+      },
+    });
+
+    // Clinical notes authored by user, or attached to their episodes/sessions
+    await tx.clinicalNote.updateMany({
+      where: {
+        OR: [
+          { authorId: userId },
+          ...(episodeIds.length > 0 ? [{ episodeId: { in: episodeIds } }] : []),
+          {
+            session: {
+              OR: [{ clientId: userId }, { providerId: userId }],
+            },
+          },
+        ],
+      },
+      data: { content: redacted },
+    });
+
+    await tx.session.updateMany({
+      where: { OR: [{ clientId: userId }, { providerId: userId }] },
+      data: {
+        notes: null,
+        recordingUrl: null,
+        latitude: null,
+        longitude: null,
+        checkInLat: null,
+        checkInLng: null,
+        checkOutLat: null,
+        checkOutLng: null,
       },
     });
 
@@ -167,6 +285,10 @@ export async function anonymizeUser(userId: string): Promise<void> {
     await tx.userSession.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
+    });
+    await tx.dataExportRequest.updateMany({
+      where: { userId, status: { in: ['pending', 'ready'] } },
+      data: { status: 'expired', fileUrl: null },
     });
     await tx.accountDeletionRequest.updateMany({
       where: { userId, status: { not: 'completed' } },

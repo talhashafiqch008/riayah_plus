@@ -130,11 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-validate session when navigating to protected routes (middleware parity)
+  // Re-validate session when navigating to protected routes (cookie session)
   useEffect(() => {
     if (loading || !isProtectedPath(location.pathname)) return;
-    const token = localStorage.getItem(STORAGE_KEYS.apiToken);
-    if (!token) return;
     void revalidateSession();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);

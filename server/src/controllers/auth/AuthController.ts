@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
@@ -12,7 +11,10 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
+  verifyAccessToken,
   recordLogoutAll,
+  assertUserActive,
+  wasLoggedOutAll,
   AuthPayload,
 } from '../../middleware/auth';
 import {
@@ -267,7 +269,15 @@ export class AuthController {
     }
 
     try {
-      const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as AuthPayload;
+      const payload = verifyAccessToken(token);
+      const [active, terminated] = await Promise.all([
+        assertUserActive(payload.userId),
+        wasLoggedOutAll(payload.userId, payload.iat),
+      ]);
+      if (!active || terminated) {
+        res.json({ authenticated: false });
+        return;
+      }
       res.json({
         authenticated: true,
         userId: payload.userId,
@@ -389,8 +399,19 @@ export class AuthController {
       await tx.otpVerification.deleteMany({
         where: { userId, type: INVITE_TOKEN_TYPE },
       });
+      // Match resetPassword: revoke any pre-invite sessions/tokens
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       return updated;
     });
+    await recordLogoutAll(userId);
+    clearAuthCookies(res);
 
     await AuditService.log({
       userId,

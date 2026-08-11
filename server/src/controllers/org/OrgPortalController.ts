@@ -641,7 +641,14 @@ export class OrgPortalController {
       const [data, total] = await Promise.all([
         prisma.intakeRecord.findMany({
           where,
-          include: {
+          select: {
+            id: true,
+            status: true,
+            urgencyLevel: true,
+            reasonForCare: true,
+            serviceInterests: true,
+            submittedAt: true,
+            createdAt: true,
             careUnit: { select: { id: true, name: true } },
             careRecipient: {
               select: { id: true, name: true },

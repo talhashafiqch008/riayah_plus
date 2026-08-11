@@ -132,7 +132,7 @@ export class CareUnitController {
         include: {
           careRecipients: {
             where: { deletedAt: null },
-            select: { id: true, name: true, externalRef: true, diagnosisCodes: true },
+            select: { id: true, name: true, externalRef: true },
           },
           _count: { select: { intakeRecords: true, careEpisodes: true } },
         },

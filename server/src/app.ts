@@ -7,7 +7,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { Server as SocketIOServer } from 'socket.io';
-import jwt from 'jsonwebtoken';
 import * as Sentry from '@sentry/node';
 
 import { env } from './config/env';
@@ -17,6 +16,11 @@ import { logger } from './config/logger';
 import { requestLogger, forceJson } from './middleware/requestLogger';
 import { notFound, errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
+import {
+  assertUserActive,
+  verifyAccessToken,
+  wasLoggedOutAll,
+} from './middleware/auth';
 import { startScheduler } from './cron/scheduler';
 import apiRouter from './routes/index';
 
@@ -59,21 +63,31 @@ io.on('connection', (socket) => {
     socket.disconnect(true);
     return;
   }
-  let userId: string;
-  try {
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as { userId: string };
-    userId = payload.userId;
-  } catch {
-    socket.disconnect(true);
-    return;
-  }
-  socket.join(`chat.${userId}`);
-  socket.join(`notification.user.${userId}`);
-  logger.debug(`Socket connected: ${userId}`);
+  void (async () => {
+    let userId: string;
+    try {
+      const payload = verifyAccessToken(token);
+      const [active, terminated] = await Promise.all([
+        assertUserActive(payload.userId),
+        wasLoggedOutAll(payload.userId, payload.iat),
+      ]);
+      if (!active || terminated) {
+        socket.disconnect(true);
+        return;
+      }
+      userId = payload.userId;
+    } catch {
+      socket.disconnect(true);
+      return;
+    }
+    socket.join(`chat.${userId}`);
+    socket.join(`notification.user.${userId}`);
+    logger.debug(`Socket connected: ${userId}`);
 
-  socket.on('disconnect', () => {
-    logger.debug(`Socket disconnected: ${userId}`);
-  });
+    socket.on('disconnect', () => {
+      logger.debug(`Socket disconnected: ${userId}`);
+    });
+  })();
 });
 
 // ─── Global middleware ───────────────────────────────────────────────────────

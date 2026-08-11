@@ -79,6 +79,11 @@ export const env = {
   SENTRY_DSN: process.env.SENTRY_DSN || '',
   SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT || 'development',
 
+  /** AES key material for GDPR data-export files at rest (falls back to JWT_ACCESS_SECRET). */
+  DATA_EXPORT_ENCRYPTION_KEY: process.env.DATA_EXPORT_ENCRYPTION_KEY || '',
+  /** How long an encrypted export remains downloadable (hours). */
+  DATA_EXPORT_TTL_HOURS: parseInt(process.env.DATA_EXPORT_TTL_HOURS || '24', 10),
+
   isDev: process.env.NODE_ENV !== 'production',
   isProd: process.env.NODE_ENV === 'production',
 };

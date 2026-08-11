@@ -86,10 +86,9 @@ export default function PhoneLoginPage() {
  return;
  }
 
- if (result.accessToken) {
+ // Sessions are cookie-only — never persist access tokens in localStorage (M1)
+ if (result.accessToken || result.user) {
  toast.success('Phone verified successfully!');
- localStorage.setItem(STORAGE_KEYS.token, result.accessToken);
- localStorage.setItem(STORAGE_KEYS.apiToken, result.accessToken);
  if (result.user) {
  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(result.user));
  }

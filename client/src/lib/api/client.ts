@@ -33,6 +33,11 @@ export function clearLegacyTokenStorage(): void {
   localStorage.removeItem('raiyah:api_token');
   localStorage.removeItem('raiyah:refresh_token');
   localStorage.removeItem('raiyah:token');
+  localStorage.removeItem('api_token');
+  localStorage.removeItem('token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
 }
 
 async function sleep(ms: number): Promise<void> {

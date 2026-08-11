@@ -8,6 +8,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { deleteAccount } from '@/lib/api/user';
+import {
+ downloadDataExport,
+ requestDataExport,
+ triggerBlobDownload,
+} from '@/lib/api/privacy';
 import { isApiError } from '@/lib/errors';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -20,6 +25,33 @@ export default function AccountPage() {
  const [saving, setSaving] = useState(false);
  const [deleting, setDeleting] = useState(false);
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+ const [exportPassword, setExportPassword] = useState('');
+ const [exporting, setExporting] = useState(false);
+ const [showExportForm, setShowExportForm] = useState(false);
+
+ const handleDataExport = async () => {
+ if (!exportPassword.trim()) {
+ toast.error('Enter your password to export your data.');
+ return;
+ }
+ setExporting(true);
+ try {
+ const ready = await requestDataExport(exportPassword);
+ const blob = await downloadDataExport(ready.requestId, exportPassword);
+ triggerBlobDownload(blob, `riayah-data-export-${ready.requestId}.json`);
+ toast.success('Your data export has been downloaded. The secure copy was removed from the server.');
+ setExportPassword('');
+ setShowExportForm(false);
+ } catch (error) {
+ if (isApiError(error)) {
+ toast.error(error.message || 'Failed to export data.');
+ } else {
+ toast.error('Failed to export data. Please try again.');
+ }
+ } finally {
+ setExporting(false);
+ }
+ };
 
  const handleDeleteAccount = async () => {
  setDeleting(true);
@@ -560,9 +592,40 @@ export default function AccountPage() {
  <div className="flex-1">
  <h4 className="font-semibold text-stone-900">Download Your Data</h4>
  <p className="text-sm text-stone-500 mb-4">
- Get a copy of all your personal data in a portable format
+ Get an encrypted, time-limited copy of your personal data. You must re-enter your password.
+ The file is removed from the server after one download (expires in 24 hours if unused).
  </p>
- <Button variant="outline">Request Data Export</Button>
+ {!showExportForm ? (
+ <Button variant="outline" onClick={() => setShowExportForm(true)}>
+ Request Data Export
+ </Button>
+ ) : (
+ <div className="flex flex-col gap-3 max-w-sm">
+ <input
+ type="password"
+ autoComplete="current-password"
+ placeholder="Confirm your password"
+ value={exportPassword}
+ onChange={(e) => setExportPassword(e.target.value)}
+ className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+ />
+ <div className="flex gap-2">
+ <Button
+ variant="outline"
+ disabled={exporting}
+ onClick={() => {
+ setShowExportForm(false);
+ setExportPassword('');
+ }}
+ >
+ Cancel
+ </Button>
+ <Button disabled={exporting} onClick={() => void handleDataExport()}>
+ {exporting ? 'Preparing…' : 'Export & Download'}
+ </Button>
+ </div>
+ </div>
+ )}
  </div>
  </div>
  </div>

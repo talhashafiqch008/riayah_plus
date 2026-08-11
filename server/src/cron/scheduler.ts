@@ -424,5 +424,32 @@ export function startScheduler(): void {
     }
   });
 
+  // ── retention:purge-expired-data-exports — hourly (M2 encrypted export TTL) ─
+  cron.schedule('10 * * * *', async () => {
+    try {
+      const expired = await prisma.dataExportRequest.findMany({
+        where: {
+          status: { in: ['ready', 'pending'] },
+          expiresAt: { lt: new Date() },
+        },
+        select: { id: true },
+        take: 200,
+      });
+      const { deleteExportFile } = await import('../utils/dataExportCrypto');
+      for (const row of expired) {
+        await deleteExportFile(row.id);
+      }
+      if (expired.length > 0) {
+        await prisma.dataExportRequest.updateMany({
+          where: { id: { in: expired.map((e) => e.id) } },
+          data: { status: 'expired', fileUrl: null },
+        });
+        logger.info(`Purged ${expired.length} expired data exports`);
+      }
+    } catch (err) {
+      logger.error('retention:purge-expired-data-exports failed', { err });
+    }
+  });
+
   logger.info('All cron jobs scheduled');
 }

@@ -9,6 +9,7 @@ router.use(authenticate);
 
 // GDPR / privacy
 router.post('/privacy/data-export', PrivacyController.requestDataExport);
+router.post('/privacy/data-export/:id/download', PrivacyController.downloadDataExport);
 router.post('/privacy/delete-account', PrivacyController.requestAccountDeletion);
 router.post('/privacy/restrict-processing', PrivacyController.restrictProcessing);
 router.get('/privacy/consents', PrivacyController.listConsents);
