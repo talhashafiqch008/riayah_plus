@@ -4,6 +4,7 @@ import { Send, Bot, Loader2, User, Home, Sparkles, AlertCircle, ArrowRight, Vide
 import { Logo } from '@/components/Logo';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
@@ -275,6 +276,7 @@ export default function PublicAiChatPage() {
  <div className="prose prose-sm max-w-none prose-neutral">
  <ReactMarkdown
  remarkPlugins={[remarkGfm]}
+ rehypePlugins={[rehypeSanitize]}
  components={{
  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
  a: ({ children, href }) => {

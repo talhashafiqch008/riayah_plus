@@ -6,6 +6,7 @@ import { Send, Paperclip, FileText, Check, Stethoscope, User, Bot, Loader2 } fro
 import { RaiyahLogo } from '@/components/SinaLogo';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import { AI_FEATURES } from '@/lib/feature-flags';
 import { FeatureDisabled } from '@/components/FeatureDisabled';
 
@@ -197,6 +198,7 @@ export default function SinaChatPage() {
  <div className="prose prose-sm max-w-none prose-slate">
  <ReactMarkdown
  remarkPlugins={[remarkGfm]}
+ rehypePlugins={[rehypeSanitize]}
  components={{
  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,

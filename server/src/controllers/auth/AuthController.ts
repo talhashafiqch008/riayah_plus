@@ -51,8 +51,6 @@ const setPasswordSchema = z.object({
   password: z.string().min(8),
 });
 
-const FAMILY_ROLES = new Set(['family', 'patient', 'client', 'consumer']);
-
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 async function issueTokens(user: { id: string; role: string; email: string }, req: Request) {
@@ -111,13 +109,8 @@ export class AuthController {
       );
     }
 
-    // Family/patient accounts cannot log in until a platform admin assigns an organization.
-    if (FAMILY_ROLES.has(user.role) && !user.organizationId) {
-      throw new AppError(
-        'Your account is awaiting organization assignment. You will be able to log in once an administrator links you to a care organization.',
-        403,
-      );
-    }
+    // Family may log in and request care before organization assignment.
+    // Platform admin assigns org later (Admin → Families); units/intakes backfill then.
 
     // Enforce email verification before allowing login.
     // (Seed accounts can be marked verified via prisma/seed.ts)
@@ -148,6 +141,7 @@ export class AuthController {
         avatar: user.avatar,
         onboardingStatus: user.onboardingStatus,
         twoFactorEnabled: user.twoFactorEnabled,
+        organizationId: user.organizationId,
       },
       onboarding_status: user.onboardingStatus,
     });
@@ -185,7 +179,14 @@ export class AuthController {
       token: accessToken,
       accessToken,
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, twoFactorEnabled: user.twoFactorEnabled },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        twoFactorEnabled: user.twoFactorEnabled,
+        organizationId: user.organizationId,
+      },
     });
   }
 

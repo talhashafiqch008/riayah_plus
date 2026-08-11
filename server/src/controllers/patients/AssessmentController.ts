@@ -11,6 +11,7 @@ import {
   assertEpisodeAccess,
   familyAssessmentWhere,
 } from '../../utils/careAccess';
+import { staffPublicUserSelect, toPublicStaffCard } from '../../utils/staffProfile';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -75,9 +76,19 @@ const ASSESSMENT_INCLUDE = {
       careUnit: { select: { familyUserId: true } },
     },
   },
-  assessor: { select: { id: true, name: true } },
+  assessor: { select: staffPublicUserSelect },
   patient: { select: { id: true, name: true } },
 } as const;
+
+function mapAssessment(row: {
+  assessor?: Parameters<typeof toPublicStaffCard>[0] | null;
+  [key: string]: unknown;
+}) {
+  return {
+    ...row,
+    assessor: row.assessor ? toPublicStaffCard(row.assessor) : row.assessor,
+  };
+}
 
 function parseScheduledAt(raw: string): Date {
   const d = new Date(raw);
@@ -171,11 +182,11 @@ export class AssessmentController {
 
     const data = await prisma.user.findMany({
       where,
-      select: { id: true, name: true, email: true, role: true },
+      select: staffPublicUserSelect,
       orderBy: { name: 'asc' },
       take: 100,
     });
-    res.json({ data });
+    res.json({ data: data.map(toPublicStaffCard) });
   }
 
   static async index(req: Request, res: Response): Promise<void> {
@@ -226,13 +237,18 @@ export class AssessmentController {
       prisma.assessment.count({ where }),
     ]);
 
-    res.json({ data, total, page: parseInt(page, 10), limit: parseInt(limit, 10) });
+    res.json({
+      data: data.map((row) => mapAssessment(row)),
+      total,
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
   }
 
   static async show(req: Request, res: Response): Promise<void> {
     const assessment = await loadAssessment(req.params.id);
     assertAccess(req, assessment);
-    res.json({ data: assessment });
+    res.json({ data: mapAssessment(assessment) });
   }
 
   static async store(req: Request, res: Response): Promise<void> {
@@ -339,7 +355,7 @@ export class AssessmentController {
       }).catch(() => undefined);
     }
 
-    res.status(201).json({ data: assessment });
+    res.status(201).json({ data: mapAssessment(assessment) });
   }
 
   static async update(req: Request, res: Response): Promise<void> {
@@ -484,6 +500,6 @@ export class AssessmentController {
       }
     }
 
-    res.json({ data: updated });
+    res.json({ data: mapAssessment(updated) });
   }
 }

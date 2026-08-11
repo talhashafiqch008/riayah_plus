@@ -1,5 +1,5 @@
-
-import { m, LazyMotion, domAnimation } from "framer-motion";
+import { useEffect, useState } from "react";
+import { m } from "framer-motion";
 import { ArrowRight, MapPin, Languages, Users, User, HeartHandshake, Check, Briefcase } from "lucide-react";
 
 // Country options
@@ -8,6 +8,7 @@ const COUNTRIES = [
  { code: 'SAU', shortCode: 'SA', label: 'Saudi Arabia', flag: '🇸🇦' },
  { code: 'EGY', shortCode: 'EG', label: 'Egypt', flag: '🇪🇬' },
  { code: 'AUS', shortCode: 'AU', label: 'Australia', flag: '🇦🇺' },
+ { code: 'PAK', shortCode: 'PK', label: 'Pakistan', flag: '🇵🇰' },
 ];
 
 const LANGUAGES = [
@@ -59,6 +60,41 @@ const fadeIn = {
  animate: { opacity: 1, y: 0 },
 };
 
+function detectCountryFromTimezone(): string {
+ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+ if (timeZone.includes('Karachi') || timeZone.includes('Pakistan')) {
+ return 'PAK';
+ }
+ if (timeZone.includes('Qatar') || timeZone.includes('Manama')) {
+ return 'QAT';
+ }
+ if (
+ timeZone.includes('Riyadh') ||
+ timeZone.includes('Saudi') ||
+ timeZone.includes('Jeddah')
+ ) {
+ return 'SAU';
+ }
+ if (timeZone.includes('Cairo') || timeZone.includes('Egypt')) {
+ return 'EGY';
+ }
+ if (
+ timeZone.includes('Australia') ||
+ timeZone.includes('Sydney') ||
+ timeZone.includes('Melbourne') ||
+ timeZone.includes('Brisbane') ||
+ timeZone.includes('Perth') ||
+ timeZone.includes('Adelaide') ||
+ timeZone.includes('Hobart') ||
+ timeZone.includes('Darwin')
+ ) {
+ return 'AUS';
+ }
+
+ return 'QAT';
+}
+
 interface StepCountryLanguageProps {
  data: Record<string, unknown>;
  onUpdate: (data: Record<string, unknown>) => void;
@@ -70,6 +106,17 @@ interface StepCountryLanguageProps {
 export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 'careseeker' }: StepCountryLanguageProps) {
  const showRoleDetails = variant === 'family';
  const isValid = data.country && data.preferredLanguage && data.careRecipientType;
+ const [showCountryPicker, setShowCountryPicker] = useState(false);
+
+ // Auto-detect unless the user already picked a country manually
+ useEffect(() => {
+ if (data.countryManual) return;
+ const detected = detectCountryFromTimezone();
+ if (data.country !== detected) {
+ onUpdate({ country: detected });
+ }
+ // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+ }, []);
 
  // Filter account types based on country
  // Support Coordinator is ONLY for Australia
@@ -81,7 +128,7 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  });
 
  const handleCountrySelect = (code: string) => {
- const updates: Record<string, unknown> = { country: code };
+ const updates: Record<string, unknown> = { country: code, countryManual: true };
 
  // If switching away from Australia, deselect Support Coordinator if selected
  if (code !== 'AUS' && data.careRecipientType === 'support_coordinator') {
@@ -89,13 +136,16 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  }
 
  onUpdate(updates);
+ setShowCountryPicker(false);
  };
+
+ const selectedCountry = COUNTRIES.find((c) => c.code === data.country) ?? COUNTRIES[0];
 
  return (
  <div className="space-y-10">
 
  <div className="grid md:grid-cols-2 gap-10">
- {/* 1. Country Selection (First) */}
+ {/* 1. Detected location */}
  <m.div {...fadeIn} className="space-y-4">
  <div className="flex items-center gap-3">
  <div className="size-10 bg-teal-50 rounded-full flex items-center justify-center">
@@ -103,23 +153,47 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  </div>
  <div>
  <h3 className="text-lg font-semibold text-stone-900">Location</h3>
- <p className="text-xs text-stone-500">Where are you based?</p>
+ <p className="text-xs text-stone-500">Detected from your device</p>
  </div>
  </div>
 
- <div className="grid grid-cols-2 gap-3">
+ <div className="rounded-2xl border-2 border-teal-500 bg-teal-50/60 p-4">
+ <div className="flex items-center justify-between gap-3">
+ <div className="flex items-center gap-3 min-w-0">
+ <span className="text-3xl shrink-0">{selectedCountry.flag}</span>
+ <div className="min-w-0">
+ <p className="text-sm font-bold text-stone-900 uppercase tracking-wide">
+ {selectedCountry.label}
+ </p>
+ <p className="text-xs text-stone-500 mt-0.5">Detected from your device</p>
+ </div>
+ </div>
+ <button
+ type="button"
+ onClick={() => setShowCountryPicker((v) => !v)}
+ className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline underline-offset-2 shrink-0"
+ >
+ {showCountryPicker ? 'Close' : 'Change'}
+ </button>
+ </div>
+
+ {showCountryPicker && (
+ <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-teal-200/80">
  {COUNTRIES.map((country) => (
  <button
  key={country.code}
+ type="button"
  onClick={() => handleCountrySelect(country.code)}
- className={`relative p-4 rounded-2xl border-2 transition-transform duration-300 text-center group ${data.country === country.code ? 'border-teal-500 bg-teal-600 text-white shadow-lg' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50' }`}
+ className={`relative p-3 rounded-xl border-2 transition-transform duration-300 text-center ${data.country === country.code ? 'border-teal-600 bg-teal-600 text-white' : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50'}`}
  >
- <span className="text-2xl block mb-1">{country.flag}</span>
- <span className={`text-sm font-bold uppercase tracking-wide ${data.country === country.code ? 'text-white' : 'text-stone-600'}`}>
+ <span className="text-xl block mb-0.5">{country.flag}</span>
+ <span className={`text-xs font-bold uppercase tracking-wide ${data.country === country.code ? 'text-white' : 'text-stone-600'}`}>
  {country.label}
  </span>
  </button>
  ))}
+ </div>
+ )}
  </div>
  </m.div>
 

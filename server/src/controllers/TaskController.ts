@@ -42,10 +42,31 @@ const validStatuses = ['pending', 'in_progress', 'completed', 'cancelled', 'on_h
 
 const COORD_ROLES = ['care_coordinator', 'admin', 'super_admin', 'support_admin'];
 
-function canManageTask(req: Request, task: { assignerId: string; assigneeId: string }): boolean {
+/**
+ * Asserts the caller can access/mutate the given task.
+ * Coordinators must be in the same org as the task's episode; without an episode
+ * they may only touch tasks they assigned or are assigned to.
+ */
+async function assertTaskAccess(
+  req: Request,
+  task: { assignerId: string; assigneeId: string; careEpisodeId: string | null },
+): Promise<void> {
   const { userId, role } = req.user!;
-  if (COORD_ROLES.includes(role)) return true;
-  return task.assignerId === userId || task.assigneeId === userId;
+  if (COORD_ROLES.includes(role)) {
+    if (task.careEpisodeId) {
+      const episode = await prisma.careEpisode.findUnique({
+        where: { id: task.careEpisodeId },
+        select: { organizationId: true },
+      });
+      assertTenantOrgAccess(req, episode?.organizationId);
+    } else if (task.assignerId !== userId && task.assigneeId !== userId) {
+      throw new AppError('Forbidden', 403);
+    }
+    return;
+  }
+  if (task.assignerId !== userId && task.assigneeId !== userId) {
+    throw new AppError('Forbidden', 403);
+  }
 }
 
 export class TaskController {
@@ -54,36 +75,60 @@ export class TaskController {
     try {
       const userId = req.user!.userId;
       const role = req.user!.role;
-      const { status, assignee, episodeId, page = '1', limit = '20' } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { status, assignee, episodeId } = req.query as Record<string, string>;
+      const page = parseInt((req.query.page as string) || '1', 10) || 1;
+      const limit = Math.min(parseInt((req.query.limit as string) || '20', 10) || 20, 100);
+      const skip = (page - 1) * limit;
 
       const where: Record<string, unknown> = {};
 
-      // Support workers default to their assigned tasks (M3-4.5)
       if (role === 'support_worker' || assignee === 'me') {
         where.assigneeId = userId;
       } else if (assignee === 'created') {
         where.assignerId = userId;
       } else if (COORD_ROLES.includes(role) && episodeId) {
+        // Validate the episode belongs to the coordinator's org before filtering by it
+        const episode = await prisma.careEpisode.findUnique({
+          where: { id: episodeId },
+          select: { id: true, organizationId: true },
+        });
+        if (!episode) throw new AppError('Care episode not found.', 404);
+        assertTenantOrgAccess(req, episode.organizationId);
         where.careEpisodeId = episodeId;
       } else if (!COORD_ROLES.includes(role)) {
         where.OR = [{ assigneeId: userId }, { assignerId: userId }];
       }
-      // coordinators without filters see all they created or org tasks via assignee/created query
 
-      if (status) where.status = status;
-      if (episodeId && !where.careEpisodeId) where.careEpisodeId = episodeId;
+      if (status) {
+        if (!validStatuses.includes(status)) {
+          throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
+        }
+        where.status = status;
+      }
 
-      // Coordinator default: tasks they assigned OR in their tenant episodes
+      // Non-coordinator episodeId filter (support worker filtering their own tasks)
+      if (episodeId && !where.careEpisodeId && !COORD_ROLES.includes(role)) {
+        where.careEpisodeId = episodeId;
+      }
+
+      // Coordinator default: scope to their org's episodes + tasks they created
       if (COORD_ROLES.includes(role) && !assignee && !episodeId) {
-        where.OR = [{ assignerId: userId }, { assigneeId: userId }];
+        const orgId = req.tenant?.organizationId;
+        if (orgId) {
+          where.OR = [
+            { assignerId: userId },
+            { careEpisode: { organizationId: orgId } },
+          ];
+        } else {
+          where.OR = [{ assignerId: userId }, { assigneeId: userId }];
+        }
       }
 
       const [tasks, total] = await Promise.all([
         prisma.task.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take: limit,
           include: {
             assigner: { select: { id: true, name: true } },
             assignee: { select: { id: true, name: true, role: true } },
@@ -103,7 +148,7 @@ export class TaskController {
         }),
         prisma.task.count({ where }),
       ]);
-      res.json({ data: tasks, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: tasks, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }
@@ -149,9 +194,7 @@ export class TaskController {
     }
   }
 
-  /**
-   * POST /tasks/assign-episode — bulk-assign pending episode tasks to a support worker (M3-4.5)
-   */
+  // POST /tasks/assign-episode — bulk-assign pending episode tasks to a support worker
   async assignEpisode(req: Request, res: Response, next: NextFunction) {
     try {
       if (!COORD_ROLES.includes(req.user!.role)) {
@@ -219,13 +262,10 @@ export class TaskController {
       const { id } = req.params;
       const task = await prisma.task.findUnique({ where: { id } });
       if (!task) throw new AppError('Task not found', 404);
-      if (!canManageTask(req, task)) {
-        throw new AppError('Forbidden', 403);
-      }
+      await assertTaskAccess(req, task);
 
       const parsed = updateTaskSchema.parse(req.body);
 
-      // Only coordinator/assigner can reassign
       if (parsed.assigneeId && parsed.assigneeId !== task.assigneeId) {
         if (!COORD_ROLES.includes(req.user!.role) && task.assignerId !== req.user!.userId) {
           throw new AppError('Only the assigner or coordinator can reassign tasks.', 403);
@@ -261,9 +301,7 @@ export class TaskController {
       const { id } = req.params;
       const task = await prisma.task.findUnique({ where: { id } });
       if (!task) throw new AppError('Task not found', 404);
-      if (task.assignerId !== req.user!.userId && !COORD_ROLES.includes(req.user!.role)) {
-        throw new AppError('Forbidden', 403);
-      }
+      await assertTaskAccess(req, task);
       await prisma.task.delete({ where: { id } });
       res.json({ message: 'Deleted' });
     } catch (err) {
@@ -280,9 +318,7 @@ export class TaskController {
 
       const task = await prisma.task.findUnique({ where: { id } });
       if (!task) throw new AppError('Task not found', 404);
-      if (!canManageTask(req, task)) {
-        throw new AppError('Forbidden', 403);
-      }
+      await assertTaskAccess(req, task);
 
       if (completionEvidence !== undefined && completionEvidence !== null) {
         const ok = z.string().url().safeParse(completionEvidence);
@@ -303,15 +339,14 @@ export class TaskController {
     }
   }
 
-  /** POST /tasks/:id/complete — complete with optional evidence URL (M3-4.4) */
+  // POST /tasks/:id/complete
   async complete(req: Request, res: Response, next: NextFunction) {
     try {
       const body = completeSchema.parse(req.body ?? {});
       const task = await prisma.task.findUnique({ where: { id: req.params.id } });
       if (!task) throw new AppError('Task not found', 404);
-      if (task.assigneeId !== req.user!.userId && !COORD_ROLES.includes(req.user!.role)) {
-        throw new AppError('Only the assignee can complete this task.', 403);
-      }
+      await assertTaskAccess(req, task);
+
       if (task.status === 'completed') {
         res.json({ message: 'Already completed.', data: task });
         return;

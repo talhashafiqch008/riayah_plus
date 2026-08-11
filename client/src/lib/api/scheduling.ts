@@ -1,4 +1,5 @@
 import { client } from './client';
+import type { PublicStaffCard } from './staffProfile';
 
 export interface AvailabilitySlot {
   id: string;
@@ -19,7 +20,7 @@ export interface CareSession {
   scheduledAt: string;
   durationMinutes?: number | null;
   notes?: string | null;
-  provider?: { id: string; name: string; role?: string };
+  provider?: PublicStaffCard;
   client?: { id: string; name: string };
 }
 
@@ -93,12 +94,7 @@ export async function cancelSession(id: string) {
   return data;
 }
 
-export interface ScheduleStaffOption {
-  id: string;
-  name: string;
-  email?: string;
-  role: string;
-}
+export type ScheduleStaffOption = PublicStaffCard;
 
 export async function listScheduleStaff() {
   const { data } = await client.get<{ data: ScheduleStaffOption[] }>('/scheduling/staff');

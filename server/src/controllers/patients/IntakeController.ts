@@ -59,13 +59,17 @@ const reviewSchema = z.object({
   riskFlags: z.array(sanitizedString(z.string().min(1))).default([]),
   createEpisode: z.boolean().optional().default(true),
   episodeTitle: optionalSanitizedString(),
-  notes: optionalSanitizedString(),
+  notes: sanitizedString(z.string().min(10, 'Reviewer notes are required (min 10 characters).')),
   coordinatorId: z.string().min(1).optional(),
 });
 
 const statusSchema = z.object({
   status: z.nativeEnum(IntakeStatus),
+  reason: z.string().min(5).max(2000).optional(),
 });
+
+/** Backward intake transitions require an explicit reason. */
+const INTAKE_BACKWARD_TRANSITIONS = new Set<string>(['under_review:submitted']);
 
 const updateFamilyRequestSchema = z.object({
   wizardPayload: z.record(z.unknown()),
@@ -268,14 +272,8 @@ export class IntakeController {
     }
 
     const familyUserId = isFamily(role) ? req.user!.userId : unit.familyUserId;
+    // May be null until platform admin assigns the family to an organization.
     const organizationId = unit.organizationId ?? req.tenant?.organizationId ?? null;
-
-    if (!organizationId) {
-      throw new AppError(
-        'This care unit is not linked to a care organization, so the request cannot be routed. Contact your clinic or ask an administrator to assign an organization.',
-        422,
-      );
-    }
 
     // Immutable consent capture (Privacy + Treatment required)
     const consentRecords = [];
@@ -622,8 +620,13 @@ export class IntakeController {
     const intake = await loadIntakeOrThrow(req.params.id);
     assertIntakeAccess(req, intake);
 
-    const { status } = statusSchema.parse(req.body);
+    const { status, reason } = statusSchema.parse(req.body);
     assertIntakeTransition(intake.status, status);
+
+    const transitionKey = `${intake.status}:${status}`;
+    if (INTAKE_BACKWARD_TRANSITIONS.has(transitionKey) && !reason) {
+      throw new AppError('A reason is required when reverting intake status.', 422);
+    }
 
     // Only coordinators/admins can pull into review or validate; family can withdraw while open
     if (status === 'withdrawn') {
@@ -663,7 +666,7 @@ export class IntakeController {
       entity: 'IntakeRecord',
       entityId: intake.id,
       before: { status: intake.status },
-      after: { status: updated.status },
+      after: { status: updated.status, ...(reason ? { reason } : {}) },
       req,
     });
 

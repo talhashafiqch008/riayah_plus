@@ -15,6 +15,7 @@ import {
   Activity,
   UserPlus,
   Briefcase,
+  UserCog,
 } from 'lucide-react';
 
 export interface RoleShellNavItem {
@@ -155,6 +156,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Patients', href: '/clinical/patients', icon: Users },
       { name: 'Session Notes', href: '/clinical/notes', icon: Stethoscope },
       { name: 'Care Plans', href: '/clinical/plans', icon: BookOpen },
+      { name: 'Profile', href: '/clinical/profile', icon: UserCog },
       { name: 'Messages', href: '/clinical/messages', icon: MessageCircle },
     ],
     dashboard: {
@@ -184,6 +186,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'My Shifts', href: '/support/shifts', icon: Clock },
       { name: 'Tasks', href: '/support/tasks', icon: ClipboardList },
       { name: 'Shift Notes', href: '/support/notes', icon: FileText },
+      { name: 'Profile', href: '/support/profile', icon: UserCog },
       { name: 'Messages', href: '/support/messages', icon: MessageCircle },
     ],
     dashboard: {

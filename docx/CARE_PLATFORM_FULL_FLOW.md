@@ -47,7 +47,7 @@ Family can also request a **resend verification** email if needed.
 
 **When:** Platform admin assigns a registered family to an org.  
 **Subject:** `Your Riayah Plus account is ready — you can log in now`  
-**Effect:** Tells the family they can log in to the family portal (org is now linked).
+**Effect:** Confirms the family is linked to a care organization. Care units / intakes created earlier are backfilled to that org. Family may already have been logged in and requesting care before this email.
 
 ---
 
@@ -112,16 +112,16 @@ Family can also request a **resend verification** email if needed.
 2. System emails **email verification**: subject `Verify your Riayah Plus email`, with a **Verify Email** button.
 3. Family clicks **Verify Email** (link expires in 24 hours). Until verified, login is blocked.
 4. At registration, the family still has **no organization** yet.
-5. Even after verification, family login stays blocked until org assignment (“awaiting organization”).
-6. Platform admin opens **Admin → Families**.
+5. After verification, family **can log in** and complete onboarding / submit a care request even while unassigned (`organizationId` null). The family portal shows a soft banner that an organization will be assigned shortly — this does **not** block navigation or Finish.
+6. Platform admin opens **Admin → Families** (unassigned filter).
 7. Finds the unassigned family and **assigns them to an organization**.
-8. Family receives a second email: **account ready / org assigned** (login link → family portal).
-9. Family signs in → http://localhost:5173/login?portal=family
+8. System backfills related care unit / intake org linkage; family may receive an **account ready / org assigned** email.
+9. Org / coordinator flow continues as today once the family is linked.
 
-**Outcome:** Family email is verified, belongs to a specific org, and can complete intake / care requests.
+**Outcome:** Family email is verified; they can request care immediately; admin later places them in an org so intakes enter that org’s queue.
 
 > Families do **not** self-select an organization. Platform admin assigns them.  
-> **Order for family:** register → verify email → admin assigns org → log in.
+> **Order for family:** register → verify email → log in and request care → admin assigns org (backfill).
 
 ---
 
@@ -133,11 +133,18 @@ Platform admin creates Org (+ Org Admin invite / set-password email)
     → Org Admin invites Clinical (set-password email)
     → Org Admin invites Support (set-password email)
     → Family registers → verification email (Verify your Riayah Plus email)
-    → Family clicks Verify Email
-    → Platform admin assigns Family → Org (account-ready email)
+    → Family clicks Verify Email → can log in and request care
+    → Platform admin assigns Family → Org (backfill + optional account-ready email)
 ```
 
 After that, care delivery follows Part B below.
+
+---
+
+## Deferred (discuss later)
+
+- **Staff invite / profile more details** — license, specialties, languages, availability, photo, etc. TBD; not in this pass.
+- **Doctor / clinician details with photos** — clinician is clinical staff; profile schema + UI enrichment TBD; not in this pass.
 
 ---
 
@@ -160,9 +167,9 @@ After that, care delivery follows Part B below.
 
 ```
 Platform admin creates organization (+ org admin)
-    → Family registers
-    → Platform admin assigns family to an organization
-    → Family completes intake
+    → Family registers → verifies email → can log in
+    → Family completes intake (org may still be null)
+    → Platform admin assigns family to an organization (backfill)
     → Org admin assigns coordinator
     → Coordinator validates intake
     → Clinical assesses & documents
@@ -188,12 +195,12 @@ Platform admin creates organization (+ org admin)
 
 ---
 
-### 2. Family registers
-1. Family creates an account (family / patient role).
+### 2. Family registers and can use the portal
+1. Family creates an account (family / patient role) and verifies email.
 2. At registration, the family has **no organization yet** (`organizationId` is empty).
-3. Until an org is assigned, family login is blocked with an “awaiting assignment” state.
+3. After verification, family **can log in** and continue onboarding / care request. A soft banner notes that an organization will be assigned shortly — login and Finish are **not** blocked.
 
-**Outcome:** Family account exists and is waiting for platform admin to place them in an org.
+**Outcome:** Family account exists; they may already have submitted a care request before org assignment.
 
 ---
 
@@ -201,22 +208,22 @@ Platform admin creates organization (+ org admin)
 1. Platform admin opens **Admin → Families**.
 2. Finds the unassigned family.
 3. **Assigns the family to an organization**.
-4. System can backfill related care unit / intake org linkage as needed.
-5. Family receives an email that they have been assigned (login link → family portal).
+4. System backfills related care unit / intake org linkage.
+5. Family may receive an email that they have been assigned.
 
-**Outcome:** Family now belongs to a specific hospital / care org and can use the family portal.
+**Outcome:** Family belongs to a specific hospital / care org; prior intakes enter that org’s queue.
 
 > This is the critical platform-admin step: **users do not pick their org themselves — admin assigns them.**
 
 ---
 
 ### 4. Family requests care (intake)
-1. Family signs in to the family portal.
+1. Family signs in to the family portal (allowed with or without org).
 2. Completes clinical onboarding (care unit, care recipient, history, documents, consent).
-3. Submits intake under their assigned organization.
-4. Intake appears as **pending** for that organization.
+3. Submits intake — `organizationId` may be null until admin assign, then backfilled.
+4. Once assigned, intake appears as **pending** for that organization.
 
-**Outcome:** Care request is in the org queue, waiting for coordinator assignment / review.
+**Outcome:** Care request can be submitted before org assignment; after assignment it is in the org queue for coordinator assignment / review.
 
 ---
 
@@ -340,19 +347,18 @@ Non-material edits can stay in place without restarting family approval.
 
 1. **Platform admin** — create organization + org admin invite  
 2. **Org admin** — invite coordinator, clinical, support  
-3. **Family** — register (show awaiting-org state if useful)  
-4. **Platform admin** — **Admin → Families** → assign family to the org  
-5. **Family** — log in, complete onboarding + submit intake  
-6. **Org admin** — assign coordinator to the family  
-7. **Coordinator** — validate intake → create/submit care plan  
-8. **Family** — approve care plan  
-9. **Coordinator** — schedule session + assign tasks  
-10. **Clinical** — assessment + clinical note  
-11. **Support** — start shift + complete task  
-12. *(Optional)* Coordinator material edit → family re-approval  
+3. **Family** — register, verify email, log in, complete onboarding + submit intake (may still be unassigned)  
+4. **Platform admin** — **Admin → Families** → assign family to the org (backfill)  
+5. **Org admin** — assign coordinator to the family  
+6. **Coordinator** — validate intake → create/submit care plan  
+7. **Family** — approve care plan  
+8. **Coordinator** — schedule session + assign tasks  
+9. **Clinical** — assessment + clinical note  
+10. **Support** — start shift + complete task  
+11. *(Optional)* Coordinator material edit → family re-approval  
 
 ---
 
 ## One-line summary
 
-**Create accounts (org → staff → family assignment) → family intakes → org assigns coordinator → coordinator validates and plans → family approves → clinical assesses and documents → support delivers tasks → meaningful plan changes return to the family.**
+**Create accounts (org → staff → family) → family can log in and intake before org assign → admin assigns org (backfill) → org assigns coordinator → coordinator validates and plans → family approves → clinical assesses and documents → support delivers tasks → meaningful plan changes return to the family.**

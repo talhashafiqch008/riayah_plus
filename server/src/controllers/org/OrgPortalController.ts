@@ -215,6 +215,21 @@ export class OrgPortalController {
         },
       });
 
+      const action = body.isActive === false
+        ? 'org_coordinator_deactivated'
+        : body.isActive === true
+          ? 'org_coordinator_reactivated'
+          : 'org_coordinator_updated';
+      await AuditService.log({
+        userId: req.user!.userId,
+        action,
+        entity: 'User',
+        entityId: existing.id,
+        before: { isActive: existing.isActive },
+        after: { isActive: updated.isActive },
+        req,
+      });
+
       res.json({ data: updated });
     } catch (err) {
       next(err);
@@ -555,6 +570,21 @@ export class OrgPortalController {
           isActive: true,
           mustSetPassword: true,
         },
+      });
+
+      const staffAction = body.isActive === false
+        ? 'org_staff_deactivated'
+        : body.isActive === true
+          ? 'org_staff_reactivated'
+          : 'org_staff_updated';
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: staffAction,
+        entity: 'User',
+        entityId: existing.id,
+        before: { isActive: existing.isActive },
+        after: { isActive: updated.isActive },
+        req,
       });
 
       res.json({ data: updated });

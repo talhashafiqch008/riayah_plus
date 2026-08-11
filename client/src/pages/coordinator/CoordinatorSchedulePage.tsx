@@ -23,6 +23,7 @@ import {
   btnSecondaryClass,
   fieldClass,
 } from '@/components/care/RolePageChrome';
+import StaffPersonCard from '@/components/care/StaffPersonCard';
 
 type SlotDraft = { dayOfWeek: number; startTime: string; endTime: string; isAvailable: boolean };
 
@@ -37,7 +38,8 @@ function episodeOptionLabel(ep: CareEpisode): string {
 }
 
 function staffOptionLabel(s: ScheduleStaffOption): string {
-  return `${s.name} · ${scheduleStaffRoleLabel(s.role)}`;
+  const langs = s.languages?.length ? ` · ${s.languages.slice(0, 2).join(', ')}` : '';
+  return `${s.name} · ${scheduleStaffRoleLabel(s.role)}${langs}`;
 }
 
 export default function CoordinatorSchedulePage() {
@@ -253,8 +255,17 @@ export default function CoordinatorSchedulePage() {
               the Org portal.
             </p>
           )}
-          {selectedStaff?.email ? (
-            <p className="text-xs text-stone-500">{selectedStaff.email}</p>
+          {selectedStaff ? (
+            <div className="pt-2">
+              <StaffPersonCard
+                staff={selectedStaff}
+                variant={
+                  selectedStaff.role === 'support_worker' || selectedStaff.role === 'caregiver'
+                    ? 'support'
+                    : 'clinician'
+                }
+              />
+            </div>
           ) : null}
         </label>
 

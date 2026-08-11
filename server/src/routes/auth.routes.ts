@@ -4,9 +4,10 @@ import { RegistrationController } from '../controllers/auth/RegistrationControll
 import { OtpController } from '../controllers/auth/OtpController';
 import { DeviceTokenController } from '../controllers/auth/DeviceTokenController';
 import { UserProfileController } from '../controllers/users/UserProfileController';
+import { StaffProfileController, staffAvatarUploadMiddleware } from '../controllers/users/StaffProfileController';
 import { authenticate, optionalAuth, generateAccessToken } from '../middleware/auth';
 import { requireAdmin } from '../middleware/rbac';
-import { loginLimiter, otpLimiter, registerLimiter, adminLimiter } from '../middleware/rateLimiter';
+import { loginLimiter, otpLimiter, registerLimiter, adminLimiter, avatarUploadLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
@@ -78,6 +79,9 @@ router.post('/auth/logout', optionalAuth, AuthController.logout);
 // GET /api/email/verify?token=...&email=...
 router.get('/email/verify', AuthController.verifyEmailLink);
 
+// Public staff profile photos (shown on episode cards)
+router.get('/avatars/:userId/:filename', StaffProfileController.serveAvatar);
+
 // Authenticated
 router.use(authenticate);
 router.post('/logout-all', AuthController.logoutAll);
@@ -113,6 +117,14 @@ router.get('/onboarding/status', RegistrationController.getOnboardingStatus);
 router.put('/user/password', UserProfileController.updatePassword);
 router.put('/user/profile', UserProfileController.updateProfile);
 router.put('/client/profile', UserProfileController.updateProfile);
+router.get('/users/me/profile', StaffProfileController.getMeProfile);
+router.patch('/users/me/profile', StaffProfileController.patchMeProfile);
+router.post(
+  '/users/me/avatar',
+  avatarUploadLimiter,
+  staffAvatarUploadMiddleware,
+  StaffProfileController.uploadAvatar,
+);
 router.delete('/user', UserProfileController.destroy);
 
 export default router;

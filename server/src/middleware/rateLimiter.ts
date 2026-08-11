@@ -82,6 +82,14 @@ export const documentLimiter = rateLimit({
   message: { message: 'Document rate limit exceeded.' },
 });
 
+/** Staff profile photo uploads — stricter than general documents. */
+export const avatarUploadLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  store: makeStore('avatar'),
+  message: { message: 'Profile photo upload rate limit exceeded. Try again shortly.' },
+});
+
 export const webhookLimiter = rateLimit({
   windowMs: 60_000,
   max: 100,

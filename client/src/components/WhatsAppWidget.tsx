@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, X, MoreHorizontal, Smile, Paperclip, ChevronDown, MessageCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import Logo from './Logo';
 import { client } from '@/lib/api/client';
 
@@ -132,6 +133,7 @@ export const WhatsAppWidget = ({ selectedCategory = "General Inquiry" }: WhatsAp
  <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed ${msg.isUser ? 'bg-[#84cc16] text-white rounded-br-none' : 'bg-stone-100 text-stone-800 rounded-bl-none' }`}>
  <ReactMarkdown
  remarkPlugins={[remarkGfm]}
+ rehypePlugins={[rehypeSanitize]}
  components={{
  ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
  ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,

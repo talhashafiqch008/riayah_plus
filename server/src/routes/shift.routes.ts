@@ -34,17 +34,22 @@ router.post('/start', async (req: Request, res: Response, next: NextFunction) =>
 
     const { bookingId } = z.object({ bookingId: z.string().optional() }).parse(req.body ?? {});
 
-    const existing = await prisma.shift.findFirst({
-      where: { workerId: req.user!.userId, status: { in: ['active', 'on_break'] } },
+    const { shift, created } = await prisma.$transaction(async (tx) => {
+      const existing = await tx.shift.findFirst({
+        where: { workerId: req.user!.userId, status: { in: ['active', 'on_break'] } },
+      });
+      if (existing) return { shift: existing, created: false };
+
+      const s = await tx.shift.create({
+        data: { workerId: req.user!.userId, bookingId, status: 'active', startedAt: new Date() },
+      });
+      return { shift: s, created: true };
     });
-    if (existing) {
-      res.status(200).json({ message: 'Shift already active.', data: existing });
+
+    if (!created) {
+      res.status(200).json({ message: 'Shift already active.', data: shift });
       return;
     }
-
-    const shift = await prisma.shift.create({
-      data: { workerId: req.user!.userId, bookingId, status: 'active', startedAt: new Date() },
-    });
     res.status(201).json({ data: shift });
   } catch (err) {
     next(err);
