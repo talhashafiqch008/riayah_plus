@@ -27,6 +27,10 @@ declare global {
 const USER_STATUS_CACHE_TTL_SECONDS = 30;
 const LOGOUT_ALL_TTL_SECONDS = 7 * 24 * 60 * 60; // matches max refresh token lifetime
 
+/** M1: pin JWT algorithms — reject alg=none / unexpected algs. */
+const ACCESS_VERIFY_OPTS: jwt.VerifyOptions = { algorithms: ['HS256'] };
+const REFRESH_VERIFY_OPTS: jwt.VerifyOptions = { algorithms: ['HS256'] };
+
 export async function recordLogoutAll(userId: string): Promise<void> {
   try {
     await redis.set(`auth:logoutall:${userId}`, Date.now().toString(), 'EX', LOGOUT_ALL_TTL_SECONDS);
@@ -35,7 +39,7 @@ export async function recordLogoutAll(userId: string): Promise<void> {
   }
 }
 
-async function wasLoggedOutAll(userId: string, iatSeconds: number): Promise<boolean> {
+export async function wasLoggedOutAll(userId: string, iatSeconds: number): Promise<boolean> {
   try {
     const val = await redis.get(`auth:logoutall:${userId}`);
     if (!val) return false;
@@ -45,7 +49,7 @@ async function wasLoggedOutAll(userId: string, iatSeconds: number): Promise<bool
   }
 }
 
-async function assertUserActive(userId: string): Promise<boolean> {
+export async function assertUserActive(userId: string): Promise<boolean> {
   const cacheKey = `auth:active:${userId}`;
   try {
     const cached = await redis.get(cacheKey);
@@ -78,7 +82,11 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
 
   void (async () => {
     try {
-      const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as AuthPayload & { iat: number };
+      const payload = jwt.verify(
+        token,
+        env.JWT_ACCESS_SECRET,
+        ACCESS_VERIFY_OPTS,
+      ) as AuthPayload & { iat: number };
       const [active, terminated] = await Promise.all([
         assertUserActive(payload.userId),
         wasLoggedOutAll(payload.userId, payload.iat),
@@ -139,7 +147,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   })();
 }
 
-export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
   const token = getAccessTokenFromRequest(req);
   if (!token) {
     next();
@@ -148,10 +156,26 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
 
   void (async () => {
     try {
-      const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as AuthPayload;
-      const active = await assertUserActive(payload.userId);
-      if (active) {
+      const payload = jwt.verify(
+        token,
+        env.JWT_ACCESS_SECRET,
+        ACCESS_VERIFY_OPTS,
+      ) as AuthPayload & { iat: number };
+
+      const [active, terminated] = await Promise.all([
+        assertUserActive(payload.userId),
+        wasLoggedOutAll(payload.userId, payload.iat),
+      ]);
+
+      // Treat revoked / inactive tokens as anonymous on optional routes
+      if (!terminated && active) {
         req.user = payload;
+        await new Promise<void>((resolve, reject) => {
+          attachTenantContext(req, res, (err?: unknown) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
       }
     } catch {
       // silently ignore — route is publicly accessible
@@ -163,17 +187,28 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
 export function generateAccessToken(payload: AuthPayload): string {
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN,
+    algorithm: 'HS256',
   } as jwt.SignOptions);
 }
 
 export function generateRefreshToken(payload: Pick<AuthPayload, 'userId'>): string {
   return jwt.sign({ ...payload, jti: randomUUID() }, env.JWT_REFRESH_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+    algorithm: 'HS256',
   } as jwt.SignOptions);
 }
 
+export function verifyAccessToken(token: string): AuthPayload & { iat: number } {
+  return jwt.verify(token, env.JWT_ACCESS_SECRET, ACCESS_VERIFY_OPTS) as AuthPayload & {
+    iat: number;
+  };
+}
+
 export function verifyRefreshToken(token: string): Pick<AuthPayload, 'userId'> {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as Pick<AuthPayload, 'userId'>;
+  return jwt.verify(token, env.JWT_REFRESH_SECRET, REFRESH_VERIFY_OPTS) as Pick<
+    AuthPayload,
+    'userId'
+  >;
 }
 
 export async function getUserFromRequest(req: Request) {

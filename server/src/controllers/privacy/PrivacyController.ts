@@ -1,11 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
+import { env } from '../../config/env';
 import { AuditService } from '../../services/AuditService';
 import { performAccountDeletion } from '../../services/AccountDeletionService';
 import { AppError } from '../../middleware/errorHandler';
+import {
+  writeEncryptedExport,
+  readAndDecryptExport,
+  deleteExportFile,
+} from '../../utils/dataExportCrypto';
+
+const EXPORT_TTL_MS = () => Math.max(1, env.DATA_EXPORT_TTL_HOURS) * 60 * 60 * 1000;
 
 const exportSchema = z.object({
+  /** Re-authentication required before PHI export (M2 / GDPR Art 15–20). */
+  password: z.string().min(1, 'Password is required to export your data.'),
   format: z.enum(['json']).default('json'),
   categories: z
     .array(
@@ -28,19 +39,40 @@ const exportSchema = z.object({
     .optional(),
 });
 
+const downloadSchema = z.object({
+  password: z.string().min(1, 'Password is required to download your export.'),
+});
+
+async function assertPassword(userId: string, password: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true, isActive: true, deletedAt: true },
+  });
+  if (!user || !user.isActive || user.deletedAt) {
+    throw new AppError('Account unavailable.', 403);
+  }
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) {
+    throw new AppError('Invalid password.', 401);
+  }
+}
+
 export class PrivacyController {
-  // POST /api/privacy/data-export — GDPR Art 15/20 (G-4, G-5, G-21)
+  // POST /api/privacy/data-export — GDPR Art 15/20 (encrypt + re-auth + TTL)
   static async requestDataExport(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.userId;
-      const { format, categories } = exportSchema.parse(req.body ?? {});
+      const { format, categories, password } = exportSchema.parse(req.body ?? {});
+      await assertPassword(userId, password);
+
       const include = (key: string) => !categories || categories.includes(key as never);
+      const expiresAt = new Date(Date.now() + EXPORT_TTL_MS());
 
       const exportRequest = await prisma.dataExportRequest.create({
         data: {
           userId,
           status: 'pending',
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          expiresAt,
         },
       });
 
@@ -83,14 +115,59 @@ export class PrivacyController {
         include('bookings')
           ? prisma.booking.findMany({
               where: { OR: [{ clientId: userId }, { providerId: userId }] },
+              select: {
+                id: true,
+                clientId: true,
+                providerId: true,
+                serviceType: true,
+                status: true,
+                scheduledAt: true,
+                durationHours: true,
+                totalAmount: true,
+                currency: true,
+                notes: true,
+                createdAt: true,
+                updatedAt: true,
+              },
             })
           : [],
-        include('payments') ? prisma.payment.findMany({ where: { userId } }) : [],
-        include('messages') ? prisma.message.findMany({ where: { senderId: userId } }) : [],
-        include('notifications')
-          ? prisma.notification.findMany({ where: { userId } })
+        include('payments')
+          ? prisma.payment.findMany({
+              where: { userId },
+              select: {
+                id: true,
+                amount: true,
+                currency: true,
+                status: true,
+                gateway: true,
+                method: true,
+                createdAt: true,
+              },
+            })
           : [],
-        include('documents') ? prisma.document.findMany({ where: { userId } }) : [],
+        include('messages')
+          ? prisma.message.findMany({
+              where: { senderId: userId },
+              select: {
+                id: true,
+                receiverId: true,
+                content: true,
+                createdAt: true,
+              },
+            })
+          : [],
+        include('notifications')
+          ? prisma.notification.findMany({
+              where: { userId },
+              select: { id: true, title: true, body: true, type: true, createdAt: true },
+            })
+          : [],
+        include('documents')
+          ? prisma.document.findMany({
+              where: { userId },
+              select: { id: true, name: true, type: true, status: true, createdAt: true },
+            })
+          : [],
         include('reviews') ? prisma.review.findMany({ where: { clientId: userId } }) : [],
         include('wallet') ? prisma.walletBalance.findUnique({ where: { userId } }) : null,
         include('care')
@@ -119,13 +196,20 @@ export class PrivacyController {
           : [],
         prisma.consent.findMany({ where: { userId } }),
         prisma.consentLog.findMany({ where: { userId }, take: 200, orderBy: { createdAt: 'desc' } }),
-        include('gps_logs') ? prisma.gpsLog.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 500 }) : [],
+        include('gps_logs')
+          ? prisma.gpsLog.findMany({
+              where: { userId },
+              orderBy: { createdAt: 'desc' },
+              take: 500,
+            })
+          : [],
       ]);
 
       const exportData = {
         exportedAt: new Date().toISOString(),
         requestId: exportRequest.id,
         format,
+        expiresAt: expiresAt.toISOString(),
         user,
         bookings,
         payments,
@@ -149,9 +233,16 @@ export class PrivacyController {
         gpsLogs,
       };
 
+      const fileUrl = await writeEncryptedExport(exportRequest.id, exportData);
+
       await prisma.dataExportRequest.update({
         where: { id: exportRequest.id },
-        data: { status: 'completed', completedAt: new Date() },
+        data: {
+          status: 'ready',
+          completedAt: new Date(),
+          fileUrl,
+          expiresAt,
+        },
       });
 
       await AuditService.log({
@@ -159,14 +250,86 @@ export class PrivacyController {
         action: 'data_export_requested',
         entity: 'DataExportRequest',
         entityId: exportRequest.id,
-        after: { status: 'completed', categories: categories ?? 'all' },
+        after: {
+          status: 'ready',
+          categories: categories ?? 'all',
+          expiresAt: expiresAt.toISOString(),
+          encrypted: true,
+        },
         req,
       });
 
-      const filename = `riayah-data-export-${userId}.json`;
-      res.setHeader('Content-Type', 'application/json');
+      // Never return PHI in this response — download is a separate re-auth step
+      res.status(202).json({
+        success: true,
+        requestId: exportRequest.id,
+        status: 'ready',
+        expiresAt: expiresAt.toISOString(),
+        downloadUrl: `/api/privacy/data-export/${exportRequest.id}/download`,
+        message:
+          'Your encrypted export is ready. Re-enter your password on the download endpoint within the expiry window.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/privacy/data-export/:id/download — re-auth + decrypt + one-time stream
+  static async downloadDataExport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const { id } = req.params;
+      const { password } = downloadSchema.parse(req.body ?? {});
+      await assertPassword(userId, password);
+
+      const exportRequest = await prisma.dataExportRequest.findFirst({
+        where: { id, userId },
+      });
+      if (!exportRequest) {
+        throw new AppError('Export not found.', 404);
+      }
+      if (exportRequest.status === 'downloaded') {
+        throw new AppError('This export was already downloaded and has been removed.', 410);
+      }
+      if (exportRequest.status !== 'ready' || !exportRequest.fileUrl) {
+        throw new AppError('Export is not ready.', 409);
+      }
+      if (exportRequest.expiresAt && exportRequest.expiresAt.getTime() < Date.now()) {
+        await deleteExportFile(exportRequest.id);
+        await prisma.dataExportRequest.update({
+          where: { id: exportRequest.id },
+          data: { status: 'expired', fileUrl: null },
+        });
+        throw new AppError('This export has expired. Please request a new one.', 410);
+      }
+
+      let plaintext: Buffer;
+      try {
+        plaintext = await readAndDecryptExport(exportRequest.id);
+      } catch {
+        throw new AppError('Export file is missing or corrupt. Please request a new export.', 410);
+      }
+
+      await prisma.dataExportRequest.update({
+        where: { id: exportRequest.id },
+        data: { status: 'downloaded', fileUrl: null },
+      });
+      await deleteExportFile(exportRequest.id);
+
+      await AuditService.log({
+        userId,
+        action: 'data_export_downloaded',
+        entity: 'DataExportRequest',
+        entityId: exportRequest.id,
+        req,
+      });
+
+      const filename = `riayah-data-export-${exportRequest.id}.json`;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.json(exportData);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.send(plaintext);
     } catch (err) {
       next(err);
     }
@@ -228,6 +391,15 @@ export class PrivacyController {
           where: { userId },
           orderBy: { createdAt: 'desc' },
           take: 20,
+          select: {
+            id: true,
+            status: true,
+            requestedAt: true,
+            expiresAt: true,
+            completedAt: true,
+            createdAt: true,
+            // never expose fileUrl paths
+          },
         }),
         prisma.accountDeletionRequest.findMany({
           where: { userId },

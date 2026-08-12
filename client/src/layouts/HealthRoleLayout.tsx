@@ -157,6 +157,14 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
           <h1 className="font-semibold text-stone-900">{pageTitle}</h1>
         </header>
         <main id="main-content" className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8">
+          {config.key === 'family' && !user?.organizationId && (
+            <div
+              role="status"
+              className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            >
+              Your care organization will be assigned shortly. You can continue requesting care in the meantime.
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

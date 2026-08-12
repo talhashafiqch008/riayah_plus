@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
@@ -12,7 +11,10 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
+  verifyAccessToken,
   recordLogoutAll,
+  assertUserActive,
+  wasLoggedOutAll,
   AuthPayload,
 } from '../../middleware/auth';
 import {
@@ -50,8 +52,6 @@ const setPasswordSchema = z.object({
   token: z.string().min(1),
   password: z.string().min(8),
 });
-
-const FAMILY_ROLES = new Set(['family', 'patient', 'client', 'consumer']);
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -111,13 +111,8 @@ export class AuthController {
       );
     }
 
-    // Family/patient accounts cannot log in until a platform admin assigns an organization.
-    if (FAMILY_ROLES.has(user.role) && !user.organizationId) {
-      throw new AppError(
-        'Your account is awaiting organization assignment. You will be able to log in once an administrator links you to a care organization.',
-        403,
-      );
-    }
+    // Family may log in and request care before organization assignment.
+    // Platform admin assigns org later (Admin → Families); units/intakes backfill then.
 
     // Enforce email verification before allowing login.
     // (Seed accounts can be marked verified via prisma/seed.ts)
@@ -148,6 +143,7 @@ export class AuthController {
         avatar: user.avatar,
         onboardingStatus: user.onboardingStatus,
         twoFactorEnabled: user.twoFactorEnabled,
+        organizationId: user.organizationId,
       },
       onboarding_status: user.onboardingStatus,
     });
@@ -185,7 +181,14 @@ export class AuthController {
       token: accessToken,
       accessToken,
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, twoFactorEnabled: user.twoFactorEnabled },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        twoFactorEnabled: user.twoFactorEnabled,
+        organizationId: user.organizationId,
+      },
     });
   }
 
@@ -266,7 +269,15 @@ export class AuthController {
     }
 
     try {
-      const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as AuthPayload;
+      const payload = verifyAccessToken(token);
+      const [active, terminated] = await Promise.all([
+        assertUserActive(payload.userId),
+        wasLoggedOutAll(payload.userId, payload.iat),
+      ]);
+      if (!active || terminated) {
+        res.json({ authenticated: false });
+        return;
+      }
       res.json({
         authenticated: true,
         userId: payload.userId,
@@ -388,8 +399,19 @@ export class AuthController {
       await tx.otpVerification.deleteMany({
         where: { userId, type: INVITE_TOKEN_TYPE },
       });
+      // Match resetPassword: revoke any pre-invite sessions/tokens
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       return updated;
     });
+    await recordLogoutAll(userId);
+    clearAuthCookies(res);
 
     await AuditService.log({
       userId,

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
 import {
- ArrowRight, ArrowLeft, Check, Heart, Info,
+ ArrowRight, ArrowLeft, Check,
  Baby, Activity, Home, Accessibility, UserPlus,
  Stethoscope, Sparkles, X, Trash2
 } from "lucide-react";
@@ -81,12 +81,6 @@ const CARE_CATEGORIES = [
  },
 ];
 
-const PLAN_TYPES = [
- { id: 'ndia_managed', label: 'NDIA Managed' },
- { id: 'plan_managed', label: 'Plan Managed' },
- { id: 'self_managed', label: 'Self Managed' },
-];
-
 const fadeIn = {
  initial: { opacity: 0, y: 10 },
  animate: { opacity: 1, y: 0 },
@@ -122,17 +116,6 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  newCategories = selectedCategories.filter(c => c !== categoryId);
  if (activeDetailId === categoryId) setActiveDetailId(null);
  delete newNeeds[categoryId];
-
- // Clear plan data if removing disability
- if (categoryId === 'disability_support') {
- onUpdate({
- careCategories: newCategories,
- careNeeds: newNeeds,
- supportPlanType: undefined,
- planDates: undefined
- });
- return;
- }
 
  } else {
  // Adding category
@@ -309,161 +292,6 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  </m.button>
  );
  })}
- </div>
- </m.div>
- )}
- </AnimatePresence>
-
- {/* Disability Support Plan (Conditional) */}
- <AnimatePresence>
- {selectedCategories.includes('disability_support') && (
- <m.div
- initial={{ opacity: 0, height: 0 }}
- animate={{ opacity: 1, height: 'auto' }}
- exit={{ opacity: 0, height: 0 }}
- className="bg-purple-50/50 rounded-[24px] p-6 border-2 border-purple-100 shadow-sm overflow-hidden mt-6"
- >
- <div className="flex items-center gap-3 mb-6">
- <div className="size-10 bg-purple-100 rounded-full flex items-center justify-center">
- <Accessibility className="size-5 text-purple-600" />
- </div>
- <div>
- <h3 className="text-lg font-semibold text-stone-900">NDIS Plan Details</h3>
- <p className="text-xs text-stone-500">Select how your plan is managed</p>
- </div>
- </div>
-
- <div className="space-y-8">
- {/* Plan Type Selection */}
- <div className="bg-stone-100 p-1.5 rounded-xl flex flex-col md:flex-row gap-1">
- {PLAN_TYPES.map((plan) => {
- const isPlanSelected = (data.supportPlanType as string) === plan.id;
- return (
- <button
- key={plan.id}
- onClick={() => onUpdate({ supportPlanType: plan.id })}
- className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-transform duration-300 ${isPlanSelected ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100' : 'text-stone-500 hover:text-stone-700 hover:bg-stone-200/50' }`}
- >
- {plan.label}
- </button>
- );
- })}
- </div>
-
- {/* Dynamic Fields based on Plan Type */}
- {Boolean(data.supportPlanType) && (
- <m.div
- initial={{ opacity: 0, y: -10 }}
- animate={{ opacity: 1, y: 0 }}
- className="space-y-6"
- >
- {/* NDIS Number - Mandatory for Plan & NDIA, Optional for Self */}
- <div className="space-y-1.5">
- <span className="block text-sm font-bold text-stone-900">
- NDIS Number
- {(data.supportPlanType === 'plan_managed' || data.supportPlanType === 'ndia_managed') !== false && <span className="text-red-500 ml-1">*</span>}
- {data.supportPlanType === 'self_managed' && <span className="text-stone-400 font-normal ml-1">(Optional)</span>}
- </span>
- <input
- type="text"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
- value={(data.ndisNumber as string) || ''}
- onChange={(e) => onUpdate({ ndisNumber: e.target.value })}
- placeholder="e.g. 430xxxxxx"
- />
- </div>
-
- {/* Plan Manager Email - Mandatory ONLY for Plan Managed */}
- {data.supportPlanType === 'plan_managed' && (
- <div className="space-y-1.5">
- <label htmlFor="input-src-app-careseeker-onboarding-steps-StepCareNeeds-tsx-390-392" className="block text-sm font-bold text-stone-900">
- Plan Manager's Email <span className="text-red-500">*</span>
- </label>
- <input
- type="email"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
- value={(data.planManagerEmail as string) || ''}
- onChange={(e) => onUpdate({ planManagerEmail: e.target.value })}
- placeholder="manager@example.com"
- />
- <p className="text-xs text-stone-500 flex items-center gap-1.5">
- <Info className="size-3.5" />
- Invoices will be sent directly to your Plan Manager
- </p>
- </div>
- )}
-
- {/* Date of Birth - Mandatory for NDIA, Optional for others */}
- <div className="space-y-1.5">
- <span className="block text-sm font-bold text-stone-900">
- Date of Birth
- {data.supportPlanType === 'ndia_managed' && <span className="text-red-500 ml-1">*</span>}
- {data.supportPlanType !== 'ndia_managed' && <span className="text-stone-400 font-normal ml-1">(Optional)</span>}
- </span>
- <input
- type="date"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
- value={(data.dateOfBirth as string) || ''}
- onChange={(e) => onUpdate({ dateOfBirth: e.target.value })}
- />
- </div>
-
- {/* NDIA Specifics: Plan Dates & Info */}
- {data.supportPlanType === 'ndia_managed' && (
- <div className="space-y-4">
- <div className="space-y-1.5">
- <span className="block text-sm font-bold text-stone-900">
- Plan Dates (Start - End) <span className="text-red-500">*</span>
- </span>
- <div className="grid grid-cols-2 gap-4">
- <div className="space-y-1">
- <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider ml-1">Start Date</span>
- <input
- type="date"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
- value={(data.planStartDate as string) || ''}
- onChange={(e) => onUpdate({ planStartDate: e.target.value })}
- />
- </div>
- <div className="space-y-1">
- <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider ml-1">End Date</span>
- <input
- type="date"
- className="w-full px-4 py-3.5 rounded-xl border-2 ring-1 ring-stone-200/50 focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-500/10 bg-white text-stone-900 placeholder:text-stone-400 font-medium transition-transform duration-300"
- value={(data.planEndDate as string) || ''}
- onChange={(e) => onUpdate({ planEndDate: e.target.value })}
- />
- </div>
- </div>
- </div>
-
- <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex items-start gap-3">
- <div className="size-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
- <Info className="size-4 text-purple-600" />
- </div>
- <div className="text-sm text-stone-700 pt-1">
- <p className="font-bold mb-1 text-stone-900">Important for NDIA Managed</p>
- <ul className="list-disc pl-4 space-y-1 text-stone-600">
- <li>Payments are claimed via the NDIS Portal.</li>
- <li>You can only connect with <span className="font-bold text-purple-700">Registered NDIS Providers</span>.</li>
- </ul>
- </div>
- </div>
- </div>
- )}
-
- {/* Self Managed Info */}
- {data.supportPlanType === 'self_managed' && (
- <div className="bg-stone-50 p-4 rounded-xl ring-1 ring-stone-200/50 text-sm text-stone-600 flex items-center gap-3">
- <div className="size-8 bg-white rounded-full border border-stone-200 flex items-center justify-center flex-shrink-0 ">
- <Info className="size-4 text-stone-400" />
- </div>
- Payment via Credit Card / Direct Debit. Invoices sent to your email.
- </div>
- )}
-
- </m.div>
- )}
  </div>
  </m.div>
  )}

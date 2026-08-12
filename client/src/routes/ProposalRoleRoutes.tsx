@@ -29,6 +29,7 @@ import CarePatientDetailPage from '@/pages/care/CarePatientDetailPage';
 import EpisodeListPage from '@/pages/care/EpisodeListPage';
 import EpisodeDetailPage from '@/pages/care/EpisodeDetailPage';
 import AssessmentSchedulePage from '@/pages/care/AssessmentSchedulePage';
+import StaffProfileSettingsPage from '@/pages/staff/ProfilePage';
 
 const PageSpinner = () => (
   <div className="min-h-[200px] flex items-center justify-center">
@@ -330,6 +331,14 @@ export const proposalRoleRouteElements = (
                   }
                 />
                 <Route
+                  path="/clinical/profile"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <StaffProfileSettingsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/clinical/plans/:id"
                   element={
                     <Suspense fallback={<PageSpinner />}>
@@ -354,6 +363,14 @@ export const proposalRoleRouteElements = (
                   element={
                     <Suspense fallback={<PageSpinner />}>
                       <SupportTasksPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/support/profile"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <StaffProfileSettingsPage />
                     </Suspense>
                   }
                 />

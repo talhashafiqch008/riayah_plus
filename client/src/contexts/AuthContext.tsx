@@ -33,6 +33,7 @@ export interface User {
   country?: string;
   phone?: string;
   avatar?: string | null;
+  organizationId?: string | null;
   onboarding_status?: string;
   is_active?: boolean;
   is_verified?: boolean;
@@ -95,6 +96,7 @@ function mapUserData(userData: Record<string, unknown>, extra?: Record<string, u
     country: userData.country as string | undefined,
     phone: userData.phone as string | undefined,
     avatar: userData.avatar as string | null | undefined,
+    organizationId: (userData.organizationId ?? userData.organization_id ?? null) as string | null,
     onboarding_status: (
       userData.onboarding_status ||
       userData.onboardingStatus ||
@@ -128,11 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-validate session when navigating to protected routes (middleware parity)
+  // Re-validate session when navigating to protected routes (cookie session)
   useEffect(() => {
     if (loading || !isProtectedPath(location.pathname)) return;
-    const token = localStorage.getItem(STORAGE_KEYS.apiToken);
-    if (!token) return;
     void revalidateSession();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);

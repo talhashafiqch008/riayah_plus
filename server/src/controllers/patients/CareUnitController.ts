@@ -132,7 +132,7 @@ export class CareUnitController {
         include: {
           careRecipients: {
             where: { deletedAt: null },
-            select: { id: true, name: true, externalRef: true, diagnosisCodes: true },
+            select: { id: true, name: true, externalRef: true },
           },
           _count: { select: { intakeRecords: true, careEpisodes: true } },
         },
@@ -198,12 +198,8 @@ export class CareUnitController {
         familyUser.organizationId ??
         null;
 
-    if (isFamily(role) && !organizationId) {
-      throw new AppError(
-        'Your account is not linked to a care organization. Contact your clinic or ask an administrator to assign you before creating a care unit.',
-        422,
-      );
-    }
+    // Family may create care units before org assignment (organizationId null).
+    // Admin assignOrganization backfills unit/intake org later.
 
     if (isFamily(role) && (data.organizationId || data.clinicId)) {
       // Strip silently for family — ignore body org/clinic

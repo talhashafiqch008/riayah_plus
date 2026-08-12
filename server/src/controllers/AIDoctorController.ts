@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
+import { assertContentPolicy } from '../utils/contentPolicy';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
@@ -27,6 +28,7 @@ export class AIDoctorController {
   async doctorChat(req: Request, res: Response, next: NextFunction) {
     try {
       const { message } = doctorChatSchema.parse(req.body);
+      assertContentPolicy(message);
 
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',

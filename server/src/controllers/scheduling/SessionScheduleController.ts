@@ -10,14 +10,16 @@ import {
   assertNoProviderConflict,
   expandRecurrence,
 } from '../../services/SchedulingConflictService';
+import { staffPublicUserSelect, toPublicStaffCard } from '../../utils/staffProfile';
 
 const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
+const MAX_DURATION_MINUTES = 480;
 
 const bookSchema = z.object({
   episodeId: z.string().min(1),
   providerId: z.string().min(1),
   scheduledAt: z.string().min(1),
-  durationMinutes: z.number().int().positive().max(24 * 60).default(60),
+  durationMinutes: z.number().int().positive().max(MAX_DURATION_MINUTES).default(60),
   type: z.enum(['in_person', 'telehealth', 'home_visit']).optional(),
   notes: z.string().max(5000).optional(),
   /** Reassign pending episode tasks (from care-plan goals) to this provider. */
@@ -34,14 +36,15 @@ const recurringSchema = bookSchema.extend({
 
 const rescheduleSchema = z.object({
   scheduledAt: z.string().min(1).optional(),
-  durationMinutes: z.number().int().positive().max(24 * 60).optional(),
+  durationMinutes: z.number().int().positive().max(MAX_DURATION_MINUTES).optional(),
   notes: z.string().max(5000).nullable().optional(),
   status: z.enum(['pending', 'accepted', 'cancelled']).optional(),
 });
 
-function parseScheduledAt(raw: string): Date {
+function parseScheduledAt(raw: string, mustBeFuture = true): Date {
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) throw new AppError('Invalid scheduledAt datetime.', 422);
+  if (mustBeFuture && d <= new Date()) throw new AppError('scheduledAt must be in the future.', 422);
   return d;
 }
 
@@ -139,12 +142,12 @@ export class SessionScheduleController {
 
     const data = await prisma.user.findMany({
       where,
-      select: { id: true, name: true, role: true },
+      select: staffPublicUserSelect,
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
       take: 200,
     });
 
-    res.json({ data });
+    res.json({ data: data.map(toPublicStaffCard) });
   }
 
   /** GET /scheduling/sessions?episodeId=&providerId= */
@@ -160,6 +163,15 @@ export class SessionScheduleController {
     } else if (providerId) {
       if (req.user!.userId !== providerId && !['care_coordinator', 'admin', 'super_admin', 'support_admin'].includes(req.user!.role)) {
         throw new AppError('Forbidden.', 403);
+      }
+      // Coordinators/admins must only see sessions for providers in their own org
+      if (req.user!.userId !== providerId) {
+        const provider = await prisma.user.findFirst({
+          where: { id: providerId, deletedAt: null },
+          select: { organizationId: true },
+        });
+        if (!provider) throw new AppError('Provider not found.', 404);
+        assertTenantOrgAccess(req, provider.organizationId);
       }
       where.providerId = providerId;
     } else if (['support_worker', 'clinical_staff', 'doctor', 'nurse', 'physiotherapist', 'therapist', 'caregiver'].includes(req.user!.role)) {
@@ -178,12 +190,17 @@ export class SessionScheduleController {
       orderBy: { scheduledAt: 'asc' },
       take: 100,
       include: {
-        provider: { select: { id: true, name: true, role: true } },
+        provider: { select: staffPublicUserSelect },
         client: { select: { id: true, name: true } },
       },
     });
 
-    res.json({ sessions });
+    res.json({
+      sessions: sessions.map((s) => ({
+        ...s,
+        provider: s.provider ? toPublicStaffCard(s.provider) : s.provider,
+      })),
+    });
   }
 
   /** GET /scheduling/sessions/:id */
@@ -191,7 +208,7 @@ export class SessionScheduleController {
     const session = await prisma.session.findUnique({
       where: { id: req.params.id },
       include: {
-        provider: { select: { id: true, name: true, role: true } },
+        provider: { select: staffPublicUserSelect },
         client: { select: { id: true, name: true } },
         episode: { select: { id: true, title: true, organizationId: true, patientId: true } },
       },
@@ -208,7 +225,12 @@ export class SessionScheduleController {
       throw new AppError('Forbidden.', 403);
     }
 
-    res.json({ session });
+    res.json({
+      session: {
+        ...session,
+        provider: session.provider ? toPublicStaffCard(session.provider) : session.provider,
+      },
+    });
   }
 
   /** POST /scheduling/sessions — book one session with conflict detection */

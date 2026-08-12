@@ -4,11 +4,17 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { NotificationService } from '../../services/NotificationService';
 
+const AGENCY_STAFF_ROLES = [
+  'support_worker', 'nurse', 'physiotherapist', 'occupational_therapist',
+  'speech_therapist', 'psychologist', 'dietitian', 'cleaner', 'gardener',
+  'driver', 'companion', 'nanny', 'caregiver', 'therapist', 'doctor',
+] as const;
+
 const createStaffSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   phone: z.string().optional(),
-  role: z.string(),
+  role: z.enum(AGENCY_STAFF_ROLES),
   hourlyRate: z.number().positive().optional(),
   skills: z.array(z.string()).optional(),
   bio: z.string().optional(),
@@ -123,6 +129,22 @@ export class StaffController {
       const staff = await prisma.agencyStaff.findUnique({ where: { id: body.staffId } });
       if (!staff || staff.agencyId !== agencyId) throw new AppError('Staff member not found.', 404);
 
+      // Verify referenced booking/shift exist and belong to this agency's scope
+      if (body.bookingId) {
+        const booking = await prisma.booking.findUnique({
+          where: { id: body.bookingId },
+          select: { id: true },
+        });
+        if (!booking) throw new AppError('Booking not found.', 404);
+      }
+      if (body.shiftId) {
+        const shift = await prisma.shift.findUnique({
+          where: { id: body.shiftId },
+          select: { id: true },
+        });
+        if (!shift) throw new AppError('Shift not found.', 404);
+      }
+
       const assignment = await prisma.staffAssignment.create({
         data: {
           staffId: body.staffId,
@@ -161,11 +183,14 @@ export class StaffController {
   static async updateAssignment(req: Request, res: Response, next: NextFunction) {
     try {
       const { status, notes } = z.object({ status: z.string().optional(), notes: z.string().optional() }).parse(req.body);
-      const assignment = await prisma.staffAssignment.update({
+      const assignment = await prisma.staffAssignment.findUnique({ where: { id: req.params.id } });
+      if (!assignment) throw new AppError('Assignment not found.', 404);
+      if (assignment.agencyId !== req.user!.userId) throw new AppError('Forbidden.', 403);
+      const updated = await prisma.staffAssignment.update({
         where: { id: req.params.id },
         data: { status, notes },
       });
-      res.json({ success: true, assignment });
+      res.json({ success: true, assignment: updated });
     } catch (err) {
       next(err);
     }
@@ -174,6 +199,9 @@ export class StaffController {
   // DELETE /api/agency/assignments/:id
   static async deleteAssignment(req: Request, res: Response, next: NextFunction) {
     try {
+      const assignment = await prisma.staffAssignment.findUnique({ where: { id: req.params.id } });
+      if (!assignment) throw new AppError('Assignment not found.', 404);
+      if (assignment.agencyId !== req.user!.userId) throw new AppError('Forbidden.', 403);
       await prisma.staffAssignment.delete({ where: { id: req.params.id } });
       res.json({ success: true, message: 'Assignment removed.' });
     } catch (err) {

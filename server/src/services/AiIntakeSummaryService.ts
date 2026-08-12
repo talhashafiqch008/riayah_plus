@@ -2,6 +2,7 @@ import { Prisma, ServiceCategory, UrgencyLevel } from '@prisma/client';
 import { logger } from '../config/logger';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { AuditService } from './AuditService';
 import {
   RiayahAiClient,
   RiayahAiError,
@@ -126,6 +127,18 @@ export class AiIntakeSummaryService {
     intake: IntakeForAiSummary;
     careRecipient: CareRecipientForAiSummary;
   }): Promise<{ id: string; status: string }> {
+    const episode = await prisma.careEpisode.findUnique({
+      where: { id: params.episodeId },
+      select: { consentGiven: true },
+    });
+    if (!episode) throw new AppError('Care episode not found.', 404);
+    if (!episode.consentGiven) {
+      throw new AppError(
+        'AI processing consent has not been recorded for this episode. Obtain consent before sending data to Riayah AI.',
+        403,
+      );
+    }
+
     const payload = buildIntakeSummarisePayload(params.intake, params.careRecipient);
     const response = await RiayahAiClient.summarizeIntake(params.episodeId, payload);
 
@@ -175,6 +188,14 @@ export class AiIntakeSummaryService {
       status: row.status,
       model: response.model,
       totalTokens: response.totalTokens,
+    });
+
+    await AuditService.log({
+      userId: 'system',
+      action: 'ai_intake_summary_generated',
+      entity: 'AiIntakeSummary',
+      entityId: row.id,
+      after: { episodeId: params.episodeId, model: response.model, totalTokens: response.totalTokens, status: row.status },
     });
 
     return row;
@@ -246,6 +267,14 @@ export class AiIntakeSummaryService {
       episodeId: params.episodeId,
       summaryId: summary.id,
       approverId: params.approverId,
+    });
+
+    await AuditService.log({
+      userId: params.approverId,
+      action: 'ai_intake_summary_approved',
+      entity: 'AiIntakeSummary',
+      entityId: summary.id,
+      after: { episodeId: params.episodeId, approverId: params.approverId, status: summary.status },
     });
 
     return { summary, alreadyApproved: false };

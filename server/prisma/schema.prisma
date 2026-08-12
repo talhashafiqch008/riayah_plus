@@ -1863,19 +1863,31 @@ model Consent {
 }
 
 model ProviderProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  hourlyRate      Decimal? @db.Decimal(10, 2)
-  currency        String   @default("QAR")
-  averageRating   Float    @default(0)
-  reviewCount     Int      @default(0)
-  bio             String?
-  specialties     String[]
-  yearsExperience Int?
-  isAvailable     Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  hourlyRate             Decimal?  @db.Decimal(10, 2)
+  currency               String    @default("QAR")
+  averageRating          Float     @default(0)
+  reviewCount            Int       @default(0)
+  bio                    String?
+  specialties            String[]
+  yearsExperience        Int?
+  isAvailable            Boolean   @default(true)
+  // PE-01 staff self-managed profile
+  dateOfBirth            DateTime?
+  gender                 String?
+  nationality            String?
+  languages              String[]  @default([])
+  qatarId                String?   // internal only — never expose to families
+  certifications         String[]  @default([])
+  emergencyContactName   String?   // internal only
+  emergencyContactPhone  String?   // internal only
+  availabilitySchedule   Json?     // { days: number[], windows: { start, end }[] }
+  serviceAreas           String[]  @default([])
+  mohLicenseNumber       String?   // Qatar MOH license (clinicians)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("provider_profiles")
 }

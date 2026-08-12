@@ -21,6 +21,8 @@ import {
 } from '@/lib/familyLanguage';
 import { buildFamilyJourneyMilestones } from '@/lib/familyJourneyMilestones';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
+import StaffPersonCard from '@/components/care/StaffPersonCard';
+import type { PublicStaffCard } from '@/lib/api/staffProfile';
 
 type Props = {
   basePath: string;
@@ -609,21 +611,29 @@ export default function EpisodeDetailPage({
               : 'No assessments linked to this episode yet.'}
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {episode.assessments!.map((a) => (
               <li
                 key={a.id}
-                className="rounded-xl bg-stone-50 px-3 py-2 text-sm flex flex-wrap items-center justify-between gap-2"
+                className="rounded-xl bg-stone-50 px-3 py-3 text-sm space-y-2"
               >
-                <span className="font-medium text-stone-900 capitalize">
-                  {a.type || (familyFacing ? 'consultation' : 'assessment')}
-                  {a.scheduledAt ? ` · ${new Date(a.scheduledAt).toLocaleString()}` : ''}
-                </span>
-                <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900">
-                  {familyFacing
-                    ? familyAssessmentStatusLabel(a.status || 'scheduled')
-                    : (a.status || 'scheduled').replace(/_/g, ' ')}
-                </span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-stone-900 capitalize">
+                    {a.type || (familyFacing ? 'consultation' : 'assessment')}
+                    {a.scheduledAt ? ` · ${new Date(a.scheduledAt).toLocaleString()}` : ''}
+                  </span>
+                  <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900">
+                    {familyFacing
+                      ? familyAssessmentStatusLabel(a.status || 'scheduled')
+                      : (a.status || 'scheduled').replace(/_/g, ' ')}
+                  </span>
+                </div>
+                {a.assessor ? (
+                  <StaffPersonCard
+                    staff={a.assessor as PublicStaffCard}
+                    variant="clinician"
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -645,7 +655,9 @@ export default function EpisodeDetailPage({
                   {clinicians.length === 0 && <option value="">No clinicians found</option>}
                   {clinicians.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} ({c.email})
+                      {c.name}
+                      {c.languages?.length ? ` · ${c.languages.slice(0, 2).join(', ')}` : ''}
+                      {c.role ? ` (${c.role.replace(/_/g, ' ')})` : ''}
                     </option>
                   ))}
                 </select>
@@ -672,6 +684,12 @@ export default function EpisodeDetailPage({
                 />
               </label>
             </div>
+            {assessorId && clinicians.find((c) => c.id === assessorId) ? (
+              <StaffPersonCard
+                staff={clinicians.find((c) => c.id === assessorId)!}
+                variant="clinician"
+              />
+            ) : null}
             <button
               type="button"
               disabled={scheduling || !assessorId || !scheduledAt}
@@ -682,6 +700,33 @@ export default function EpisodeDetailPage({
               {familyFacing ? 'Book consultation' : 'Schedule assessment'}
             </button>
           </div>
+        )}
+      </div>
+
+      {/* Sessions / support workers */}
+      <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
+        <h3 className="text-sm font-semibold text-stone-900">Sessions</h3>
+        {(episode.sessions?.length ?? 0) === 0 ? (
+          <p className="text-sm text-stone-500">No care sessions scheduled for this episode yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {episode.sessions!.map((s) => (
+              <li key={s.id} className="rounded-xl bg-stone-50 px-3 py-3 text-sm space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-stone-900">
+                    {s.scheduledAt ? new Date(s.scheduledAt).toLocaleString() : 'Session'}
+                    {s.durationMinutes ? ` · ${s.durationMinutes} min` : ''}
+                  </span>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-900 capitalize">
+                    {(s.status || 'scheduled').replace(/_/g, ' ')}
+                  </span>
+                </div>
+                {s.provider ? (
+                  <StaffPersonCard staff={s.provider as PublicStaffCard} variant="support" />
+                ) : null}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

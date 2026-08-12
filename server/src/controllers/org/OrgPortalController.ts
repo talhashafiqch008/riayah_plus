@@ -215,6 +215,21 @@ export class OrgPortalController {
         },
       });
 
+      const action = body.isActive === false
+        ? 'org_coordinator_deactivated'
+        : body.isActive === true
+          ? 'org_coordinator_reactivated'
+          : 'org_coordinator_updated';
+      await AuditService.log({
+        userId: req.user!.userId,
+        action,
+        entity: 'User',
+        entityId: existing.id,
+        before: { isActive: existing.isActive },
+        after: { isActive: updated.isActive },
+        req,
+      });
+
       res.json({ data: updated });
     } catch (err) {
       next(err);
@@ -557,6 +572,21 @@ export class OrgPortalController {
         },
       });
 
+      const staffAction = body.isActive === false
+        ? 'org_staff_deactivated'
+        : body.isActive === true
+          ? 'org_staff_reactivated'
+          : 'org_staff_updated';
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: staffAction,
+        entity: 'User',
+        entityId: existing.id,
+        before: { isActive: existing.isActive },
+        after: { isActive: updated.isActive },
+        req,
+      });
+
       res.json({ data: updated });
     } catch (err) {
       next(err);
@@ -611,7 +641,14 @@ export class OrgPortalController {
       const [data, total] = await Promise.all([
         prisma.intakeRecord.findMany({
           where,
-          include: {
+          select: {
+            id: true,
+            status: true,
+            urgencyLevel: true,
+            reasonForCare: true,
+            serviceInterests: true,
+            submittedAt: true,
+            createdAt: true,
             careUnit: { select: { id: true, name: true } },
             careRecipient: {
               select: { id: true, name: true },

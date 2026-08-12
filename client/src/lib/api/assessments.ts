@@ -1,4 +1,5 @@
 import { client } from './client';
+import type { PublicStaffCard } from './staffProfile';
 
 export type AssessmentStatus = 'scheduled' | 'completed' | 'cancelled';
 
@@ -17,16 +18,11 @@ export interface Assessment {
   notes?: string | null;
   createdAt?: string;
   episode?: { id: string; title: string; status: string; patientId: string };
-  assessor?: { id: string; name: string; email: string };
+  assessor?: PublicStaffCard;
   patient?: { id: string; name: string; email?: string };
 }
 
-export interface ClinicianOption {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
+export type ClinicianOption = PublicStaffCard;
 
 export async function listAssessments(params?: {
   status?: string;

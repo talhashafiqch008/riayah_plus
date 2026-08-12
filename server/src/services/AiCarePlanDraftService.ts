@@ -70,7 +70,6 @@ export const carePlanDraftCallbackSchema = z.object({
   promptTokens: z.number().optional(),
   completionTokens: z.number().optional(),
   totalTokens: z.number().optional(),
-  rawResponse: z.record(z.unknown()).nullable().optional(),
 });
 
 export type CarePlanDraftCallbackInput = z.infer<typeof carePlanDraftCallbackSchema>;
@@ -126,16 +125,26 @@ export class AiCarePlanDraftService {
     status: string;
     version: number;
   }> {
+    const AI_ALLOWED_EPISODE_STATUSES = ['validated', 'active'] as const;
+
     const episode = await prisma.careEpisode.findUnique({
       where: { id: raw.episodeId },
       select: {
         id: true,
         title: true,
         coordinatorId: true,
+        organizationId: true,
+        status: true,
       },
     });
     if (!episode) {
       throw new AppError('Episode not found.', 404);
+    }
+    if (!AI_ALLOWED_EPISODE_STATUSES.includes(episode.status as typeof AI_ALLOWED_EPISODE_STATUSES[number])) {
+      throw new AppError(
+        `AI care plan drafts are only permitted for validated or active episodes (current: ${episode.status}).`,
+        422,
+      );
     }
 
     const draft = raw.draft;

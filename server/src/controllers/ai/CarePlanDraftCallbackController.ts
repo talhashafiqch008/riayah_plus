@@ -24,6 +24,21 @@ export class CarePlanDraftCallbackController {
     const body = carePlanDraftCallbackSchema.parse(req.body);
     const result = await AiCarePlanDraftService.handleCallback(body);
 
+    await AuditService.log({
+      userId: 'ai-service',
+      action: 'ai_care_plan_callback',
+      entity: 'CarePlan',
+      entityId: result.carePlanId,
+      after: {
+        episodeId: result.episodeId,
+        created: result.created,
+        idempotentReplay: result.idempotentReplay,
+        status: result.status,
+        version: result.version,
+      },
+      req,
+    });
+
     res.status(result.created ? 201 : 200).json({
       message: result.idempotentReplay
         ? 'AI care plan draft already applied (idempotent).'

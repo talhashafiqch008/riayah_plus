@@ -28,7 +28,20 @@ export interface CareEpisode {
   patient?: { id: string; name: string; email?: string };
   coordinator?: { id: string; name: string } | null;
   careRecipient?: { id: string; name: string; externalRef?: string | null } | null;
-  assessments?: { id: string; status?: string; type?: string; scheduledAt?: string }[];
+  assessments?: {
+    id: string;
+    status?: string;
+    type?: string;
+    scheduledAt?: string;
+    assessor?: import('@/lib/api/staffProfile').PublicStaffCard | null;
+  }[];
+  sessions?: {
+    id: string;
+    scheduledAt?: string;
+    status?: string;
+    durationMinutes?: number | null;
+    provider?: import('@/lib/api/staffProfile').PublicStaffCard | null;
+  }[];
 }
 
 /** Mirror of server stateMachine CARE_EPISODE_TRANSITIONS for UI buttons. */

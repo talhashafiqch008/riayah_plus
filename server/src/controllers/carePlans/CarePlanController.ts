@@ -509,6 +509,8 @@ export class CarePlanController {
   }
 
   static async submitForApproval(req: Request, res: Response): Promise<void> {
+    const { changeNotes } = z.object({ changeNotes: z.string().min(10).optional() }).parse(req.body ?? {});
+
     const plan = await prisma.carePlan.findUnique({
       where: { id: req.params.id },
       include: {
@@ -520,6 +522,13 @@ export class CarePlanController {
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertTenantOrgAccess(req, plan.episode.organizationId);
 
+    if (plan.status === 'revision_requested' && !changeNotes) {
+      throw new AppError(
+        'changeNotes is required when resubmitting after a revision request. Describe what was changed.',
+        422,
+      );
+    }
+
     assertCarePlanTransition(plan.status, 'submitted_for_approval');
 
     await prisma.carePlan.update({
@@ -528,7 +537,7 @@ export class CarePlanController {
     });
 
     await prisma.carePlanApprovalLog.create({
-      data: { carePlanId: plan.id, action: 'submitted', actorId: req.user!.userId },
+      data: { carePlanId: plan.id, action: 'submitted', actorId: req.user!.userId, notes: changeNotes ?? null },
     });
 
     // Notify family/patient (patientId may be null when only careUnit.familyUserId is set)
@@ -564,6 +573,9 @@ export class CarePlanController {
     if (!plan) throw new AppError('Care plan not found.', 404);
     assertCarePlanAccess(req, plan.episode);
 
+    if (plan.status !== 'submitted_for_approval') {
+      throw new AppError('Care plan must be submitted for approval before it can be approved.', 422);
+    }
     assertCarePlanTransition(plan.status, 'approved');
 
     await prisma.$transaction(async (tx) => {

@@ -13,6 +13,7 @@ import {
   isFamilyRole,
   resolveEpisodePartyIds,
 } from '../../utils/careAccess';
+import { staffPublicUserSelect, toPublicStaffCard } from '../../utils/staffProfile';
 
 const createEpisodeSchema = z.object({
   patientId: z.string().optional(),
@@ -131,9 +132,28 @@ export class CareEpisodeController {
           },
         },
         careUnit: { select: { id: true, name: true, familyUserId: true } },
-        assessments: { select: { id: true, type: true, status: true, scheduledAt: true, completedAt: true } },
+        assessments: {
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            scheduledAt: true,
+            completedAt: true,
+            assessor: { select: staffPublicUserSelect },
+          },
+          orderBy: { scheduledAt: 'desc' },
+        },
         carePlans: { select: { id: true, title: true, status: true, submittedAt: true, approvedAt: true } },
-        sessions: { select: { id: true, scheduledAt: true, status: true, durationMinutes: true }, orderBy: { scheduledAt: 'desc' } },
+        sessions: {
+          select: {
+            id: true,
+            scheduledAt: true,
+            status: true,
+            durationMinutes: true,
+            provider: { select: staffPublicUserSelect },
+          },
+          orderBy: { scheduledAt: 'desc' },
+        },
         documents: { select: { id: true, name: true, type: true, status: true, createdAt: true } },
         invoices: { select: { id: true, status: true, total: true, dueDate: true, createdAt: true } },
       },
@@ -146,7 +166,19 @@ export class CareEpisodeController {
     } catch {
       throw new AppError('Care episode not found.', 404);
     }
-    res.json({ data: episode });
+    res.json({
+      data: {
+        ...episode,
+        assessments: episode.assessments.map((a) => ({
+          ...a,
+          assessor: a.assessor ? toPublicStaffCard(a.assessor) : a.assessor,
+        })),
+        sessions: episode.sessions.map((s) => ({
+          ...s,
+          provider: s.provider ? toPublicStaffCard(s.provider) : s.provider,
+        })),
+      },
+    });
   }
 
   static async update(req: Request, res: Response): Promise<void> {

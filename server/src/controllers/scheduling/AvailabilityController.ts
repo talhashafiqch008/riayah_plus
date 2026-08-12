@@ -33,6 +33,10 @@ function assertCanManageProvider(req: Request, providerId: string, providerOrgId
     throw new AppError('Forbidden. Only the provider or a care coordinator can manage availability.', 403);
   }
   if (!isSelf) {
+    // Null-org providers are platform-level; only super_admin may manage them.
+    if (providerOrgId === null && role !== 'super_admin') {
+      throw new AppError('Forbidden.', 403);
+    }
     assertTenantOrgAccess(req, providerOrgId);
   }
 }
