@@ -112,6 +112,22 @@ export default function FamilyCarePlanReviewPage() {
         </span>
       </div>
 
+      {(() => {
+        const changeNotes = (plan.approvalLogs ?? [])
+          .filter((log) => log.action === 'submitted' && Boolean(log.notes?.trim()))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+          ?.notes;
+        if (!changeNotes) return null;
+        return (
+          <section className="rounded-xl border border-teal-200 bg-teal-50/70 p-5 shadow-sm">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-teal-800">
+              What the care team changed
+            </h3>
+            <p className="mt-2 text-sm text-stone-800">{changeNotes}</p>
+          </section>
+        );
+      })()}
+
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h3 className="font-semibold text-stone-900 mb-3">Care goals</h3>
         <ul className="space-y-2">

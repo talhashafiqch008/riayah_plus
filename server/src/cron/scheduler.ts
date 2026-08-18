@@ -252,7 +252,7 @@ export function startScheduler(): void {
             lte: new Date(Date.now() - 30 * 60 * 1000),
           },
           checkInAt: null,
-          type: 'home_visit',
+          type: { in: ['home_visit', 'in_person'] },
         },
         include: { episode: true },
       });

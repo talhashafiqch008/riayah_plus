@@ -117,11 +117,14 @@ export class OrganizationController {
   static async createOrganization(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const body = organizationCreateSchema.parse(req.body);
+      const email = body.email.trim().toLowerCase();
 
       const nameTaken = await prisma.organization.findFirst({ where: { name: body.name } });
       if (nameTaken) throw new AppError('An organization with this name already exists.', 409);
 
-      const emailTaken = await prisma.user.findUnique({ where: { email: body.email } });
+      const emailTaken = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+      });
       if (emailTaken) throw new AppError('An account with this email already exists.', 409);
 
       const baseSlug = slugify(body.slug ?? body.name);
@@ -136,7 +139,7 @@ export class OrganizationController {
             logoUrl: body.logoUrl ?? undefined,
             address: body.address ?? undefined,
             phone: body.phone ?? undefined,
-            email: body.email,
+            email,
             website: body.website ?? undefined,
             isActive: body.isActive ?? true,
           },
@@ -145,7 +148,7 @@ export class OrganizationController {
         const orgAdmin = await tx.user.create({
           data: {
             name: adminName,
-            email: body.email,
+            email,
             passwordHash: INVITE_PASSWORD_PLACEHOLDER,
             role: 'org_admin',
             organizationId: organization.id,
@@ -249,7 +252,10 @@ export class OrganizationController {
           logoUrl: body.logoUrl === null ? null : body.logoUrl,
           address: body.address === null ? null : body.address,
           phone: body.phone === null ? null : body.phone,
-          email: body.email === null ? null : body.email,
+          email:
+            body.email === null || body.email === undefined
+              ? body.email
+              : body.email.trim().toLowerCase(),
           website: body.website === null ? null : body.website,
         },
       });

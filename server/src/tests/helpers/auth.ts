@@ -9,6 +9,7 @@ export type TestRole =
   | 'admin'
   | 'super_admin'
   | 'care_coordinator'
+  | 'support_worker'
   | 'staff';
 
 export interface TestUser {
@@ -26,6 +27,7 @@ const DEFAULT_USERS: Record<TestRole, TestUser> = {
   admin: { id: 'test-admin-id', name: 'Test Admin', email: 'admin@test.com', role: 'admin' },
   super_admin: { id: 'test-superadmin-id', name: 'Test Super Admin', email: 'superadmin@test.com', role: 'super_admin' },
   care_coordinator: { id: 'test-coordinator-id', name: 'Test Coordinator', email: 'coordinator@test.com', role: 'care_coordinator' },
+  support_worker: { id: 'test-support-id', name: 'Test Support Worker', email: 'support@test.com', role: 'support_worker' },
   staff: { id: 'test-staff-id', name: 'Test Staff', email: 'staff@test.com', role: 'staff' },
 };
 

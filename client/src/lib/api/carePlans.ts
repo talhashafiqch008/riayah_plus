@@ -173,8 +173,11 @@ export async function updateCarePlan(id: string, payload: UpdateCarePlanPayload)
   return data.data;
 }
 
-export async function submitCarePlan(id: string) {
-  const { data } = await client.post<{ message?: string }>(`/care-plans/${id}/submit`);
+export async function submitCarePlan(id: string, changeNotes?: string) {
+  const { data } = await client.post<{ message?: string }>(
+    `/care-plans/${id}/submit`,
+    changeNotes ? { changeNotes } : {},
+  );
   return data;
 }
 

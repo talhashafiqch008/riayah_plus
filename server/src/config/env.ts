@@ -64,7 +64,7 @@ export const env = {
   FIREBASE_CLIENT_ID: process.env.FIREBASE_CLIENT_ID || '',
 
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
-  GPS_CHECKIN_RADIUS_METERS: parseInt(process.env.GPS_CHECKIN_RADIUS_METERS || '200', 10),
+  GPS_CHECKIN_RADIUS_METERS: parseInt(process.env.GPS_CHECKIN_RADIUS_METERS || '300', 10),
 
   WHATSAPP_BASE_URL: process.env.WHATSAPP_BASE_URL || 'https://graph.facebook.com/v18.0',
   WHATSAPP_PHONE_ID: process.env.WHATSAPP_PHONE_ID || '',

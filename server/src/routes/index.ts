@@ -9,6 +9,7 @@ import invoiceRoutes from './invoice.routes';
 import chatRoutes from './chat.routes';
 import notificationRoutes from './notification.routes';
 import telehealthRoutes from './telehealth.routes';
+import gpsRoutes from './gps.routes';
 import bookingRoutes from './booking.routes';
 import providerRoutes from './provider.routes';
 import documentRoutes from './document.routes';
@@ -90,6 +91,7 @@ router.get('/coordinator/intake-queue', authenticate, requireCareCoordinator, In
 
 // Telehealth & GPS (M4–M5)
 router.use('/telehealth', telehealthRoutes);
+router.use('/gps', gpsRoutes);
 
 // Billing (M4)
 router.use('/invoices', invoiceRoutes);

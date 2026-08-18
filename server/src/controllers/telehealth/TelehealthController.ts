@@ -91,71 +91,55 @@ export class TelehealthController {
     const { sessionId, latitude, longitude } = z
       .object({
         sessionId: z.string(),
-        latitude: z.number(),
-        longitude: z.number(),
+        latitude: z.number().gte(-90).lte(90),
+        longitude: z.number().gte(-180).lte(180),
       })
       .parse(req.body);
 
     const { GPSService } = await import('../../services/GPSService');
+    const session = await GPSService.loadSession(sessionId);
+    GPSService.assertAssignedWorker(session, req.user!.userId);
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: { client: true },
-    });
-    if (!session) throw new AppError('Session not found.', 404);
-
-    const geofenceResult = await GPSService.validateCheckin(
-      { lat: latitude, lng: longitude },
-      session.clientId
-    );
-
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: {
-        checkInAt: new Date(),
-        checkInLat: latitude,
-        checkInLng: longitude,
-        isGeofenced: geofenceResult.isWithinRadius,
-        geofenceStatus: geofenceResult.status,
-      },
+    const result = await GPSService.applySessionCheckin({
+      session,
+      userId: req.user!.userId,
+      coords: { lat: latitude, lng: longitude },
     });
 
-    await GPSService.logCheckin(req.user!.userId, sessionId, { lat: latitude, lng: longitude }, geofenceResult);
-
-    if (!geofenceResult.isWithinRadius) {
-      // Notify coordinator of out-of-radius check-in
-      const episode = session.episodeId
-        ? await prisma.careEpisode.findUnique({ where: { id: session.episodeId } })
-        : null;
-
-      if (episode) {
+    if (!result.geofence.isWithinRadius && result.geofence.status === 'out_of_radius') {
+      if (session.episode?.coordinatorId) {
         await NotificationService.create({
-          userId: episode.coordinatorId,
+          userId: session.episode.coordinatorId,
           title: 'Out-of-Radius Check-In Detected',
-          body: `Worker checked in ${geofenceResult.distanceMeters}m from the patient's address.`,
+          body: `Worker checked in ${result.geofence.distanceMeters}m from the patient's address.`,
           type: 'gps_out_of_radius',
-          data: { sessionId, distanceMeters: geofenceResult.distanceMeters },
+          data: { sessionId, distanceMeters: result.geofence.distanceMeters },
         });
       }
     }
 
-    res.json({ checkedIn: true, geofence: geofenceResult });
+    res.json({ checkedIn: true, geofence: result.geofence, checkInAt: result.checkInAt });
   }
 
   static async sessionCheckout(req: Request, res: Response): Promise<void> {
     const { sessionId, latitude, longitude } = z
-      .object({ sessionId: z.string(), latitude: z.number(), longitude: z.number() })
+      .object({
+        sessionId: z.string(),
+        latitude: z.number().gte(-90).lte(90),
+        longitude: z.number().gte(-180).lte(180),
+      })
       .parse(req.body);
 
     const { GPSService } = await import('../../services/GPSService');
+    const session = await GPSService.loadSession(sessionId);
+    GPSService.assertAssignedWorker(session, req.user!.userId);
 
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: { checkOutAt: new Date(), checkOutLat: latitude, checkOutLng: longitude },
+    const result = await GPSService.applySessionCheckout({
+      session,
+      userId: req.user!.userId,
+      coords: { lat: latitude, lng: longitude },
     });
 
-    await GPSService.logCheckout(req.user!.userId, sessionId, { lat: latitude, lng: longitude });
-
-    res.json({ checkedOut: true });
+    res.json({ checkedOut: true, checkOutAt: result.checkOutAt });
   }
 }

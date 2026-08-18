@@ -27,6 +27,8 @@ export async function cleanDb(): Promise<void> {
     'documents',
     'user_sessions',
     'audit_logs',
+    'gps_logs',
+    'sessions',
     'consents',
     'family_members',
     'care_recipients',
