@@ -6,6 +6,7 @@ import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
 import {
   bookRecurringSessions,
   bookSession,
+  completeSession,
   dayOfWeekLabel,
   listAvailability,
   listScheduleStaff,
@@ -53,6 +54,7 @@ export default function CoordinatorSchedulePage() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   const [episodeId, setEpisodeId] = useState('');
+  const [sessionType, setSessionType] = useState<'telehealth' | 'in_person' | 'home_visit'>('telehealth');
   const [scheduledLocal, setScheduledLocal] = useState('');
   const [duration, setDuration] = useState(60);
   const [assignTasks, setAssignTasks] = useState(true);
@@ -182,6 +184,7 @@ export default function CoordinatorSchedulePage() {
         const result = await bookRecurringSessions({
           episodeId,
           providerId,
+          type: sessionType,
           scheduledAt,
           durationMinutes: duration,
           assignPendingTasks: assignTasks,
@@ -195,6 +198,7 @@ export default function CoordinatorSchedulePage() {
         await bookSession({
           episodeId,
           providerId,
+          type: sessionType,
           scheduledAt,
           durationMinutes: duration,
           assignPendingTasks: assignTasks,
@@ -397,6 +401,19 @@ export default function CoordinatorSchedulePage() {
         </label>
 
         <label className="block space-y-1">
+          <span className="text-sm font-medium text-stone-700">Session type</span>
+          <select
+            value={sessionType}
+            onChange={(e) => setSessionType(e.target.value as typeof sessionType)}
+            className={fieldClass}
+          >
+            <option value="telehealth">Telehealth (video call)</option>
+            <option value="in_person">In-person</option>
+            <option value="home_visit">Home visit</option>
+          </select>
+        </label>
+
+        <label className="block space-y-1">
           <span className="text-sm font-medium text-stone-700">Start (local)</span>
           <input
             type="datetime-local"
@@ -462,16 +479,46 @@ export default function CoordinatorSchedulePage() {
             <li className="py-2 text-sm text-stone-500">No sessions booked for this episode yet.</li>
           )}
           {sessions.map((s) => (
-            <li key={s.id} className="py-2 text-sm">
-              <span className="font-medium text-stone-900">
-                {new Date(s.scheduledAt).toLocaleString()}
-              </span>
-              <span className="text-stone-500">
-                {' '}
-                · {s.durationMinutes ?? 60}m · {s.status}
-              </span>
-              {s.provider?.name && (
-                <span className="text-stone-600"> · {s.provider.name}</span>
+            <li key={s.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <div>
+                <span className="font-medium text-stone-900">
+                  {new Date(s.scheduledAt).toLocaleString()}
+                </span>
+                <span className="text-stone-500">
+                  {' '}· {s.durationMinutes ?? 60}m
+                </span>
+                <span className={`ml-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  s.status === 'completed' ? 'bg-teal-50 text-teal-700' :
+                  s.status === 'accepted' ? 'bg-blue-50 text-blue-700' :
+                  s.status === 'in_progress' ? 'bg-amber-50 text-amber-700' :
+                  'bg-stone-100 text-stone-600'
+                }`}>
+                  {s.status}
+                </span>
+                {s.provider?.name && (
+                  <span className="ml-1.5 text-stone-600">· {s.provider.name}</span>
+                )}
+              </div>
+              {(s.status === 'accepted' || s.status === 'in_progress') && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      await completeSession(s.id);
+                      toast.success('Session completed — invoice generated');
+                      await loadSessions(episodeId, true);
+                    } catch (error: unknown) {
+                      toast.error(extractApiError(error).message || 'Could not complete session');
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className="shrink-0 rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  Complete
+                </button>
               )}
             </li>
           ))}

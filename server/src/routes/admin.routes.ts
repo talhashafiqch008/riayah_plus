@@ -418,6 +418,8 @@ router.post('/document-requests/:id/reject', requireApprove('document'), adminDo
 router.get('/payouts/:id', requireView('booking'), adminPayoutController.getOne.bind(adminPayoutController));
 router.post('/payouts/:id/confirm-reconciliation', requireApprove('booking'), adminPayoutController.confirmReconciliation.bind(adminPayoutController));
 router.get('/payments/stats', requireView('booking'), adminPayoutController.getPaymentStats.bind(adminPayoutController));
+router.get('/payments/reconciliation', requireView('booking'), AdvancedAdminController.reconciliation);
+router.get('/reconciliation', requireView('booking'), AdvancedAdminController.reconciliation);
 router.get('/payments/:id', requireView('booking'), adminPayoutController.getPayment.bind(adminPayoutController));
 router.post('/payments/:id/mark-paid', requireApprove('booking'), adminPayoutController.markPaid.bind(adminPayoutController));
 router.get('/payment-audits', requireView('booking'), adminPayoutController.listPaymentAudits.bind(adminPayoutController));

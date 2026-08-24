@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { resolveCatalogService } from './ServiceCatalog';
 
 interface PricingInput {
   serviceType: string;
@@ -42,19 +43,18 @@ export class PricingEngine {
     const currency = input.currency ?? 'QAR';
 
     // Fetch service base rate from catalogue
-    const service = await prisma.serviceType.findFirst({
-      where: { type: input.serviceType },
-    });
+    const service = await resolveCatalogService(input.serviceType);
 
-    // Fetch provider's own hourly rate if set
-    let hourlyRate = service?.baseRate ? Number(service.baseRate) : 50; // default QAR 50/hr
+    // Catalogue hourly rate (M4 pricing master). Provider rate may add later; never below catalog.
+    let hourlyRate = service?.baseRate ? Number(service.baseRate) : 50;
 
     if (input.providerId) {
       const providerProfile = await prisma.providerProfile.findUnique({
         where: { userId: input.providerId },
         select: { hourlyRate: true },
       });
-      if (providerProfile?.hourlyRate) hourlyRate = Number(providerProfile.hourlyRate);
+      const providerRate = providerProfile?.hourlyRate ? Number(providerProfile.hourlyRate) : 0;
+      if (providerRate > hourlyRate) hourlyRate = providerRate;
     }
 
     const basePrice = Math.round(hourlyRate * input.durationHours * 100) / 100;

@@ -7,20 +7,17 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { Server as SocketIOServer } from 'socket.io';
+import { attachRealtime } from './services/RealtimeService';
 import * as Sentry from '@sentry/node';
 
 import { env } from './config/env';
+import { corsOriginDelegate } from './utils/frontendOrigins';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
 import { logger } from './config/logger';
 import { requestLogger, forceJson } from './middleware/requestLogger';
 import { notFound, errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
-import {
-  assertUserActive,
-  verifyAccessToken,
-  wasLoggedOutAll,
-} from './middleware/auth';
 import { startScheduler } from './cron/scheduler';
 import apiRouter from './routes/index';
 
@@ -52,43 +49,14 @@ const server = http.createServer(app);
 
 // ─── Socket.io ───────────────────────────────────────────────────────────────
 const io = new SocketIOServer(server, {
-  cors: { origin: env.FRONTEND_URL, credentials: true },
+  cors: {
+    origin: corsOriginDelegate,
+    credentials: true,
+  },
 });
 
 app.locals.io = io;
-
-io.on('connection', (socket) => {
-  const token = socket.handshake.auth?.token as string | undefined;
-  if (!token) {
-    socket.disconnect(true);
-    return;
-  }
-  void (async () => {
-    let userId: string;
-    try {
-      const payload = verifyAccessToken(token);
-      const [active, terminated] = await Promise.all([
-        assertUserActive(payload.userId),
-        wasLoggedOutAll(payload.userId, payload.iat),
-      ]);
-      if (!active || terminated) {
-        socket.disconnect(true);
-        return;
-      }
-      userId = payload.userId;
-    } catch {
-      socket.disconnect(true);
-      return;
-    }
-    socket.join(`chat.${userId}`);
-    socket.join(`notification.user.${userId}`);
-    logger.debug(`Socket connected: ${userId}`);
-
-    socket.on('disconnect', () => {
-      logger.debug(`Socket disconnected: ${userId}`);
-    });
-  })();
-});
+attachRealtime(io);
 
 // ─── Global middleware ───────────────────────────────────────────────────────
 app.use(
@@ -116,11 +84,7 @@ app.use(
 app.use(cookieParser());
 app.use(
   cors({
-    origin: [
-      env.FRONTEND_URL,
-      'http://localhost:3000', // legacy Next.js dev
-      'http://localhost:5173', // Vite dev server
-    ],
+    origin: corsOriginDelegate,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
@@ -130,6 +94,8 @@ app.use(
 // Raw body for Stripe webhooks
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/paytabs/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/wallet/paytabs/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/livekit/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

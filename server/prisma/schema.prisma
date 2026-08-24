@@ -712,6 +712,7 @@ model CareEpisode {
   incidents        Incident[]        @relation("EpisodeIncidents")
   aiIntakeSummary  AiIntakeSummary?
   intakeRecord     IntakeRecord?
+  conversations    Conversation[]    @relation("EpisodeConversations")
 
   @@index([patientId])
   @@index([coordinatorId])
@@ -887,8 +888,12 @@ model Session {
   durationMinutes Int?
   notes           String?
   recordingUrl    String?
+  recordingStatus String?
+  recordingTranscript String?
+  recordingEgressId String?
   livekitRoomId   String?
   dailyRoomUrl    String?
+  telehealthControl Json?
 
   latitude        Decimal?    @db.Decimal(10, 8)
   longitude       Decimal?    @db.Decimal(11, 8)
@@ -1228,6 +1233,7 @@ model DocumentRequest {
 model Conversation {
   id            String                   @id @default(cuid())
   episodeId     String?
+  episode       CareEpisode?             @relation("EpisodeConversations", fields: [episodeId], references: [id])
   type          String                   @default("direct")
   title         String?
   lastMessageAt DateTime?
@@ -1237,6 +1243,7 @@ model Conversation {
   messages         Message[]
   participantLinks ConversationParticipant[]
 
+  @@index([episodeId])
   @@map("conversations")
 }
 
@@ -1246,6 +1253,7 @@ model ConversationParticipant {
   userId         String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
   createdAt      DateTime     @default(now())
 
   @@unique([conversationId, userId])
@@ -1264,6 +1272,7 @@ model Message {
   type           String        @default("text")
   fileUrl        String?
   status         MessageStatus @default(sent)
+  readAt         DateTime?
   editedAt       DateTime?
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
@@ -1957,6 +1966,7 @@ model Meeting {
   recurringPattern String?
   recordingUrl     String?
   recordingStatus  String?
+  telehealthControl Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   host             User      @relation("MeetingHost", fields: [hostId], references: [id])

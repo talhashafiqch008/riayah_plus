@@ -7,7 +7,9 @@ import { QatariPaymentService } from '../../services/QatariPaymentService';
 import { NotificationService } from '../../services/NotificationService';
 import { AuditService } from '../../services/AuditService';
 import { CacheInvalidationService } from '../../services/CacheInvalidationService';
+import { RefundService } from '../../services/RefundService';
 import { AppError } from '../../middleware/errorHandler';
+import { env } from '../../config/env';
 
 const initiateSchema = z.object({
   gateway: z.enum(['stripe', 'wallet', 'paytabs', 'fatora']).default('stripe'),
@@ -90,8 +92,8 @@ export class BookingPaymentController {
           customerEmail: user!.email,
           customerName: user!.name,
           customerPhone: user!.phone ?? undefined,
-          returnUrl: `${process.env.FRONTEND_URL}/bookings/${bookingId}/payment-result`,
-          callbackUrl: `${process.env.BACKEND_URL}/api/wallet/webhook/paytabs`,
+          returnUrl: `${env.FRONTEND_URL}/bookings/${bookingId}/payment-result`,
+          callbackUrl: `${env.BACKEND_URL}/api/wallet/paytabs/webhook`,
         });
 
         await prisma.payment.upsert({
@@ -113,17 +115,56 @@ export class BookingPaymentController {
   static async verifyPayment(req: Request, res: Response, next: NextFunction) {
     try {
       const { bookingId } = req.params;
-      const { paymentIntentId } = req.body;
+      const userId = req.user!.userId;
+      const { paymentIntentId } = z.object({ paymentIntentId: z.string().min(1) }).parse(req.body);
+
+      const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { payment: true } });
+      if (!booking) throw new AppError('Booking not found.', 404);
+      if (booking.clientId !== userId) throw new AppError('Forbidden.', 403);
+
+      const payment = booking.payment;
+      if (!payment) throw new AppError('No payment found for this booking.', 404);
+      if (payment.userId !== userId) throw new AppError('Forbidden.', 403);
+      if (payment.gatewayRef !== paymentIntentId) {
+        throw new AppError('Payment intent does not match this booking.', 400);
+      }
+
+      if (payment.status === 'paid') {
+        res.json({ success: true, status: 'paid', message: 'Already paid.' });
+        return;
+      }
 
       const intent = await StripeService.retrievePaymentIntent(paymentIntentId);
       if (intent.status !== 'succeeded') throw new AppError('Payment has not succeeded.', 400);
 
-      const payment = await prisma.payment.updateMany({
-        where: { bookingId, gatewayRef: paymentIntentId },
-        data: { status: 'paid' },
+      const expectedMinor = Math.round(Number(payment.amount) * 100);
+      const currency = (payment.currency || 'QAR').toLowerCase();
+      if (intent.currency !== currency) {
+        throw new AppError('Payment currency mismatch.', 400);
+      }
+      if (intent.amount !== expectedMinor) {
+        throw new AppError('Payment amount mismatch.', 400);
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'paid' },
+        });
+        await tx.booking.update({
+          where: { id: bookingId },
+          data: { status: 'accepted', paidAt: new Date() },
+        });
       });
 
-      await prisma.booking.update({ where: { id: bookingId }, data: { status: 'accepted', paidAt: new Date() } });
+      await AuditService.log({
+        userId,
+        action: 'booking_payment_verified',
+        entity: 'Booking',
+        entityId: bookingId,
+        after: { paymentIntentId },
+        req,
+      });
 
       res.json({ success: true, status: 'paid' });
     } catch (err) {
@@ -137,34 +178,62 @@ export class BookingPaymentController {
       const { bookingId } = req.params;
       const userId = req.user!.userId;
 
-      const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { payment: true } });
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { payment: true },
+      });
       if (!booking) throw new AppError('Booking not found.', 404);
       if (booking.clientId !== userId) throw new AppError('Forbidden.', 403);
+
+      if (booking.status === 'cancelled' && booking.payment?.status === 'refunded') {
+        res.json({ success: true, message: 'Already refunded.', alreadyRefunded: true });
+        return;
+      }
 
       // Self-refund is allowed 24+ hours before scheduled time
       if (booking.scheduledAt && booking.scheduledAt.getTime() - Date.now() < 24 * 60 * 60 * 1000) {
         throw new AppError('Cancellations within 24 hours are not eligible for a full refund.', 400);
       }
 
-      if (!booking.payment || booking.payment.status !== 'paid') {
+      if (!booking.payment) {
+        throw new AppError('No paid payment found for this booking.', 400);
+      }
+      if (booking.payment.status === 'refunded') {
+        res.json({ success: true, message: 'Already refunded.', alreadyRefunded: true });
+        return;
+      }
+      if (booking.payment.status !== 'paid') {
         throw new AppError('No paid payment found for this booking.', 400);
       }
 
-      const payment = booking.payment;
-
-      if (payment.gateway === 'stripe' && payment.gatewayRef) {
-        await StripeService.refundPayment(payment.gatewayRef);
-      } else if (payment.gateway === 'wallet') {
-        await WalletService.credit(userId, Number(payment.amount), 'refund', `Refund for booking ${bookingId}`, bookingId, 'Booking');
-      }
-
-      await prisma.payment.update({ where: { id: payment.id }, data: { status: 'refunded', refundedAt: new Date() } });
-      await prisma.booking.update({ where: { id: bookingId }, data: { status: 'cancelled', cancellationReason: 'client_request' } });
+      const result = await RefundService.refundPaidBookingPayment({
+        paymentId: booking.payment.id,
+        bookingId,
+        clientUserId: booking.clientId,
+        actorUserId: userId,
+        reason: `Client self-refund for booking ${bookingId}`,
+        finalizeBooking: {
+          status: 'cancelled',
+          cancellationReason: 'client_request',
+        },
+      });
 
       await CacheInvalidationService.onBookingUpdated(booking.clientId, booking.providerId);
-      await AuditService.log({ userId, action: 'booking_refund', entity: 'Booking', entityId: bookingId, req });
+      await AuditService.log({
+        userId,
+        action: 'booking_refund',
+        entity: 'Booking',
+        entityId: bookingId,
+        after: { refundRef: result.alreadyRefunded ? null : result.refundRef },
+        req,
+      });
 
-      res.json({ success: true, message: 'Refund processed.' });
+      res.json({
+        success: true,
+        message: result.alreadyRefunded ? 'Already refunded.' : 'Refund processed.',
+        alreadyRefunded: result.alreadyRefunded,
+        refundRef: result.alreadyRefunded ? undefined : result.refundRef,
+      });
     } catch (err) {
       next(err);
     }

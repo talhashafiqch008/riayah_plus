@@ -16,7 +16,21 @@ interface LineItem {
 }
 
 export class InvoicePDFService {
+  /** Build PDF bytes without uploading (local / fallback). */
+  static async generatePdfBuffer(invoiceId: string): Promise<Buffer> {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { client: { select: { name: true, email: true } } },
+    });
+    if (!invoice) throw new AppError('Invoice not found.', 404);
+    return InvoicePDFService.buildPDF(invoice);
+  }
+
   static async generateAndUpload(invoiceId: string): Promise<string> {
+    if (!env.AWS_BUCKET?.trim() || !env.AWS_ACCESS_KEY_ID?.trim() || !env.AWS_SECRET_ACCESS_KEY?.trim()) {
+      throw new AppError('PDF storage is not configured (AWS credentials / bucket).', 503);
+    }
+
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { client: { select: { name: true, email: true } } },
@@ -88,27 +102,63 @@ export class InvoicePDFService {
         .text(invoice.client.email, 350, 148);
 
       // ── Line items table ───────────────────────────────────────────────────
-      const tableTop = 220;
-      doc.fillColor(teal).rect(50, tableTop, doc.page.width - 100, 24).fill();
-      doc.fillColor('white').fontSize(10).font('Helvetica-Bold')
-        .text('Description', 58, tableTop + 7)
-        .text('Qty', 320, tableTop + 7)
-        .text('Unit Price', 370, tableTop + 7)
-        .text('Total', 460, tableTop + 7);
+      const tableLeft = 50;
+      const tableWidth = doc.page.width - 100;
+      const colDescX = 58;
+      const colDescWidth = 248;
+      const colQtyX = 318;
+      const colUnitX = 368;
+      const colTotalX = 455;
+      const rowPad = 8;
+      const minRowHeight = 22;
+      const footerReserve = 140;
+
+      const drawTableHeader = (top: number) => {
+        doc.fillColor(teal).rect(tableLeft, top, tableWidth, 24).fill();
+        doc.fillColor('white').fontSize(10).font('Helvetica-Bold')
+          .text('Description', colDescX, top + 7, { width: colDescWidth })
+          .text('Qty', colQtyX, top + 7, { width: 40, align: 'right' })
+          .text('Unit Price', colUnitX, top + 7, { width: 80, align: 'right' })
+          .text('Total', colTotalX, top + 7, { width: 80, align: 'right' });
+        return top + 34;
+      };
+
+      let y = drawTableHeader(220);
 
       const lineItems = invoice.lineItems as LineItem[];
-      let y = tableTop + 34;
 
       lineItems.forEach((item, idx) => {
-        const rowColor = idx % 2 === 0 ? '#f9fafb' : 'white';
-        doc.fillColor(rowColor).rect(50, y - 4, doc.page.width - 100, 22).fill();
         const lineTotal = item.quantity * item.unitPrice;
+        doc.fontSize(10).font('Helvetica');
+        const descHeight = doc.heightOfString(item.description, {
+          width: colDescWidth,
+          lineGap: 2,
+        });
+        const rowHeight = Math.max(descHeight + rowPad, minRowHeight);
+
+        if (y + rowHeight > doc.page.height - footerReserve) {
+          doc.addPage();
+          y = drawTableHeader(50);
+        }
+
+        const rowColor = idx % 2 === 0 ? '#f9fafb' : 'white';
+        doc.fillColor(rowColor).rect(tableLeft, y, tableWidth, rowHeight).fill();
+
         doc.fillColor('#111').fontSize(10).font('Helvetica')
-          .text(item.description, 58, y)
-          .text(item.quantity.toString(), 320, y)
-          .text(`${invoice.currency} ${item.unitPrice.toFixed(2)}`, 370, y)
-          .text(`${invoice.currency} ${lineTotal.toFixed(2)}`, 460, y);
-        y += 24;
+          .text(item.description, colDescX, y + 4, { width: colDescWidth, lineGap: 2 });
+
+        const valueY = y + 4;
+        doc.text(item.quantity.toString(), colQtyX, valueY, { width: 40, align: 'right' });
+        doc.text(`${invoice.currency} ${item.unitPrice.toFixed(2)}`, colUnitX, valueY, {
+          width: 80,
+          align: 'right',
+        });
+        doc.text(`${invoice.currency} ${lineTotal.toFixed(2)}`, colTotalX, valueY, {
+          width: 80,
+          align: 'right',
+        });
+
+        y += rowHeight;
       });
 
       // ── Totals ─────────────────────────────────────────────────────────────

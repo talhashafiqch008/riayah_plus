@@ -14,6 +14,7 @@ import providerRoutes from './provider.routes';
 import documentRoutes from './document.routes';
 import shiftRoutes from './shift.routes';
 import walletRoutes from './wallet.routes';
+import walletWebhookRoutes from './wallet-webhook.routes';
 import adminRoutes from './admin.routes';
 import orgRoutes from './org.routes';
 import whatsappRoutes from './whatsapp.routes';
@@ -32,6 +33,7 @@ import providerDashboardRoutes from './provider-dashboard.routes';
 import privacyRoutes from './privacy.routes';
 import lmsRoutes from './lms.routes';
 import meetingsRoutes from './meetings.routes';
+import livekitWebhookRoutes from './livekit-webhook.routes';
 import careOrdersRoutes from './care-orders.routes';
 // New routes (Phase 2+ parity)
 import pricingRoutes from './pricing.routes';
@@ -75,6 +77,10 @@ router.post(
     CarePlanDraftCallbackController.handle(req, res).catch(next);
   },
 );
+
+// Payment + LiveKit webhooks (MUST be before auth.routes — same catch-all authenticate issue)
+router.use('/wallet', walletWebhookRoutes);
+router.use('/livekit', livekitWebhookRoutes);
 
 // Auth & user management
 router.use('/', authRoutes);
@@ -161,9 +167,8 @@ router.use('/', privacyRoutes);
 // LMS — courses, enrollments, quizzes
 router.use('/courses', lmsRoutes);
 
-// Meetings — scheduling, LiveKit, recordings
+// Meetings — scheduling, recordings (webhook is mounted before auth.routes)
 router.use('/meetings', meetingsRoutes);
-router.use('/', meetingsRoutes); // livekit webhook at /livekit/webhook
 
 // Admin (prefixed)
 router.use('/admin', adminRoutes);

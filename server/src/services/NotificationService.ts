@@ -1,6 +1,7 @@
 import { NotificationChannel } from '@prisma/client';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
+import { emitNotification } from './RealtimeService';
 
 interface CreateNotificationOptions {
   userId: string;
@@ -13,7 +14,7 @@ interface CreateNotificationOptions {
 
 export class NotificationService {
   static async create(opts: CreateNotificationOptions) {
-    return prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: opts.userId,
         title: opts.title,
@@ -23,6 +24,12 @@ export class NotificationService {
         data: (opts.data ?? {}) as any,
       },
     });
+    try {
+      emitNotification(opts.userId, notification);
+    } catch (err) {
+      logger.warn('Realtime notification emit failed', { userId: opts.userId, type: opts.type, err });
+    }
+    return notification;
   }
 
   static async getForUser(userId: string, page = 1, limit = 20) {
@@ -46,14 +53,14 @@ export class NotificationService {
   static async markAsRead(id: string, userId: string) {
     return prisma.notification.updateMany({
       where: { id, userId },
-      data: { readAt: new Date() },
+      data: { readAt: new Date(), isRead: true },
     });
   }
 
   static async markAllAsRead(userId: string) {
     return prisma.notification.updateMany({
       where: { userId, readAt: null },
-      data: { readAt: new Date() },
+      data: { readAt: new Date(), isRead: true },
     });
   }
 

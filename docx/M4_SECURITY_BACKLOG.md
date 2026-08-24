@@ -34,17 +34,20 @@ Both the invoice detail and invoice send endpoints only require a login — no c
 
 ## Refund & Self-Refund
 
-**Provider self-refund creates duplicate paid records without issuing an actual refund**  
-A provider can call the self-refund endpoint multiple times on the same booking, creating multiple "refund paid" records in the database without ever debiting their wallet or issuing a real Stripe refund.  
-→ `server/src/controllers/provider/ProviderBookingController.ts:132-164`
+**Provider self-refund creates duplicate paid records without issuing an actual refund** — ✅ Fixed (M4-1.5, 2026-08-12)  
+Was: provider could create multiple "refund paid" rows without a real gateway refund.  
+Now: `RefundService` marks the original payment `refunded`, issues Stripe/PayTabs/wallet refund, writes `PaymentAudit`.  
+→ `server/src/services/RefundService.ts`; `ProviderBookingController.selfRefund`
 
-**Client self-refund is not atomic — race condition allows double wallet credit**  
-The balance check, wallet credit, and payment status update happen in separate DB operations. Two simultaneous refund requests can both pass the balance check before either updates the payment record.  
-→ `server/src/controllers/payments/BookingPaymentController.ts:134-171`
+**Client self-refund is not atomic — race condition allows double wallet credit** — ✅ Fixed (M4-1.5, 2026-08-12)  
+Was: wallet credit and payment status update were separate.  
+Now: wallet path claims `paid→refunded` + credits in one Prisma transaction. Card path uses `updateMany` claim before gateway call.  
+→ `RefundService`; `BookingPaymentController.selfRefund`
 
-**Client self-refund for Stripe payments does not create a reconciliation record**  
-When a client cancels a Stripe-paid booking, the Stripe refund is issued but no matching refund record is written to the database, making financial reconciliation incomplete.  
-→ `server/src/controllers/payments/BookingPaymentController.ts:134-171`
+**Client self-refund for Stripe payments does not create a reconciliation record** — ✅ Fixed (M4-1.5, 2026-08-12)  
+Was: Stripe refund with no DB reconciliation.  
+Now: `refundRef` stored on payment metadata + `PaymentAudit` row; Stripe idempotency key `booking-refund-{paymentId}`.  
+→ `RefundService`; `StripeService.refundPayment`
 
 ---
 
