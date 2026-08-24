@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { RefundService } from '../../services/RefundService';
+import { AuditService } from '../../services/AuditService';
+import { CacheInvalidationService } from '../../services/CacheInvalidationService';
 
 export class ProviderBookingController {
   // GET /provider/bookings/requests — incoming booking requests for provider
@@ -128,36 +131,69 @@ export class ProviderBookingController {
     }
   }
 
-  // POST /provider/self-refund — provider-initiated refund
+  // POST /provider/self-refund — provider-initiated refund (real gateway/wallet refund)
   async selfRefund(req: Request, res: Response, next: NextFunction) {
     try {
       const providerId = req.user!.userId;
       const { bookingId, reason } = req.body;
       if (!bookingId) throw new AppError('bookingId is required', 400);
+      if (!reason || typeof reason !== 'string' || !reason.trim()) {
+        throw new AppError('reason is required', 400);
+      }
 
-      const booking = await prisma.booking.findFirst({ where: { id: bookingId, providerId } });
+      const booking = await prisma.booking.findFirst({
+        where: { id: bookingId, providerId },
+        include: { payment: true },
+      });
       if (!booking) throw new AppError('Booking not found', 404);
-      if (booking.status !== 'completed') throw new AppError('Can only refund completed bookings', 400);
+      if (booking.status !== 'completed') {
+        throw new AppError('Can only refund completed bookings', 400);
+      }
 
-      const payment = await prisma.payment.findFirst({
-        where: { bookingId, status: 'paid' },
-      });
+      const payment = booking.payment;
       if (!payment) throw new AppError('No completed payment found for this booking', 404);
+      if (payment.status === 'refunded') {
+        res.json({
+          data: { paymentId: payment.id },
+          message: 'Already refunded',
+          alreadyRefunded: true,
+        });
+        return;
+      }
+      if (payment.status !== 'paid') {
+        throw new AppError('No completed payment found for this booking', 404);
+      }
 
-      const refund = await prisma.payment.create({
-        data: {
-          userId: booking.clientId,
-          bookingId,
-          amount: payment.amount,
-          currency: payment.currency,
-          type: 'refund',
-          status: 'paid',
-          description: `Provider self-refund: ${reason}`,
-          paidAt: new Date(),
-        },
+      const result = await RefundService.refundPaidBookingPayment({
+        paymentId: payment.id,
+        bookingId,
+        clientUserId: booking.clientId,
+        actorUserId: providerId,
+        reason: `Provider self-refund: ${reason.trim()}`,
       });
 
-      res.status(201).json({ data: refund, message: 'Refund initiated by provider' });
+      await CacheInvalidationService.onBookingUpdated(booking.clientId, booking.providerId);
+      await AuditService.log({
+        userId: providerId,
+        action: 'provider_booking_refund',
+        entity: 'Booking',
+        entityId: bookingId,
+        after: {
+          paymentId: payment.id,
+          refundRef: result.alreadyRefunded ? null : result.refundRef,
+          reason: reason.trim(),
+        },
+        req,
+      });
+
+      res.status(result.alreadyRefunded ? 200 : 201).json({
+        data: {
+          paymentId: payment.id,
+          refundRef: result.alreadyRefunded ? undefined : result.refundRef,
+        },
+        message: result.alreadyRefunded ? 'Already refunded' : 'Refund processed by provider',
+        alreadyRefunded: result.alreadyRefunded,
+      });
     } catch (err) {
       next(err);
     }

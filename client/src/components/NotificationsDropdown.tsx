@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Bell, Check, Trash2, X } from "lucide-react";
-import { deleteNotification, getNotifications, getUnreadNotificationCount, markAllNotificationsAsRead, markNotificationAsRead } from '@/lib/api';
+import { deleteNotification, getNotifications, getUnreadNotificationCount, markAllNotificationsAsRead, markNotificationAsRead, notificationIsUnread } from '@/lib/api';
 import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
 import { Link } from 'react-router-dom';
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,8 +34,8 @@ export default function NotificationsDropdown() {
  }, []);
  const fetchUnreadCount = async () => {
  try {
- const res = await getUnreadNotificationCount();
- setUnreadCount((res as { count: number }).count);
+ const count = await getUnreadNotificationCount();
+ setUnreadCount(typeof count === 'number' ? count : 0);
  } catch (error) {
  console.error("Failed to fetch notification count", error);
  }
@@ -71,11 +71,15 @@ export default function NotificationsDropdown() {
  setLoading(true);
  try {
  const res = await getNotifications();
- const notificationList = (res as NotificationItem[]) || [];
+ const notificationList = (res.notifications || []).map((n) => ({
+ id: n.id,
+ title: n.title,
+ message: n.body,
+ read: !notificationIsUnread(n),
+ createdAt: n.createdAt,
+ }));
  setNotifications(notificationList);
- // Also update count
- const startUnread = notificationList.filter((n) => !n.read).length;
- setUnreadCount(startUnread);
+ setUnreadCount(notificationList.filter((n) => !n.read).length);
  } catch (error) {
  console.error("Failed to fetch notifications", error);
  } finally {

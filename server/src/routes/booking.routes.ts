@@ -18,6 +18,7 @@ import {
   assertBookingProvider,
   loadBookingOrThrow,
 } from '../utils/bookingAccess';
+import { InvoiceService } from '../services/InvoiceService';
 
 const router = Router();
 router.use(authenticate);
@@ -141,6 +142,13 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
   const existing = await loadBookingOrThrow(req.params.id);
   assertBookingProvider(req, existing);
 
+  if (existing.status === 'completed') {
+    const invoice = await InvoiceService.tryFromBooking(existing.id, req.user!.userId);
+    const booking = await prisma.booking.findUnique({ where: { id: existing.id } });
+    res.json({ data: booking, invoice: invoice ?? undefined });
+    return;
+  }
+
   assertAppointmentTransition(existing.status, 'completed');
 
   const booking = await prisma.booking.update({
@@ -148,7 +156,9 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
     data: { status: 'completed', completedAt: new Date() },
   });
   await AuditService.log({ userId: req.user!.userId, action: 'booking_completed', entity: 'Booking', entityId: booking.id, req });
-  res.json({ data: booking });
+
+  const invoice = await InvoiceService.tryFromBooking(booking.id, req.user!.userId);
+  res.json({ data: booking, invoice: invoice ?? undefined });
 });
 
 // Pay with credits

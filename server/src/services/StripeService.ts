@@ -113,14 +113,18 @@ export class StripeService {
   static async refundPayment(
     paymentIntentId: string,
     amount?: number,
-    reason?: Stripe.RefundCreateParams.Reason
+    reason?: Stripe.RefundCreateParams.Reason,
+    idempotencyKey?: string
   ): Promise<Stripe.Refund> {
     const params: Stripe.RefundCreateParams = {
       payment_intent: paymentIntentId,
       reason: reason ?? 'requested_by_customer',
     };
     if (amount) params.amount = Math.round(amount * 100);
-    return stripe.refunds.create(params);
+    return stripe.refunds.create(
+      params,
+      idempotencyKey ? { idempotencyKey } : undefined
+    );
   }
 
   // ── Webhook Handling ───────────────────────────────────────────────────────

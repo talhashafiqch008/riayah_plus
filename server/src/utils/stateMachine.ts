@@ -3,6 +3,7 @@ import {
   CareEpisodeStatus,
   CarePlanStatus,
   IntakeStatus,
+  InvoiceStatus,
 } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 
@@ -11,7 +12,13 @@ import { AppError } from '../middleware/errorHandler';
  * Intake added in M2 — Care Unit / IntakeRecord design.
  * Assessment added in M2 Flow G.
  */
-export type StateMachineEntity = 'care_episode' | 'care_plan' | 'appointment' | 'intake' | 'assessment';
+export type StateMachineEntity =
+  | 'care_episode'
+  | 'care_plan'
+  | 'appointment'
+  | 'intake'
+  | 'assessment'
+  | 'invoice';
 
 type TransitionMatrix = Record<string, readonly string[]>;
 
@@ -60,12 +67,23 @@ const ASSESSMENT_TRANSITIONS: TransitionMatrix = {
   cancelled: [],
 };
 
+/** M4 BIL6: Draft → Sent → Paid / Overdue / Disputed */
+const INVOICE_TRANSITIONS: TransitionMatrix = {
+  draft: ['sent', 'cancelled'],
+  sent: ['paid', 'overdue', 'disputed', 'cancelled'],
+  overdue: ['paid', 'disputed', 'cancelled'],
+  disputed: ['paid', 'sent', 'cancelled'],
+  paid: [],
+  cancelled: [],
+};
+
 const TRANSITIONS: Record<StateMachineEntity, TransitionMatrix> = {
   care_episode: CARE_EPISODE_TRANSITIONS,
   care_plan: CARE_PLAN_TRANSITIONS,
   appointment: APPOINTMENT_TRANSITIONS,
   intake: INTAKE_TRANSITIONS,
   assessment: ASSESSMENT_TRANSITIONS,
+  invoice: INVOICE_TRANSITIONS,
 };
 
 export function canTransition(
@@ -114,6 +132,10 @@ export function assertCarePlanTransition(from: CarePlanStatus, to: CarePlanStatu
 
 export function assertAppointmentTransition(from: BookingStatus, to: BookingStatus): void {
   assertTransition('appointment', from, to);
+}
+
+export function assertInvoiceTransition(from: InvoiceStatus, to: InvoiceStatus): void {
+  assertTransition('invoice', from, to);
 }
 
 export function assertIntakeTransition(from: IntakeStatus, to: IntakeStatus): void {

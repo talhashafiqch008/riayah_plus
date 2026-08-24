@@ -181,7 +181,7 @@ Original stack used Next.js BFF routes (`frontend/src/app/api/auth/*`) + dual co
 | API | Express + Prisma | Laravel 12 + Eloquent |
 | Auth transport | httpOnly cookies (Express) | httpOnly cookie + localStorage bridge + Next BFF |
 | Route coverage | ~97%+ (demo coordinator pages added) | Reference |
-| Telehealth | LiveKit (swap to Daily.co/Twilio in M4) | LiveKit |
+| Telehealth | LiveKit (client-confirmed for M4, 2026-08-13) | LiveKit |
 | Payments | Stripe + Qatari stubs | Stripe + more |
 | Milestones M2–M5 | Schemas/partials exist; most clinical flows not wired | Production features |
 

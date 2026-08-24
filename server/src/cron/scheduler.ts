@@ -6,10 +6,21 @@ import { WalletService } from '../services/WalletService';
 import { EmailService } from '../services/EmailService';
 import { StripeService } from '../services/StripeService';
 import { PayoutIdempotencyService } from '../services/PayoutIdempotencyService';
+import { InvoiceService } from '../services/InvoiceService';
+import { TelehealthReminderService } from '../services/TelehealthReminderService';
 import { anonymizeUser } from '../utils/anonymizeUser';
 
 export function startScheduler(): void {
   logger.info('Starting cron scheduler');
+
+  // ── telehealth:send-reminders — every minute (~30 min before start) ───────
+  cron.schedule('* * * * *', async () => {
+    try {
+      await TelehealthReminderService.sendDueReminders();
+    } catch (err) {
+      logger.error('telehealth:send-reminders failed', { err });
+    }
+  });
 
   // ── booking:send-reminders — every minute ─────────────────────────────────
   cron.schedule('* * * * *', async () => {
@@ -213,14 +224,7 @@ export function startScheduler(): void {
   // ── payment:reconcile — every 30 min ─────────────────────────────────────
   cron.schedule('*/30 * * * *', async () => {
     try {
-      // Mark invoices as overdue
-      await prisma.invoice.updateMany({
-        where: {
-          status: 'sent',
-          dueDate: { lt: new Date() },
-        },
-        data: { status: 'overdue' },
-      });
+      await InvoiceService.markOverdueInvoices();
     } catch (err) {
       logger.error('payment:reconcile failed', { err });
     }

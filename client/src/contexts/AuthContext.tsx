@@ -197,8 +197,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const sessionRes = await client.get('/auth/session');
-      const session = sessionRes.data as { authenticated?: boolean };
+      let sessionRes = await client.get('/auth/session');
+      let session = sessionRes.data as { authenticated?: boolean };
+      // Access cookie is 15 minutes. PayTabs (and long demos) often outlive it.
+      // Session returns 200 { authenticated: false } instead of 401, so the
+      // axios refresh interceptor never runs — try refresh explicitly.
+      if (!session.authenticated) {
+        try {
+          await client.post('/auth/refresh');
+          sessionRes = await client.get('/auth/session');
+          session = sessionRes.data as { authenticated?: boolean };
+        } catch {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
       if (!session.authenticated) {
         setUser(null);
         setLoading(false);

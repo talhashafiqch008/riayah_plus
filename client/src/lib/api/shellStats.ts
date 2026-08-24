@@ -95,8 +95,8 @@ async function fetchFamilyStats(): Promise<ShellStat[]> {
       return (res.data ?? []).filter((a) => new Date(a.scheduledAt).getTime() >= now).length;
     }),
     safeCount(async () => {
-      const res = await getUnreadNotificationCount();
-      return typeof res.count === 'number' ? res.count : 0;
+      const count = await getUnreadNotificationCount();
+      return typeof count === 'number' ? count : 0;
     }),
   ]);
 

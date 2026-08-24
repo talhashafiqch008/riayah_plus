@@ -5,44 +5,11 @@ import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { paymentLimiter } from '../middleware/rateLimiter';
 import { WalletService } from '../services/WalletService';
-import { QatariPaymentService } from '../services/QatariPaymentService';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
 
 const stripe = new Stripe(env.STRIPE_SECRET, { apiVersion: '2024-06-20' });
 const router = Router();
-
-// Stripe webhook (raw body required — mounted before auth)
-router.post('/stripe/webhook', async (req: Request, res: Response) => {
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      req.headers['stripe-signature'] as string,
-      env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch {
-    res.status(400).send('Webhook signature verification failed.');
-    return;
-  }
-
-  if (event.type === 'payment_intent.succeeded') {
-    const intent = event.data.object as Stripe.PaymentIntent;
-    const topup = await prisma.creditTopup.findFirst({ where: { stripeIntentId: intent.id } });
-    if (topup) {
-      await prisma.creditTopup.update({ where: { id: topup.id }, data: { status: 'paid', confirmedAt: new Date() } });
-      await WalletService.credit(topup.userId, Number(topup.amount), 'topup', 'Stripe credit top-up', topup.id, 'CreditTopup');
-    }
-  }
-
-  res.json({ received: true });
-});
-
-// Qatari gateway webhook
-router.post('/paytabs/webhook', async (req: Request, res: Response) => {
-  await QatariPaymentService.handleWebhook(req.body);
-  res.json({ received: true });
-});
 
 router.use(authenticate);
 

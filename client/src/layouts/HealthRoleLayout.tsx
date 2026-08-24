@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { RoleShellConfig } from '@/config/proposalRoleShells';
 import { getShellNavLabel } from '@/config/proposalRoleShells';
 import { badgeLabel, fetchNavBadgesForShell, type NavBadgeMap } from '@/lib/api/navBadges';
+import RoleNotificationBell from '@/components/roles/RoleNotificationBell';
 
 interface HealthRoleLayoutProps {
   config: RoleShellConfig;
@@ -155,6 +156,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
             </button>
           )}
           <h1 className="font-semibold text-stone-900">{pageTitle}</h1>
+          <RoleNotificationBell shellBasePath={config.basePath} />
         </header>
         <main id="main-content" className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8">
           {config.key === 'family' && !user?.organizationId && (

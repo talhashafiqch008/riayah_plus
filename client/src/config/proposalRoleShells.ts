@@ -16,6 +16,8 @@ import {
   UserPlus,
   Briefcase,
   UserCog,
+  Wallet,
+  Video,
 } from 'lucide-react';
 
 export interface RoleShellNavItem {
@@ -52,8 +54,10 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Care Unit', href: '/family/care-unit', icon: Users },
       { name: 'Care Journey', href: '/family/episodes', icon: Activity },
       { name: 'Appointments', href: '/family/bookings', icon: Calendar },
+      { name: 'Video sessions', href: '/family/telehealth', icon: Video },
       { name: 'Documents', href: '/family/documents', icon: FileText },
       { name: 'Care Plans', href: '/family/care-plans', icon: BookOpen },
+      { name: 'Billing', href: '/family/billing', icon: Wallet },
       { name: 'Messages', href: '/family/messages', icon: MessageCircle },
     ],
     dashboard: {
@@ -69,6 +73,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
         'Submit or update a care request',
         'Follow your care journey milestones',
         'Confirm upcoming appointments',
+        'Review quotations and pay invoices',
       ],
     },
   },
@@ -153,6 +158,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
     navigation: [
       { name: 'Dashboard', href: '/clinical', icon: LayoutDashboard },
       { name: 'Schedule', href: '/clinical/schedule', icon: Calendar },
+      { name: 'Video sessions', href: '/clinical/telehealth', icon: Video },
       { name: 'Patients', href: '/clinical/patients', icon: Users },
       { name: 'Session Notes', href: '/clinical/notes', icon: Stethoscope },
       { name: 'Care Plans', href: '/clinical/plans', icon: BookOpen },
@@ -169,6 +175,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
         { label: 'Notes due', value: '—' },
       ],
       nextSteps: [
+        'Join today’s video sessions and admit waiting families',
         'Review today’s schedule',
         'Complete session notes',
         'Update patient assessments',

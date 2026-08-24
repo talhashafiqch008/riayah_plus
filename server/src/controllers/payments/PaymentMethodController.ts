@@ -52,6 +52,14 @@ export class PaymentMethodController {
   static async detach(req: Request, res: Response, next: NextFunction) {
     try {
       const { paymentMethodId } = req.params;
+      const userId = req.user!.userId;
+
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+      const customerId = await StripeService.getOrCreateCustomer(userId, user!.email, user!.name);
+      const methods = await StripeService.listPaymentMethods(customerId);
+      const owned = methods.some((m) => m.id === paymentMethodId);
+      if (!owned) throw new AppError('Forbidden. Payment method not found on your account.', 403);
+
       await StripeService.detachPaymentMethod(paymentMethodId);
       res.json({ success: true, message: 'Payment method removed.' });
     } catch (err) {

@@ -3,8 +3,20 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { NotificationService } from '../../services/NotificationService';
 import { AppError } from '../../middleware/errorHandler';
-import { AccessToken } from 'livekit-server-sdk';
 import { env } from '../../config/env';
+import { InvoiceService } from '../../services/InvoiceService';
+import { TelehealthRoomService } from '../../services/TelehealthRoomService';
+import { TelehealthContextService } from '../../services/TelehealthContextService';
+import { TelehealthNoteService } from '../../services/TelehealthNoteService';
+import { TelehealthConsentService } from '../../services/TelehealthConsentService';
+import { TelehealthRecordingService } from '../../services/TelehealthRecordingService';
+import { sanitizedString } from '../../utils/sanitize';
+import {
+  canJoinMeeting,
+  isJoinableMeeting,
+  issueLiveKitJoinToken,
+  receiveLiveKitWebhookEvent,
+} from '../../services/LiveKitAccess';
 
 const scheduleSchema = z.object({
   participantId: z.string(),
@@ -93,27 +105,31 @@ export class MeetingSchedulerController {
       const meeting = await prisma.meeting.findUnique({ where: { id } });
       if (!meeting) throw new AppError('Meeting not found.', 404);
 
-      const isParticipant = meeting.hostId === userId || meeting.participantId === userId;
-      const isAdmin = ['admin', 'super_admin'].includes(req.user!.role);
-      if (!isParticipant && !isAdmin) throw new AppError('Forbidden.', 403);
+      const actor = { userId, role: req.user!.role };
+      if (!canJoinMeeting(meeting, actor)) throw new AppError('Forbidden.', 403);
+      if (!isJoinableMeeting(meeting)) throw new AppError('This meeting cannot be joined.', 400);
+      await TelehealthConsentService.assertJoinConsent(actor);
 
-      const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const join = await TelehealthRoomService.prepareMeetingJoin(meeting, actor);
+      const token = await issueLiveKitJoinToken({
         identity: userId,
+        name: user?.name ?? userId,
+        roomName: join.roomName,
         ttl: '3h',
+        phase: join.phase,
       });
-      at.addGrant({ roomJoin: true, room: meeting.roomName, canPublish: true, canSubscribe: true });
 
-      const token = await at.toJwt();
-
-      if (meeting.status === 'scheduled') {
+      if (meeting.status === 'scheduled' && join.phase === 'in_call') {
         await prisma.meeting.update({ where: { id }, data: { status: 'active', startedAt: new Date() } });
       }
 
       res.json({
         success: true,
         token,
-        roomName: meeting.roomName,
+        roomName: join.roomName,
         livekitUrl: env.LIVEKIT_URL,
+        phase: join.phase,
       });
     } catch (err) {
       next(err);
@@ -138,7 +154,36 @@ export class MeetingSchedulerController {
         data: { meetingId: id },
       });
 
-      res.json({ success: true, message: 'Meeting ended.' });
+      let invoice;
+      if (meeting.bookingId) {
+        const booking = await prisma.booking.findUnique({ where: { id: meeting.bookingId } });
+        if (booking && booking.status !== 'cancelled' && booking.status !== 'completed' && booking.status !== 'no_show') {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { status: 'completed', completedAt: new Date() },
+          });
+        }
+        if (booking && booking.status !== 'cancelled' && booking.status !== 'no_show') {
+          invoice = await InvoiceService.tryFromBooking(meeting.bookingId, req.user!.userId);
+        }
+      } else if (meeting.episodeId) {
+        const session = await prisma.session.findFirst({
+          where: {
+            episodeId: meeting.episodeId,
+            status: { in: ['pending', 'accepted', 'in_progress'] },
+          },
+          orderBy: { scheduledAt: 'desc' },
+        });
+        if (session) {
+          await prisma.session.update({
+            where: { id: session.id },
+            data: { status: 'completed', completedAt: new Date() },
+          });
+          invoice = await InvoiceService.tryFromSession(session.id, req.user!.userId);
+        }
+      }
+
+      res.json({ success: true, message: 'Meeting ended.', invoice: invoice ?? undefined });
     } catch (err) {
       next(err);
     }
@@ -164,29 +209,36 @@ export class MeetingSchedulerController {
     }
   }
 
-  // POST /api/livekit/webhook — LiveKit event webhook
+  // POST /api/livekit/webhook — LiveKit event webhook (signature required)
   static async livekitWebhook(req: Request, res: Response, next: NextFunction) {
     try {
-      const event = req.body;
-      const roomName = event?.room?.name;
+      const raw = Buffer.isBuffer(req.body)
+        ? req.body.toString('utf8')
+        : typeof req.body === 'string'
+          ? req.body
+          : JSON.stringify(req.body ?? {});
+      const authHeader = typeof req.headers.authorization === 'string'
+        ? req.headers.authorization
+        : undefined;
 
-      if (event.event === 'room_finished' && roomName) {
+      const event = await receiveLiveKitWebhookEvent(
+        raw,
+        authHeader,
+        env.LIVEKIT_API_KEY,
+        env.LIVEKIT_API_SECRET,
+      );
+      const eventName = String(event.event);
+      const roomName = event.room?.name;
+
+      if (eventName === 'room_finished' && roomName) {
         await prisma.meeting.updateMany({
           where: { roomName, status: 'active' },
           data: { status: 'ended', endedAt: new Date() },
         });
       }
 
-      if (event.event === 'recording_finished' && roomName) {
-        const egressId = event?.egressInfo?.egressId;
-        const recordingUrl = event?.egressInfo?.file?.location;
-
-        if (egressId && recordingUrl) {
-          await prisma.meeting.updateMany({
-            where: { roomName },
-            data: { recordingUrl, recordingStatus: 'available' },
-          });
-        }
+      if (eventName === 'egress_ended' || eventName === 'recording_finished') {
+        await TelehealthRecordingService.persistFromEgressEvent(event);
       }
 
       res.sendStatus(200);
@@ -198,13 +250,9 @@ export class MeetingSchedulerController {
   // POST /api/meetings/:id/start-recording
   static async startRecording(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const meeting = await prisma.meeting.findUnique({ where: { id } });
-      if (!meeting) throw new AppError('Meeting not found.', 404);
-      if (meeting.hostId !== req.user!.userId) throw new AppError('Only the host can start recording.', 403);
-
-      await prisma.meeting.update({ where: { id }, data: { recordingStatus: 'in_progress' } });
-      res.json({ success: true, message: 'Recording started.' });
+      const actor = { userId: req.user!.userId, role: req.user!.role };
+      const data = await TelehealthRecordingService.startForMeeting(req.params.id, actor);
+      res.json({ success: true, message: 'Recording started.', ...data });
     } catch (err) {
       next(err);
     }
@@ -213,16 +261,57 @@ export class MeetingSchedulerController {
   // GET /api/meetings/:id/recording
   static async getRecording(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const meeting = await prisma.meeting.findUnique({ where: { id } });
-      if (!meeting) throw new AppError('Meeting not found.', 404);
+      const actor = { userId: req.user!.userId, role: req.user!.role };
+      const data = await TelehealthRecordingService.playbackForMeeting(req.params.id, actor);
+      res.json({ success: true, ...data });
+    } catch (err) {
+      next(err);
+    }
+  }
 
-      const isParticipant = meeting.hostId === req.user!.userId || meeting.participantId === req.user!.userId;
-      if (!isParticipant) throw new AppError('Forbidden.', 403);
+  static async lobby(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = { userId: req.user!.userId, role: req.user!.role };
+      const data = await TelehealthRoomService.listMeetingLobby(req.params.id, actor);
+      res.json({ success: true, ...data });
+    } catch (err) {
+      next(err);
+    }
+  }
 
-      if (!meeting.recordingUrl) throw new AppError('No recording available for this meeting.', 404);
+  static async admit(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body);
+      const actor = { userId: req.user!.userId, role: req.user!.role };
+      const data = await TelehealthRoomService.admitMeeting(req.params.id, userId, actor);
+      res.json({ success: true, ...data });
+    } catch (err) {
+      next(err);
+    }
+  }
 
-      res.json({ success: true, recordingUrl: meeting.recordingUrl });
+  static async context(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = { userId: req.user!.userId, role: req.user!.role };
+      const data = await TelehealthContextService.forMeeting(req.params.id, actor);
+      res.json({ success: true, ...data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async addNote(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = { userId: req.user!.userId, role: req.user!.role };
+      const body = z
+        .object({
+          content: sanitizedString(z.string().min(1).max(20000)),
+          noteType: z.string().min(1).max(64).optional().default('session_note'),
+          isPrivate: z.boolean().optional().default(false),
+        })
+        .parse(req.body);
+      const note = await TelehealthNoteService.addForMeeting(req.params.id, actor, body);
+      res.status(201).json({ success: true, data: note });
     } catch (err) {
       next(err);
     }

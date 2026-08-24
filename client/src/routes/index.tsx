@@ -35,7 +35,6 @@ const RegisterPage        = lazy(() => import('@/pages/public/RegisterPage'));
 const ForgotPasswordPage  = lazy(() => import('@/pages/public/ForgotPasswordPage'));
 const ResetPasswordPage   = lazy(() => import('@/pages/public/ResetPasswordPage'));
 const SetPasswordPage     = lazy(() => import('@/pages/public/SetPasswordPage'));
-const AdminFamiliesPage   = lazy(() => import('@/pages/admin/FamiliesPage'));
 const VerifyEmailPendingPage = lazy(() => import('@/pages/public/VerifyEmailPendingPage'));
 const PrivacyPage         = lazy(() => import('@/pages/public/PrivacyPage'));
 const TermsPage           = lazy(() => import('@/pages/public/TermsPage'));
@@ -58,12 +57,15 @@ const AdminDocumentsPage     = lazy(() => import('@/pages/admin/DocumentsPage'))
 const AdminIncidentsPage     = lazy(() => import('@/pages/admin/IncidentsPage'));
 const AdminPaymentsPage      = lazy(() => import('@/pages/admin/PaymentsPage'));
 const AdminPaymentDetailPage = lazy(() => import('@/pages/admin/PaymentDetailPage'));
+const AdminReconciliationPage = lazy(() => import('@/pages/admin/ReconciliationPage'));
+const AdminInvoicesPage      = lazy(() => import('@/pages/admin/InvoicesPage'));
+const AdminPricingPage       = lazy(() => import('@/pages/admin/PricingPage'));
 const AdminPayoutsPage       = lazy(() => import('@/pages/admin/PayoutsPage'));
 const AdminPayoutDetailPage  = lazy(() => import('@/pages/admin/PayoutDetailPage'));
 const AdminProvidersPage     = lazy(() => import('@/pages/admin/ProvidersPage'));
 const AdminProviderDetailPage = lazy(() => import('@/pages/admin/ProviderDetailPage'));
 const AdminProvidersPendingPage = lazy(() => import('@/pages/admin/ProvidersPendingPage'));
-const AdminServicesPage      = lazy(() => import('@/pages/admin/ServicesPage'));
+const AdminFamiliesPage      = lazy(() => import('@/pages/admin/FamiliesPage'));
 const AdminSessionsPage      = lazy(() => import('@/pages/admin/SessionsPage'));
 const AdminSettingsPage      = lazy(() => import('@/pages/admin/SettingsPage'));
 const AdminOrganizationsPage = lazy(() => import('@/pages/admin/OrganizationsPage'));
@@ -163,14 +165,17 @@ export function AppRoutes() {
             <Route path="/admin/documents"          element={<S><AdminDocumentsPage /></S>} />
             <Route path="/admin/incidents"          element={<S><AdminIncidentsPage /></S>} />
             <Route path="/admin/payments"           element={<S><AdminPaymentsPage /></S>} />
+            <Route path="/admin/payments/reconciliation" element={<S><AdminReconciliationPage /></S>} />
             <Route path="/admin/payments/:id"       element={<S><AdminPaymentDetailPage /></S>} />
+            <Route path="/admin/invoices"           element={<S><AdminInvoicesPage /></S>} />
+            <Route path="/admin/pricing"            element={<S><AdminPricingPage /></S>} />
+            <Route path="/admin/services"           element={<Navigate to="/admin/pricing" replace />} />
             <Route path="/admin/payouts"            element={<S><AdminPayoutsPage /></S>} />
             <Route path="/admin/payouts/:id"        element={<S><AdminPayoutDetailPage /></S>} />
             <Route path="/admin/providers"          element={<S><AdminProvidersPage /></S>} />
             <Route path="/admin/providers/pending"  element={<S><AdminProvidersPendingPage /></S>} />
             <Route path="/admin/providers/:id"      element={<S><AdminProviderDetailPage /></S>} />
             <Route path="/admin/families"           element={<S><AdminFamiliesPage /></S>} />
-            <Route path="/admin/services"           element={<S><AdminServicesPage /></S>} />
             <Route path="/admin/sessions"           element={<S><AdminSessionsPage /></S>} />
             <Route path="/admin/settings"           element={<S><AdminSettingsPage /></S>} />
             <Route path="/admin/organizations"     element={<S><AdminOrganizationsPage /></S>} />

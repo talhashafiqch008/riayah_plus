@@ -7,6 +7,7 @@ import { optionalSanitizedString } from '../../utils/sanitize';
 import {
   AiCarePlanDraftService,
   carePlanDraftCallbackSchema,
+  toPublicCarePlan,
 } from '../../services/AiCarePlanDraftService';
 import { AuditService } from '../../services/AuditService';
 
@@ -99,7 +100,7 @@ export class CarePlanDraftCallbackController {
         status: result.status,
         version: result.version,
         ai: { status: result.ai.status },
-        carePlan: plan,
+        carePlan: plan ? toPublicCarePlan(plan) : plan,
       },
     });
   }

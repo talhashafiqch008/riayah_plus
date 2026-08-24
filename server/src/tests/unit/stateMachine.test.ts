@@ -109,4 +109,23 @@ describe('stateMachine', () => {
     expect(canTransition('care_episode', 'active', 'active')).toBe(true);
     expect(assertTransition('care_episode', 'active', 'active')).toBeUndefined();
   });
+
+  describe('invoice', () => {
+    it('allows draft → sent → paid', () => {
+      expect(canTransition('invoice', 'draft', 'sent')).toBe(true);
+      expect(canTransition('invoice', 'sent', 'paid')).toBe(true);
+    });
+
+    it('allows sent → overdue → paid and dispute path', () => {
+      expect(canTransition('invoice', 'sent', 'overdue')).toBe(true);
+      expect(canTransition('invoice', 'overdue', 'paid')).toBe(true);
+      expect(canTransition('invoice', 'sent', 'disputed')).toBe(true);
+      expect(canTransition('invoice', 'disputed', 'paid')).toBe(true);
+    });
+
+    it('blocks draft → paid and paid → sent', () => {
+      expect(canTransition('invoice', 'draft', 'paid')).toBe(false);
+      expect(canTransition('invoice', 'paid', 'sent')).toBe(false);
+    });
+  });
 });

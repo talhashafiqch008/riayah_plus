@@ -1,98 +1,20 @@
-import rateLimit from 'express-rate-limit';
-import { RedisStore } from 'rate-limit-redis';
-import { redis } from '../config/redis';
+import type { NextFunction, Request, Response } from 'express';
 
-function makeStore(prefix: string) {
-  return new RedisStore({
-    sendCommand: (...args: string[]) => redis.call(...(args as [string, ...string[]])) as Promise<any>,
-    prefix: `rl:${prefix}:`,
-  });
+function passthrough(_req: Request, _res: Response, next: NextFunction): void {
+  next();
 }
 
-export const apiLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  store: makeStore('api'),
-  message: { message: 'Too many requests, please try again later.' },
-});
-
-export const loginLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 5,
-  store: makeStore('login'),
-  message: { message: 'Too many login attempts.' },
-});
-
-export const otpLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 3,
-  store: makeStore('otp'),
-  message: { message: 'Too many OTP requests.' },
-});
-
-export const registerLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 3,
-  store: makeStore('register'),
-  message: { message: 'Too many registration attempts.' },
-});
-
-export const aiLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 30,
-  store: makeStore('ai'),
-  message: { message: 'AI rate limit exceeded.' },
-});
-
-/** Tighter cap for unauthenticated Gemini endpoints. */
-export const publicAiLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 10,
-  store: makeStore('ai-public'),
-  message: { message: 'AI rate limit exceeded.' },
-});
-
-export const adminLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 30,
-  store: makeStore('admin'),
-  message: { message: 'Admin rate limit exceeded.' },
-});
-
-export const bookingLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 30,
-  store: makeStore('booking'),
-  message: { message: 'Booking rate limit exceeded.' },
-});
-
-export const paymentLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 20,
-  store: makeStore('payment'),
-  message: { message: 'Payment rate limit exceeded.' },
-});
-
-export const documentLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 30,
-  store: makeStore('document'),
-  message: { message: 'Document rate limit exceeded.' },
-});
-
-/** Staff profile photo uploads — stricter than general documents. */
-export const avatarUploadLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 10,
-  store: makeStore('avatar'),
-  message: { message: 'Profile photo upload rate limit exceeded. Try again shortly.' },
-});
-
-export const webhookLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 100,
-  store: makeStore('webhook'),
-  message: { message: 'Webhook rate limit exceeded.' },
-});
+// Temporary: disable all rate limiting for local/demo usage.
+// Re-enable by restoring express-rate-limit + RedisStore configuration.
+export const apiLimiter = passthrough;
+export const loginLimiter = passthrough;
+export const otpLimiter = passthrough;
+export const registerLimiter = passthrough;
+export const aiLimiter = passthrough;
+export const publicAiLimiter = passthrough;
+export const adminLimiter = passthrough;
+export const bookingLimiter = passthrough;
+export const paymentLimiter = passthrough;
+export const documentLimiter = passthrough;
+export const avatarUploadLimiter = passthrough;
+export const webhookLimiter = passthrough;

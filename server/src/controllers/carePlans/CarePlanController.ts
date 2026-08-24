@@ -5,7 +5,10 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { assertTenantOrgAccess, mergeTenantOrg } from '../../middleware/tenantAccess';
 import { AuditService } from '../../services/AuditService';
+import { QuotationService } from '../../services/QuotationService';
+import { logger } from '../../config/logger';
 import { NotificationService } from '../../services/NotificationService';
+import { mergeCarePlanNotesForSave, toPublicCarePlan } from '../../services/AiCarePlanDraftService';
 import { assertCarePlanTransition } from '../../utils/stateMachine';
 
 const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
@@ -259,7 +262,7 @@ export class CarePlanController {
       include: { goals: true, items: true, episode: { select: { id: true, organizationId: true, patientId: true } } },
       orderBy: { version: 'desc' },
     });
-    res.json({ data: plans });
+    res.json({ data: plans.map((plan) => toPublicCarePlan(plan)) });
   }
 
   static async store(req: Request, res: Response): Promise<void> {
@@ -315,7 +318,7 @@ export class CarePlanController {
     if (!plan) throw new AppError('Care plan not found.', 404);
 
     assertCarePlanAccess(req, plan.episode);
-    res.json({ data: plan });
+    res.json({ data: toPublicCarePlan(plan) });
   }
 
   static async update(req: Request, res: Response): Promise<void> {
@@ -353,7 +356,8 @@ export class CarePlanController {
     const prevGoals = mapStoredGoals(plan.goals);
     const prevItems = mapStoredItems(plan.items);
     const nextTitle = body.title ?? plan.title;
-    const nextNotes = body.notes !== undefined ? body.notes : plan.notes;
+    const nextNotes =
+      body.notes !== undefined ? mergeCarePlanNotesForSave(plan.notes, body.notes) : plan.notes;
     const nextGoals = body.goals ?? prevGoals;
     const nextItems = body.items ?? prevItems;
 
@@ -371,7 +375,7 @@ export class CarePlanController {
     // CP8: material edit of active/approved plan → new draft version requiring re-approval
     if (REAPPROVAL_STATUSES.includes(plan.status)) {
       if (!material) {
-        res.json({ data: plan });
+        res.json({ data: toPublicCarePlan(plan) });
         return;
       }
 
@@ -449,7 +453,7 @@ export class CarePlanController {
       });
 
       res.json({
-        data: newPlan,
+        data: toPublicCarePlan(newPlan),
         meta: {
           reapprovalRequired: true,
           previousVersionId: plan.id,
@@ -505,7 +509,7 @@ export class CarePlanController {
       req,
     });
 
-    res.json({ data: updated });
+    res.json({ data: toPublicCarePlan(updated) });
   }
 
   static async submitForApproval(req: Request, res: Response): Promise<void> {
@@ -568,6 +572,7 @@ export class CarePlanController {
           },
         },
         goals: true,
+        items: true,
       },
     });
     if (!plan) throw new AppError('Care plan not found.', 404);
@@ -622,8 +627,30 @@ export class CarePlanController {
       }
     });
 
-    await AuditService.log({ userId: req.user!.userId, action: 'care_plan_approved', entity: 'CarePlan', entityId: plan.id, req });
-    res.json({ message: 'Care plan approved and activated.' });
+    // M4 BIL1: auto QAR quotation — after clinical commit so billing never rolls back approval
+    let quotation: Awaited<ReturnType<typeof QuotationService.createFromCarePlanApproval>> | null = null;
+    try {
+      quotation = await QuotationService.createFromCarePlanApproval(plan.id, req.user!.userId);
+    } catch (err) {
+      logger.error('Care plan approved but quotation generation failed', {
+        carePlanId: plan.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'care_plan_approved',
+      entity: 'CarePlan',
+      entityId: plan.id,
+      after: quotation ? { quotation } : undefined,
+      req,
+    });
+
+    res.json({
+      message: 'Care plan approved and activated.',
+      quotation: quotation ?? undefined,
+    });
   }
 
   static async reject(req: Request, res: Response): Promise<void> {

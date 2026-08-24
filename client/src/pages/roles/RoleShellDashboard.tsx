@@ -14,13 +14,14 @@ const FAMILY_PRIMARY_LINKS = [
   { name: 'Care request', href: '/family/onboarding', hint: 'Start or update a request' },
   { name: 'Care Journey', href: '/family/episodes', hint: 'See where you are' },
   { name: 'Appointments', href: '/family/bookings', hint: 'Consultations & bookings' },
+  { name: 'Video sessions', href: '/family/telehealth', hint: 'Join the waiting room' },
+  { name: 'Messages', href: '/family/messages', hint: 'Talk with your care team' },
+  { name: 'Care Plans', href: '/family/care-plans', hint: 'Review and approve plans' },
+  { name: 'Billing', href: '/family/billing', hint: 'Quotations and invoices' },
   { name: 'Documents', href: '/family/documents', hint: 'Upload or review files' },
 ] as const;
 
-const FAMILY_LATER_LINKS = [
-  { name: 'Care Plans', href: '/family/care-plans', hint: 'Coming in Milestone 3' },
-  { name: 'Messages', href: '/family/messages', hint: 'Secure messaging later' },
-] as const;
+const FAMILY_LATER_LINKS: readonly { name: string; href: string; hint: string }[] = [];
 
 export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps) {
   const shell = ROLE_SHELLS[shellKey];
@@ -83,7 +84,7 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
       </div>
 
       {isFamily ? (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className={`grid gap-6 ${FAMILY_LATER_LINKS.length > 0 ? 'lg:grid-cols-2' : ''}`}>
           <div className="rounded-xl border bg-white p-6 shadow-sm">
             <h3 className="font-semibold text-stone-900 mb-1">What you can do</h3>
             <p className="text-sm text-stone-500 mb-4">
@@ -122,6 +123,7 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
             </div>
           </div>
 
+          {FAMILY_LATER_LINKS.length > 0 && (
           <div className="rounded-xl border bg-white p-6 shadow-sm">
             <h3 className="font-semibold text-stone-900 mb-1">Coming later</h3>
             <p className="text-sm text-stone-500 mb-4">
@@ -145,6 +147,7 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
               ))}
             </div>
           </div>
+          )}
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">

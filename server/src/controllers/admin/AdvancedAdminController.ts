@@ -6,6 +6,7 @@ import { DashboardAggregationService } from '../../services/DashboardAggregation
 import { InvoicePDFService } from '../../services/InvoicePDFService';
 import { AuditService } from '../../services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
+import { ReconciliationService } from '../../services/ReconciliationService';
 import { AppError } from '../../middleware/errorHandler';
 import { createObjectCsvStringifier } from 'csv-writer';
 
@@ -79,7 +80,11 @@ export class AdvancedAdminController {
   // GET /api/admin/services
   static async listServices(req: Request, res: Response, next: NextFunction) {
     try {
-      const services = await prisma.serviceType.findMany({ orderBy: { type: 'asc' } });
+      const includeInactive = String(req.query.includeInactive ?? '') === 'true';
+      const services = await prisma.serviceType.findMany({
+        where: includeInactive ? undefined : { isActive: true },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      });
       res.json({ success: true, services });
     } catch (err) {
       next(err);
@@ -90,17 +95,29 @@ export class AdvancedAdminController {
   static async createService(req: Request, res: Response, next: NextFunction) {
     try {
       const body = z.object({
-        code: z.string(),
-        name: z.string(),
+        code: z.string().min(1).max(64),
+        name: z.string().min(1).max(120),
         type: z.string().optional(),
         label: z.string().optional(),
         description: z.string().optional(),
+        category: z.string().optional(),
         baseRate: z.number().positive(),
-        currency: z.string().default('QAR'),
+        currency: z.enum(['QAR', 'USD']).default('QAR'),
         isActive: z.boolean().default(true),
       }).parse(req.body);
 
+      const existing = await prisma.serviceType.findUnique({ where: { code: body.code } });
+      if (existing) throw new AppError('A service with this code already exists.', 409);
+
       const service = await prisma.serviceType.create({ data: body });
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: 'service_catalog_created',
+        entity: 'ServiceType',
+        entityId: service.id,
+        after: { code: service.code, baseRate: Number(service.baseRate), currency: service.currency },
+        req,
+      });
       res.status(201).json({ success: true, service });
     } catch (err) {
       next(err);
@@ -111,13 +128,28 @@ export class AdvancedAdminController {
   static async updateService(req: Request, res: Response, next: NextFunction) {
     try {
       const body = z.object({
+        name: z.string().min(1).max(120).optional(),
         label: z.string().optional(),
         description: z.string().optional(),
+        category: z.string().optional(),
         baseRate: z.number().positive().optional(),
+        currency: z.enum(['QAR', 'USD']).optional(),
         isActive: z.boolean().optional(),
       }).parse(req.body);
 
+      const before = await prisma.serviceType.findUnique({ where: { id: req.params.id } });
+      if (!before) throw new AppError('Service not found.', 404);
+
       const service = await prisma.serviceType.update({ where: { id: req.params.id }, data: body });
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: 'service_catalog_updated',
+        entity: 'ServiceType',
+        entityId: service.id,
+        before: { baseRate: Number(before.baseRate), currency: before.currency, isActive: before.isActive },
+        after: { baseRate: Number(service.baseRate), currency: service.currency, isActive: service.isActive },
+        req,
+      });
       res.json({ success: true, service });
     } catch (err) {
       next(err);
@@ -287,6 +319,21 @@ export class AdvancedAdminController {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="users-export-${Date.now()}.csv"`);
       res.send(csv);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/admin/payments/reconciliation
+  static async reconciliation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const from = req.query.from ? new Date(String(req.query.from)) : undefined;
+      const to = req.query.to ? new Date(String(req.query.to)) : undefined;
+      if (from && Number.isNaN(from.getTime())) throw new AppError('Invalid from date.', 400);
+      if (to && Number.isNaN(to.getTime())) throw new AppError('Invalid to date.', 400);
+
+      const report = await ReconciliationService.report({ from, to });
+      res.json({ success: true, ...report });
     } catch (err) {
       next(err);
     }

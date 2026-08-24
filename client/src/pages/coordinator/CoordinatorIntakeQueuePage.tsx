@@ -981,7 +981,7 @@ export default function CoordinatorIntakeQueuePage() {
 
                   <div>
                     <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
-                      Notes (optional)
+                      Notes
                     </label>
                     <textarea
                       value={notes}

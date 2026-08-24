@@ -8,6 +8,13 @@ import RoleShellPlaceholder from '@/pages/roles/RoleShellPlaceholder';
 import FamilyOnboardingPage from '@/pages/family/FamilyOnboardingPage';
 import FamilyCarePlansPage from '@/pages/family/FamilyCarePlansPage';
 import FamilyCarePlanReviewPage from '@/pages/family/FamilyCarePlanReviewPage';
+import FamilyBillingPage from '@/pages/family/FamilyBillingPage';
+import FamilyInvoiceDetailPage from '@/pages/family/FamilyInvoiceDetailPage';
+import FamilyTelehealthPage from '@/pages/family/FamilyTelehealthPage';
+import FamilyTelehealthJoinPage, {
+  FamilyAppointmentJoinRedirect,
+} from '@/pages/family/FamilyTelehealthJoinPage';
+import RoleMessagesPage from '@/pages/roles/RoleMessagesPage';
 import CoordinatorIntakeQueuePage from '@/pages/coordinator/CoordinatorIntakeQueuePage';
 import CoordinatorCarePlansPage from '@/pages/coordinator/CoordinatorCarePlansPage';
 import CoordinatorCarePlanBuilderPage from '@/pages/coordinator/CoordinatorCarePlanBuilderPage';
@@ -17,6 +24,8 @@ import ClinicalNotesPage from '@/pages/clinical/ClinicalNotesPage';
 import ClinicalEpisodeNotesPage from '@/pages/clinical/ClinicalEpisodeNotesPage';
 import ClinicalCarePlansPage from '@/pages/clinical/ClinicalCarePlansPage';
 import ClinicalCarePlanPage from '@/pages/clinical/ClinicalCarePlanPage';
+import ClinicalTelehealthPage from '@/pages/clinical/ClinicalTelehealthPage';
+import ClinicalTelehealthJoinPage from '@/pages/clinical/ClinicalTelehealthJoinPage';
 import SupportShiftsPage from '@/pages/support/SupportShiftsPage';
 import SupportTasksPage from '@/pages/support/SupportTasksPage';
 import OrgFamiliesPage from '@/pages/org/OrgFamiliesPage';
@@ -44,22 +53,11 @@ const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; descripti
       title: 'Documents',
       description: 'Document upload is available from your care request and care unit. A dedicated documents hub expands in a later release.',
     },
-    {
-      path: 'messages',
-      title: 'Messages',
-      description: 'Secure family messaging ships in Milestone 4. Your care team will contact you about appointments and next steps.',
-    },
   ],
   patient: [
     { path: 'care-plan', title: 'My Care Plan' },
     { path: 'appointments', title: 'Appointments' },
     { path: 'documents', title: 'Documents' },
-    { path: 'messages', title: 'Messages' },
-  ],
-  coordinator: [
-    { path: 'messages', title: 'Messages' },
-  ],
-  clinical: [
     { path: 'messages', title: 'Messages' },
   ],
   support: [
@@ -190,6 +188,14 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/coordinator/messages/:conversationId?"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <RoleMessagesPage basePath="/coordinator/messages" canStartStaffThreads />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {shellKey === 'family' && (
@@ -266,10 +272,75 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
+                <Route path="/family/invoices" element={<Navigate to="/family/billing" replace />} />
+                <Route
+                  path="/family/quotations"
+                  element={<Navigate to="/family/billing?tab=quotations" replace />}
+                />
+                <Route
+                  path="/family/billing"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyBillingPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/billing/:id"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyInvoiceDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/appointments/:id/join"
+                  element={<FamilyAppointmentJoinRedirect />}
+                />
+                <Route
+                  path="/family/telehealth"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyTelehealthPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/telehealth/:sessionId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyTelehealthJoinPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/messages/:conversationId?"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <RoleMessagesPage basePath="/family/messages" canStartCoordinatorThread />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {shellKey === 'clinical' && (
               <>
+                <Route
+                  path="/clinical/telehealth"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <ClinicalTelehealthPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/telehealth/:sessionId"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <ClinicalTelehealthJoinPage />
+                    </Suspense>
+                  }
+                />
                 <Route
                   path="/clinical/schedule"
                   element={
@@ -343,6 +414,14 @@ export const proposalRoleRouteElements = (
                   element={
                     <Suspense fallback={<PageSpinner />}>
                       <ClinicalCarePlanPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/messages/:conversationId?"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <RoleMessagesPage basePath="/clinical/messages" canStartStaffThreads />
                     </Suspense>
                   }
                 />
