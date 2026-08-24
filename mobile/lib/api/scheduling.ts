@@ -22,6 +22,7 @@ export interface CareSession {
   type: string;
   status: string;
   scheduledAt: string;
+  livekitRoomId?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
   latitude?: number | string | null;

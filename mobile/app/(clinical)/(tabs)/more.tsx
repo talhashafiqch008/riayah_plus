@@ -15,6 +15,12 @@ export default function ClinicalMoreScreen() {
               description: 'Review plans and add an optional co-sign',
               href: '/(clinical)/plans',
             },
+            {
+              icon: 'videocam-outline',
+              label: 'Telehealth',
+              description: 'Admit patients and join video visits',
+              href: '/(clinical)/telehealth',
+            },
           ],
         },
         {

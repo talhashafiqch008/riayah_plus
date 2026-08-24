@@ -1,24 +1,13 @@
-import { ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { EmptyState } from '../../../components/ui';
-import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
+import { useLocalSearchParams } from 'expo-router';
+import { MessageThread } from '../../../components/messages/MessagesInbox';
 
-export default function MessageThreadScreen() {
+export default function FamilyMessageThreadScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Conversation" subtitle="Messages with your care team" showBack />
-      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-        <EmptyState
-          icon="chatbubble-ellipses-outline"
-          title="Secure messaging coming soon"
-          subtitle="Your care team will contact you about appointments and next steps."
-          action={{
-            label: 'Back to home',
-            onPress: () => router.replace('/(family)'),
-          }}
-        />
-      </ScrollView>
-    </SafeAreaView>
+    <MessageThread
+      conversationId={String(id ?? '')}
+      basePath="/(family)/messages"
+      tone="family"
+    />
   );
 }

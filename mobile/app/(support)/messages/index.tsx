@@ -1,18 +1,19 @@
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { EmptyState, ScreenHeader } from '../../../components/ui';
+import { EmptyState } from '../../../components/ui';
+import { ROLE, RoleTabHero } from '../../../components/shell/RoleChrome';
 
-/** Matches web RoleShellPlaceholder for /support/messages. */
+/** Support messaging uses the same APIs when threads exist; keep a calm empty state for now. */
 export default function SupportMessagesScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Messages" showBack />
+    <SafeAreaView style={{ flex: 1, backgroundColor: ROLE.stone50 }} edges={['top']}>
+      <RoleTabHero title="Messages" subtitle="Talk with your care team" showBack />
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
         <EmptyState
           icon="chatbubble-ellipses-outline"
-          title="Secure messaging coming soon"
-          subtitle="This section will be wired to live APIs in a later milestone. The Support Worker shell and navigation are in place."
+          title="Team messaging"
+          subtitle="Family, clinical, and coordinator messaging is live. Support threads will appear here when your organization opens them."
           action={{
             label: 'Back to home',
             onPress: () => router.replace('/(support)'),

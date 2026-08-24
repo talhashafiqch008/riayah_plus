@@ -59,6 +59,12 @@ const SECTIONS: { title: string; links: MoreLink[] }[] = [
         href: '/(family)/messages',
       },
       {
+        icon: 'videocam-outline',
+        label: 'Video visits',
+        description: 'Join remote care sessions',
+        href: '/(family)/telehealth',
+      },
+      {
         icon: 'notifications-outline',
         label: 'Notifications',
         description: 'Updates about your care journey',
@@ -77,8 +83,8 @@ const SECTIONS: { title: string; links: MoreLink[] }[] = [
       },
       {
         icon: 'receipt-outline',
-        label: 'Invoices',
-        description: 'Statements and payment history',
+        label: 'Billing',
+        description: 'Quotations, invoices, and pay online',
         href: '/(family)/invoices',
       },
     ],
