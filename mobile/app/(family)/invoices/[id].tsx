@@ -1,12 +1,24 @@
-// TODO: Invoice detail + payment — see M5_MOBILE_DESIGN_SPEC.md § 5.2 Invoice Detail
-// Shows: invoice lines (service, qty, rate, total), tax, grand total in QAR
-// Status badge; if status=sent → show [Pay Now] button
-// Pay Now: opens expo-web-browser with payment gateway URL from API
-// API: GET /api/invoices/:id
-//      POST /api/invoices/:id/pay → returns { paymentUrl }
-//      Open paymentUrl with WebBrowser.openBrowserAsync()
-import { View } from 'react-native';
+import { ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { EmptyState } from '../../../components/ui';
+import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 
 export default function InvoiceDetailScreen() {
-  return <View />;
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+      <FamilyTabHero title="Invoice" subtitle="Statement details and payment" showBack />
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+        <EmptyState
+          icon="receipt-outline"
+          title="Invoices coming soon"
+          subtitle="Billing and payments for family will be available after the payments work is ready."
+          action={{
+            label: 'Back to home',
+            onPress: () => router.replace('/(family)'),
+          }}
+        />
+      </ScrollView>
+    </SafeAreaView>
+  );
 }

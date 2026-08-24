@@ -282,6 +282,7 @@ export default function AdminOrganizationsScreen() {
           renderItem={({ item: o }) => (
             <View className="mb-2">
               <AdminListRow
+                icon="business-outline"
                 title={o.name || 'Organization'}
                 subtitle={o.isActive === false ? 'Inactive' : 'Active'}
                 meta={`${o._count?.clinics ?? 0} clinics · ${o._count?.users ?? 0} users`}

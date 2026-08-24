@@ -16,9 +16,9 @@ import {
   Card,
   Chip,
   EmptyState,
-  ScreenHeader,
   StatusBadge,
 } from '../../../components/ui';
+import { FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { ClinicianDropdown } from '../../../components/ClinicianDropdown';
 import {
   getEpisode,
@@ -117,7 +117,7 @@ export default function FamilyEpisodeDetailScreen() {
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care journey" showBack />
+        <FamilyTabHero title="Care journey" showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -126,7 +126,7 @@ export default function FamilyEpisodeDetailScreen() {
   if (query.isError || !episode) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care journey" showBack />
+        <FamilyTabHero title="Care journey" showBack />
         <EmptyState
           icon="alert-circle-outline"
           title="Care journey not found"
@@ -145,7 +145,7 @@ export default function FamilyEpisodeDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader
+      <FamilyTabHero
         title={episode.title ?? 'Care journey'}
         subtitle={episode.careRecipient?.name ?? episode.patient?.name ?? undefined}
         showBack
@@ -161,7 +161,7 @@ export default function FamilyEpisodeDetailScreen() {
           />
         }
       >
-        <View className="flex-row justify-end">
+        <View className="mb-3 flex-row justify-end">
           {episode.status ? (
             <StatusBadge
               status={episode.status}

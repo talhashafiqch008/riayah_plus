@@ -237,11 +237,9 @@ export default function OrgStaffScreen() {
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
         title="Staff"
-        rightAction={
-          <Pressable onPress={() => setModalOpen(true)} hitSlop={12} accessibilityRole="button">
-            <Ionicons name="add" size={24} color="#0D9488" />
-          </Pressable>
-        }
+        subtitle="Clinical and support staff"
+        showBack
+        rightAction={{ icon: 'add', onPress: () => setModalOpen(true) }}
       />
 
       <View className="border-b border-stone-100 bg-white px-4 pb-3">

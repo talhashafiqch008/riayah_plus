@@ -225,11 +225,6 @@ export async function fetchAdminComplianceStats() {
   return data.data ?? data;
 }
 
-export async function fetchAdminGpsCompliance() {
-  const { data } = await apiClient.get('/api/admin/reports/gps-compliance');
-  return data.data ?? data;
-}
-
 export async function fetchAdminVerificationQueue() {
   const { data } = await apiClient.get('/api/admin/verification-queue');
   return data;

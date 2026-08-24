@@ -41,6 +41,7 @@ export default function AdminSessionsScreen() {
       keyExtractor={(b) => b.id}
       renderItem={(b) => (
         <AdminListRow
+          icon="time-outline"
           title={b.serviceType?.replace(/_/g, ' ') || 'Session'}
           subtitle={
             [b.client?.name ?? b.patient?.name, b.provider?.name].filter(Boolean).join(' · ') ||

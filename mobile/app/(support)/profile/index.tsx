@@ -1,5 +1,5 @@
 import { ProfileScreen } from '../../../components/ProfileScreen';
 
 export default function SupportProfileScreen() {
-  return <ProfileScreen />;
+  return <ProfileScreen tone="family" />;
 }

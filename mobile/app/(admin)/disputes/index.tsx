@@ -28,6 +28,7 @@ export default function AdminDisputesScreen() {
       keyExtractor={(d) => d.id}
       renderItem={(d) => (
         <AdminListRow
+          icon="alert-circle-outline"
           title={d.reason?.slice(0, 80) || 'Dispute'}
           subtitle={d.raisedBy?.name ?? d.user?.name ?? d.status}
           meta={`${d.status ?? '—'}${d.createdAt ? ` · ${formatDateTime(d.createdAt)}` : ''}`}

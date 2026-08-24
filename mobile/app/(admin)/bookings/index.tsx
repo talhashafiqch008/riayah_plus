@@ -36,6 +36,7 @@ export default function AdminBookingsScreen() {
       keyExtractor={(b) => b.id}
       renderItem={(b) => (
         <AdminListRow
+          icon="calendar-outline"
           title={b.serviceType?.replace(/_/g, ' ') || 'Booking'}
           subtitle={
             [b.client?.name ?? b.patient?.name, b.provider?.name].filter(Boolean).join(' · ') ||

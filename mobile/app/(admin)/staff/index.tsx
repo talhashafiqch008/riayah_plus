@@ -30,6 +30,7 @@ export default function AdminStaffScreen() {
       keyExtractor={(s) => s.id}
       renderItem={(s) => (
         <AdminListRow
+          icon="briefcase-outline"
           title={s.name || s.email || 'Staff'}
           subtitle={s.email}
           meta={`${s.role ?? '—'} · ${s.isActive === false ? 'Inactive' : 'Active'}`}

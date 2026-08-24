@@ -1,21 +1,22 @@
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { EmptyState, ScreenHeader } from '../../../components/ui';
+import { EmptyState } from '../../../components/ui';
+import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 
-/**
- * Matches mern/client RoleShellPlaceholder for /family/messages —
- * secure messaging ships later; care team contacts families about appointments.
- */
 export default function MessagesScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Messages" showBack />
+    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+      <FamilyTabHero
+        title="Messages"
+        subtitle="Talk to your care team"
+        showBack
+      />
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
         <EmptyState
           icon="chatbubble-ellipses-outline"
           title="Secure messaging coming soon"
-          subtitle="Secure family messaging ships in a later release. Your care team will contact you about appointments and next steps."
+          subtitle="Your care team will contact you about appointments and next steps."
           action={{
             label: 'Back to home',
             onPress: () => router.replace('/(family)'),

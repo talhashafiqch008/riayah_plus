@@ -35,6 +35,7 @@ export default function AdminAuditScreen() {
       keyExtractor={(l) => l.id}
       renderItem={(l) => (
         <AdminListRow
+          icon="list-outline"
           title={l.action?.replace(/_/g, ' ') || 'Event'}
           subtitle={[l.entity, l.entityId].filter(Boolean).join(' · ')}
           meta={`${l.actor?.name ?? l.actor?.email ?? 'System'}${

@@ -2,7 +2,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
 import { AdminListScreen } from '../../../components/admin/AdminListScreen';
-import { Card } from '../../../components/ui';
+import { ADMIN, adminCardStyle } from '../../../components/admin/AdminChrome';
 import {
   approveAdminPayout,
   fetchAdminPayouts,
@@ -47,7 +47,7 @@ export default function AdminPayoutsScreen() {
       }
       keyExtractor={(p) => p.id}
       renderItem={(p) => (
-        <Card shadow={false}>
+        <View style={[adminCardStyle, { padding: 16 }]}>
           <Text className="font-semibold text-stone-900">
             {p.currency ?? 'SAR'} {String(p.amount ?? '—')}
           </Text>
@@ -58,7 +58,8 @@ export default function AdminPayoutsScreen() {
           </Text>
           {p.status === 'pending' ? (
             <Pressable
-              className="mt-3 rounded-xl bg-teal-600 py-2.5"
+              className="mt-3 rounded-xl py-2.5"
+              style={{ backgroundColor: ADMIN.teal }}
               disabled={approve.isPending}
               onPress={() =>
                 Alert.alert('Approve payout?', 'This marks the payout as approved.', [
@@ -72,7 +73,7 @@ export default function AdminPayoutsScreen() {
           ) : (
             <View />
           )}
-        </Card>
+        </View>
       )}
     />
   );

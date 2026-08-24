@@ -43,9 +43,11 @@ export function StatusBadge({ status, size = 'sm', label: labelOverride }: Statu
     labelOverride ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
-    <View className={`rounded-full px-2 py-0.5 ${style.bg}`}>
+    <View className={`shrink-0 rounded-full px-2.5 py-1 ${style.bg}`}>
       <Text
         className={`font-medium ${style.text} ${size === 'sm' ? 'text-xs' : 'text-sm'}`}
+        numberOfLines={1}
+        style={{ includeFontPadding: false }}
       >
         {label}
       </Text>

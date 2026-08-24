@@ -31,6 +31,7 @@ export default function AdminUsersScreen() {
       keyExtractor={(u) => u.id}
       renderItem={(u) => (
         <AdminListRow
+          icon="people-outline"
           title={u.name || u.email || 'User'}
           subtitle={u.email}
           meta={`${u.role ?? '—'} · ${u.isActive === false ? 'Inactive' : 'Active'}`}

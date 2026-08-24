@@ -7,8 +7,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { Card, EmptyState } from '../../../components/ui';
+import { EmptyState } from '../../../components/ui';
 import { AdminScreenHeader } from '../../../components/admin/AdminScreenHeader';
+import { ADMIN, adminCardStyle } from '../../../components/admin/AdminChrome';
 import { fetchAdminSettings } from '../../../lib/api/admin';
 import { apiErrorMessage } from '../../../lib/format';
 
@@ -43,26 +44,26 @@ export default function AdminSettingsScreen() {
             <RefreshControl
               refreshing={query.isFetching}
               onRefresh={() => void query.refetch()}
-              tintColor="#0D9488"
+              tintColor={ADMIN.teal}
             />
           }
         >
           {entries.length === 0 ? (
-            <Card>
+            <View className="p-4" style={adminCardStyle}>
               <Text className="text-sm text-stone-500">
                 No settings payload returned. Edit settings on the web admin console.
               </Text>
-            </Card>
+            </View>
           ) : (
             entries.map(([key, value]) => (
-              <Card key={key} className="mb-2" shadow={false}>
+              <View key={key} className="mb-3 p-4" style={adminCardStyle}>
                 <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
                   {key}
                 </Text>
                 <Text className="mt-1 text-sm text-stone-800">
                   {typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}
                 </Text>
-              </Card>
+              </View>
             ))
           )}
         </ScrollView>

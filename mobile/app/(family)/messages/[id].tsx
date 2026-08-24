@@ -1,11 +1,24 @@
-// TODO: Message thread — see M5_MOBILE_DESIGN_SPEC.md § 5.2 Messages
-// Bubble layout: outgoing right (stone-100), incoming left (teal-600 white text)
-// Input bar at bottom + send + attach (expo-image-picker)
-// Polling every 10s or WebSocket if available
-// API: GET /api/conversations/:id/messages
-//      POST /api/conversations/:id/messages { content, attachmentId? }
-import { View } from 'react-native';
+import { ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { EmptyState } from '../../../components/ui';
+import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 
 export default function MessageThreadScreen() {
-  return <View />;
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+      <FamilyTabHero title="Conversation" subtitle="Messages with your care team" showBack />
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+        <EmptyState
+          icon="chatbubble-ellipses-outline"
+          title="Secure messaging coming soon"
+          subtitle="Your care team will contact you about appointments and next steps."
+          action={{
+            label: 'Back to home',
+            onPress: () => router.replace('/(family)'),
+          }}
+        />
+      </ScrollView>
+    </SafeAreaView>
+  );
 }

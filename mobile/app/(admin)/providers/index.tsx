@@ -48,6 +48,7 @@ export default function AdminProvidersScreen() {
       keyExtractor={(p) => p.id}
       renderItem={(p) => (
         <AdminListRow
+          icon="medkit-outline"
           title={p.name || p.email || 'Provider'}
           subtitle={p.email}
           meta={p.verificationStatus ?? p.role ?? '—'}

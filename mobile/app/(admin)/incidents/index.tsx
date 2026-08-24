@@ -27,6 +27,7 @@ export default function AdminIncidentsScreen() {
       keyExtractor={(i) => i.id}
       renderItem={(i) => (
         <AdminListRow
+          icon="warning-outline"
           title={i.title || 'Incident'}
           subtitle={i.description?.slice(0, 100)}
           meta={`${i.severity ?? '—'} · ${i.status ?? '—'}${

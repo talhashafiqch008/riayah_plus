@@ -320,6 +320,64 @@ export class GPSService {
     };
   }
 
+  static async applyLocationPing(opts: {
+    session: SessionForGps;
+    userId: string;
+    coords: Coordinates;
+    accuracy?: number | null;
+  }) {
+    const { session, userId, coords, accuracy } = opts;
+    GPSService.assertAssignedWorker(session, userId);
+
+    if (CLOSED_SESSION_STATUSES.has(session.status)) {
+      throw new AppError('This session is closed.', 422);
+    }
+    if (!session.checkInAt) {
+      throw new AppError('Check in before sharing live location.', 409);
+    }
+    if (session.checkOutAt) {
+      throw new AppError('This session has already been checked out.', 409);
+    }
+
+    const recent = await prisma.gpsLog.findFirst({
+      where: { sessionId: session.id, eventType: 'ping' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true, id: true },
+    });
+    const tooSoon = recent && Date.now() - recent.createdAt.getTime() < 15_000;
+
+    const { geofence, target } = await GPSService.validateSessionCheckin(coords, session);
+
+    if (!tooSoon) {
+      await prisma.gpsLog.create({
+        data: {
+          userId,
+          sessionId: session.id,
+          eventType: 'ping',
+          latitude: coords.lat,
+          longitude: coords.lng,
+          accuracy: accuracy ?? null,
+          address: target.address,
+          geofenced: geofence.isWithinRadius,
+          geofenceStatus: geofence.status,
+          metadata: {
+            distanceMeters: geofence.distanceMeters,
+            radiusMeters: geofence.radiusMeters,
+          } as object,
+        },
+      });
+    }
+
+    return {
+      pinged: true,
+      skipped: Boolean(tooSoon),
+      lastSeenAt: tooSoon && recent ? recent.createdAt : new Date(),
+      geofence,
+      target,
+      coords,
+    };
+  }
+
   static async listActiveWorkers(organizationId: string | null | undefined) {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const where: Prisma.SessionWhereInput = {
@@ -343,38 +401,83 @@ export class GPSService {
         client: { select: { id: true, name: true } },
         episode: { select: { id: true, title: true, organizationId: true } },
         gpsLogs: {
-          where: { eventType: 'checkin' },
+          where: { eventType: { in: ['ping', 'checkin'] } },
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { metadata: true },
+          select: {
+            latitude: true,
+            longitude: true,
+            createdAt: true,
+            eventType: true,
+            metadata: true,
+          },
         },
       },
     });
 
     return sessions.map((s) => {
-      const coords = pairFromLatLng(s.checkInLat, s.checkInLng);
-      const meta = s.gpsLogs[0]?.metadata;
+      const liveLog = s.gpsLogs[0];
+      const live = liveLog ? pairFromLatLng(liveLog.latitude, liveLog.longitude) : null;
+      const checkIn = pairFromLatLng(s.checkInLat, s.checkInLng);
+      const coords = live ?? checkIn;
+      const dest = pairFromLatLng(s.latitude, s.longitude);
+      const meta = liveLog?.metadata;
       const distanceMeters =
         meta && typeof meta === 'object' && 'distanceMeters' in meta
           ? Number((meta as { distanceMeters?: unknown }).distanceMeters)
           : null;
+      const lastSeenAt = liveLog?.createdAt ?? s.checkInAt;
+      const ageMs = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
       return {
         workerId: s.providerId,
         name: s.provider.name,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
+        targetLat: dest?.lat ?? null,
+        targetLng: dest?.lng ?? null,
         patientName: s.client.name,
         patientId: s.clientId,
         sessionId: s.id,
         episodeId: s.episodeId,
         episodeTitle: s.episode?.title ?? null,
         checkInAt: s.checkInAt,
+        lastSeenAt,
+        isLive: ageMs != null && ageMs < 90_000,
+        liveSource: liveLog?.eventType === 'ping' ? 'ping' : 'checkin',
         geofenceStatus: s.geofenceStatus,
         withinGeofence: s.isGeofenced,
         shiftStart: s.checkInAt,
         distanceMeters: Number.isFinite(distanceMeters) ? distanceMeters : null,
       };
     });
+  }
+
+  static gpsLogOrgWhere(organizationId: string): Prisma.GpsLogWhereInput {
+    return {
+      OR: [
+        { session: { episode: { organizationId } } },
+        { sessionId: null, user: { organizationId } },
+        { session: { episodeId: null, provider: { organizationId } } },
+      ],
+    };
+  }
+
+  static async complianceStats(organizationId: string) {
+    const orgWhere = GPSService.gpsLogOrgWhere(organizationId);
+    const [totalCheckins, outOfRadius, totalCheckouts] = await Promise.all([
+      prisma.gpsLog.count({ where: { AND: [orgWhere, { eventType: 'checkin' }] } }),
+      prisma.gpsLog.count({
+        where: { AND: [orgWhere, { eventType: 'checkin', geofenced: false }] },
+      }),
+      prisma.gpsLog.count({ where: { AND: [orgWhere, { eventType: 'checkout' }] } }),
+    ]);
+    return {
+      totalCheckins,
+      totalCheckouts,
+      outOfRadius,
+      complianceRate:
+        totalCheckins > 0 ? (((totalCheckins - outOfRadius) / totalCheckins) * 100).toFixed(2) : '100',
+    };
   }
 
   static async listLogs(opts: {
@@ -390,13 +493,10 @@ export class GPSService {
 
     if (opts.sessionId) where.sessionId = opts.sessionId;
     if (opts.workerId) where.userId = opts.workerId;
+    where.eventType = { in: ['checkin', 'checkout'] };
 
     if (opts.organizationId) {
-      where.OR = [
-        { session: { episode: { organizationId: opts.organizationId } } },
-        { sessionId: null, user: { organizationId: opts.organizationId } },
-        { session: { episodeId: null, provider: { organizationId: opts.organizationId } } },
-      ];
+      Object.assign(where, GPSService.gpsLogOrgWhere(opts.organizationId));
     }
 
     const [rows, total] = await Promise.all([

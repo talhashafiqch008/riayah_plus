@@ -33,6 +33,7 @@ export default function AdminAssignmentsScreen() {
       keyExtractor={(r) => r.id}
       renderItem={(r) => (
         <AdminListRow
+          icon="clipboard-outline"
           title={r.title || r.type || 'Report'}
           subtitle={[r.provider?.name, r.client?.name].filter(Boolean).join(' · ') || r.status}
           meta={`${r.status ?? '—'}${r.createdAt ? ` · ${formatDateTime(r.createdAt)}` : ''}`}

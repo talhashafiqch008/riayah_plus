@@ -1,5 +1,5 @@
 import { NotificationsScreen } from '../../components/NotificationsScreen';
 
 export default function ClinicalNotificationsScreen() {
-  return <NotificationsScreen />;
+  return <NotificationsScreen tone="family" />;
 }

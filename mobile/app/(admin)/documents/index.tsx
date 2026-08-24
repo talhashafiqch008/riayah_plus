@@ -42,6 +42,7 @@ export default function AdminDocumentsScreen() {
       keyExtractor={(d) => d.id}
       renderItem={(d) => (
         <AdminListRow
+          icon="folder-outline"
           title={d.name || d.type || d.category || 'Document'}
           subtitle={d.user?.name ?? d.user?.email ?? d.status}
           meta={`${d.status ?? '—'}${d.createdAt ? ` · ${formatDateTime(d.createdAt)}` : ''}`}

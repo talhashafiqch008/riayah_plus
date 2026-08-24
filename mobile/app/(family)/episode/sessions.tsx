@@ -6,8 +6,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { EmptyState } from '../../../components/ui';
+import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { SessionCard, type SessionCardSession } from '../../../components/session/SessionCard';
 import { apiClient } from '../../../lib/api/client';
 import { apiErrorMessage } from '../../../lib/format';
@@ -126,8 +128,9 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
 
 export default function EpisodeSessionsScreen() {
   return (
-    <View className="flex-1 bg-stone-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+      <FamilyTabHero title="Sessions" subtitle="Booked visits for this care journey" showBack />
       <SessionsTab />
-    </View>
+    </SafeAreaView>
   );
 }

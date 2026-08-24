@@ -19,6 +19,7 @@ export interface GpsTarget {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  radiusMeters?: number;
 }
 
 export interface GpsCheckinResponse {
@@ -43,12 +44,17 @@ export interface ActiveWorker {
   name: string;
   lat: number | null;
   lng: number | null;
+  targetLat?: number | null;
+  targetLng?: number | null;
   patientName: string;
   patientId?: string;
   sessionId: string;
   episodeId?: string | null;
   episodeTitle?: string | null;
   checkInAt: string | null;
+  lastSeenAt?: string | null;
+  isLive?: boolean;
+  liveSource?: 'ping' | 'checkin' | string;
   geofenceStatus: string | null;
   withinGeofence: boolean;
   shiftStart: string | null;
@@ -115,6 +121,19 @@ export async function validateVisitGps(
   return data as GpsValidateResponse;
 }
 
+export async function pingVisitLocation(
+  sessionId: string,
+  coords: { latitude: number; longitude: number; accuracy?: number | null },
+) {
+  const { data } = await apiClient.post(`/api/gps/sessions/${sessionId}/ping`, coords);
+  return data as {
+    pinged: boolean;
+    skipped?: boolean;
+    lastSeenAt?: string;
+    geofence?: GeofenceResult;
+  };
+}
+
 export async function checkInVisit(
   sessionId: string,
   coords: { latitude: number; longitude: number; accuracy?: number | null },
@@ -143,7 +162,19 @@ export async function listGpsLogs(params?: {
   limit?: number;
 }) {
   const { data } = await apiClient.get('/api/gps/logs', { params });
-  return data as { data: GpsLogRow[]; meta: { page: number; limit: number; total: number } };
+  const payload = (data?.data ?? data) as {
+    data?: GpsLogRow[];
+    meta?: { page: number; limit: number; total: number };
+  };
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : [];
+  return {
+    data: rows,
+    meta: payload && !Array.isArray(payload) ? payload.meta : undefined,
+  };
 }
 
 export async function getGpsReplay(sessionId: string) {

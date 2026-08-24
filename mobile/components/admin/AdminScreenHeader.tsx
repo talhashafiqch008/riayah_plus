@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ScreenHeader } from '../ui';
-import { useAdminDrawer } from '../../stores/adminDrawerStore';
+import { Ionicons } from '@expo/vector-icons';
+import { AdminHero, AdminHeroIconButton } from './AdminChrome';
 
 type Props = {
   title: string;
@@ -16,36 +14,20 @@ type Props = {
   };
 };
 
-/** Shared admin chrome: hamburger opens the single layout-level drawer. */
+/** Shared admin chrome: teal hero with menu (or back) and notifications. */
 export function AdminScreenHeader({ title, subtitle, showBack, rightAction }: Props) {
-  const openDrawer = useAdminDrawer((s) => s.openDrawer);
-
   return (
-    <ScreenHeader
+    <AdminHero
       title={title}
       subtitle={subtitle}
       showBack={showBack}
-      leftAction={showBack ? undefined : { icon: 'menu', onPress: openDrawer }}
-      rightAction={
-        rightAction ?? {
-          icon: 'notifications-outline',
-          onPress: () => router.push('/(admin)/notifications'),
-        }
+      right={
+        <AdminHeroIconButton
+          icon={rightAction?.icon ?? 'notifications-outline'}
+          accessibilityLabel={rightAction ? 'Action' : 'Notifications'}
+          onPress={rightAction?.onPress ?? (() => router.push('/(admin)/notifications'))}
+        />
       }
     />
   );
-}
-
-/** Compact menu button for screens that already use a custom header. */
-export function AdminMenuButton() {
-  const openDrawer = useAdminDrawer((s) => s.openDrawer);
-  return (
-    <Pressable onPress={openDrawer} hitSlop={12} className="p-1">
-      <Ionicons name="menu" size={24} color="#57534E" />
-    </Pressable>
-  );
-}
-
-export function AdminChrome({ children }: { children: ReactNode }) {
-  return <View className="flex-1">{children}</View>;
 }

@@ -25,6 +25,7 @@ export default function AdminServicesScreen() {
       keyExtractor={(s) => s.id}
       renderItem={(s) => (
         <AdminListRow
+          icon="construct-outline"
           title={s.name || 'Service'}
           subtitle={s.category ?? s.description?.slice(0, 80)}
           meta={

@@ -25,6 +25,7 @@ export default function AdminVerificationsScreen() {
       keyExtractor={(d) => d.id}
       renderItem={(d) => (
         <AdminListRow
+          icon="shield-checkmark-outline"
           title={d.user?.name || d.type || 'Pending item'}
           subtitle={d.user?.email ?? d.type}
           meta={d.status ?? 'pending'}

@@ -7,8 +7,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { Card, EmptyState } from '../../../components/ui';
+import { EmptyState } from '../../../components/ui';
 import { AdminScreenHeader } from '../../../components/admin/AdminScreenHeader';
+import { ADMIN, adminCardStyle } from '../../../components/admin/AdminChrome';
 import { fetchAdminComplianceStats } from '../../../lib/api/admin';
 import { apiErrorMessage } from '../../../lib/format';
 
@@ -43,23 +44,23 @@ export default function AdminComplianceScreen() {
             <RefreshControl
               refreshing={query.isFetching}
               onRefresh={() => void query.refetch()}
-              tintColor="#0D9488"
+              tintColor={ADMIN.teal}
             />
           }
         >
           <View className="flex-row flex-wrap gap-3">
             {entries.length === 0 ? (
-              <Card className="w-full">
+              <View className="w-full p-4" style={adminCardStyle}>
                 <Text className="text-sm text-stone-500">No compliance stats available.</Text>
-              </Card>
+              </View>
             ) : (
               entries.map(([key, value]) => (
-                <Card key={key} className="w-[47%]">
+                <View key={key} className="w-[47%] p-4" style={adminCardStyle}>
                   <Text className="text-xs text-stone-500">{key.replace(/_/g, ' ')}</Text>
                   <Text className="mt-1 text-xl font-semibold text-stone-900">
                     {typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}
                   </Text>
-                </Card>
+                </View>
               ))
             )}
           </View>

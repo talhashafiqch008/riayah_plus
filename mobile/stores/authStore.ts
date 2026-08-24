@@ -33,6 +33,7 @@ export interface AuthUser {
   role: UserRole;
   avatarUrl?: string | null;
   organizationId?: string | null;
+  organizationName?: string | null;
   careUnitId?: string | null;
 }
 
@@ -73,6 +74,18 @@ export const SUPER_ADMIN_ROLES: UserRole[] = ['super_admin'];
 const TOKEN_KEY = 'auth_token';
 const BIO_EMAIL_KEY = 'auth_bio_email';
 
+function orgNameFromRaw(raw: Record<string, unknown>): string | null {
+  if (typeof raw.organizationName === 'string' && raw.organizationName.trim()) {
+    return raw.organizationName.trim();
+  }
+  const org = raw.organization;
+  if (org && typeof org === 'object' && 'name' in org) {
+    const name = (org as { name?: unknown }).name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+  }
+  return null;
+}
+
 function mapUser(raw: Record<string, unknown>): AuthUser {
   const first = (raw.firstName ?? raw.first_name ?? '') as string;
   const last = (raw.lastName ?? raw.last_name ?? '') as string;
@@ -89,6 +102,7 @@ function mapUser(raw: Record<string, unknown>): AuthUser {
     role: (raw.role as UserRole) || 'family',
     avatarUrl: (raw.avatar ?? raw.avatarUrl ?? null) as string | null,
     organizationId: (raw.organizationId ?? raw.organization_id ?? null) as string | null,
+    organizationName: orgNameFromRaw(raw),
     careUnitId: (raw.careUnitId ?? raw.care_unit_id ?? null) as string | null,
   };
 }

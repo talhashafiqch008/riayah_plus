@@ -89,9 +89,16 @@ export class AuthController {
     const body = loginSchema.parse(req.body);
     const password = body.password;
 
+    const orgInclude = { organization: { select: { id: true, name: true } } } as const;
     const user = 'email' in body
-      ? await prisma.user.findUnique({ where: { email: body.email, deletedAt: null } })
-      : await prisma.user.findFirst({ where: { phone: body.phone, deletedAt: null } });
+      ? await prisma.user.findUnique({
+          where: { email: body.email, deletedAt: null },
+          include: orgInclude,
+        })
+      : await prisma.user.findFirst({
+          where: { phone: body.phone, deletedAt: null },
+          include: orgInclude,
+        });
 
     // A-9: always run bcrypt regardless of whether the user exists to prevent timing-based enumeration
     const passwordHash = user?.passwordHash ?? '$2a$12$cNV4pbbGpFVj8mcnExwV9eVk8GgZycv2RNFJWdNJAmR8IQCBsg0VO';
@@ -144,6 +151,9 @@ export class AuthController {
         onboardingStatus: user.onboardingStatus,
         twoFactorEnabled: user.twoFactorEnabled,
         organizationId: user.organizationId,
+        organization: user.organization
+          ? { id: user.organization.id, name: user.organization.name }
+          : null,
       },
       onboarding_status: user.onboardingStatus,
     });
@@ -155,7 +165,10 @@ export class AuthController {
     const code = body.code;
     if (!userId || !code) throw new AppError('Invalid request.', 400);
 
-    const user = await prisma.user.findUnique({ where: { id: userId, deletedAt: null } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+      include: { organization: { select: { id: true, name: true } } },
+    });
     if (!user?.twoFactorSecret) throw new AppError('Invalid request.', 400);
 
     // Enforce email verification also for 2FA completion.
@@ -188,6 +201,9 @@ export class AuthController {
         role: user.role,
         twoFactorEnabled: user.twoFactorEnabled,
         organizationId: user.organizationId,
+        organization: user.organization
+          ? { id: user.organization.id, name: user.organization.name }
+          : null,
       },
     });
   }
@@ -224,7 +240,11 @@ export class AuthController {
   static async me(req: Request, res: Response): Promise<void> {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId, deletedAt: null },
-      include: { providerProfile: true, clientProfile: true },
+      include: {
+        providerProfile: true,
+        clientProfile: true,
+        organization: { select: { id: true, name: true } },
+      },
     });
     if (!user) throw new AppError('User not found.', 404);
     res.json({ user });

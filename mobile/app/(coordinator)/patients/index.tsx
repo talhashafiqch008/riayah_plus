@@ -26,10 +26,14 @@ export default function CoordinatorPatientsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Patients" />
+      <ScreenHeader
+        title="Patients"
+        subtitle="Care units in your organization"
+        showBack
+      />
 
-      <View className="border-b border-stone-100 bg-white px-4 pb-3">
-        <Text className="mb-3 text-sm text-stone-500">
+      <View className="border-b border-stone-200 bg-white px-4 pb-4 pt-4">
+        <Text className="mb-3 text-sm leading-5 text-stone-500">
           Browse care units and open patient profiles from intake.
         </Text>
         <Input

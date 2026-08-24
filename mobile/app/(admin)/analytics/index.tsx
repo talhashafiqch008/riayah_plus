@@ -1,5 +1,5 @@
+import { useEffect } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   Text,
@@ -7,8 +7,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { Card, EmptyState } from '../../../components/ui';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
+import { EmptyState } from '../../../components/ui';
 import { AdminScreenHeader } from '../../../components/admin/AdminScreenHeader';
+import { ADMIN, adminCardStyle } from '../../../components/admin/AdminChrome';
 import {
   fetchAdminDashboard,
   fetchAdminUserAnalytics,
@@ -38,6 +47,63 @@ function roleCount(row: { _count?: number | { _all?: number }; count?: number })
 
 type RoleRow = { role: string; _count?: number | { _all?: number }; count?: number };
 
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+
+function RoleBar({
+  label,
+  count,
+  max,
+  index,
+}: {
+  label: string;
+  count: number;
+  max: number;
+  index: number;
+}) {
+  const reduceMotion = useReducedMotion();
+  const ratio = max > 0 ? count / max : 0;
+  const scaleX = useSharedValue(reduceMotion ? Math.max(ratio, 0.04) : 0.04);
+
+  useEffect(() => {
+    const next = Math.max(ratio, 0.04);
+    if (reduceMotion) {
+      scaleX.value = next;
+      return;
+    }
+    scaleX.value = withDelay(
+      index * 40,
+      withTiming(next, { duration: 420, easing: EASE_OUT }),
+    );
+  }, [index, ratio, reduceMotion, scaleX]);
+
+  const style = useAnimatedStyle(() => ({ transform: [{ scaleX: scaleX.value }] }));
+
+  return (
+    <View className="mb-3">
+      <View className="mb-1 flex-row items-center justify-between">
+        <Text className="text-sm text-stone-700">{label}</Text>
+        <Text className="text-sm font-bold text-stone-900" style={{ fontVariant: ['tabular-nums'] }}>
+          {count}
+        </Text>
+      </View>
+      <View className="h-2 overflow-hidden rounded-full bg-stone-100">
+        <Animated.View
+          style={[
+            {
+              height: 8,
+              width: '100%',
+              borderRadius: 99,
+              backgroundColor: ADMIN.teal,
+              transformOrigin: 'left',
+            },
+            style,
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 export default function AdminAnalyticsScreen() {
   const dash = useQuery({
     queryKey: ['admin-dashboard'],
@@ -66,12 +132,18 @@ export default function AdminAnalyticsScreen() {
   ].filter((x) => x.value !== undefined && x.value !== null);
 
   const byRole: RoleRow[] = Array.isArray(a.byRole) ? (a.byRole as RoleRow[]) : [];
+  const sortedRoles = byRole.slice().sort((x, y) => roleCount(y) - roleCount(x));
+  const maxRole = Math.max(...sortedRoles.map(roleCount), 1);
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <AdminScreenHeader title="Analytics" subtitle="Platform user & ops metrics" />
+      <AdminScreenHeader title="Analytics" subtitle="Platform user and ops metrics" />
       {loading ? (
-        <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
+        <View className="flex-row flex-wrap gap-3 p-4">
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} className="h-24 w-[47%]" style={adminCardStyle} />
+          ))}
+        </View>
       ) : error ? (
         <EmptyState
           icon="alert-circle-outline"
@@ -90,51 +162,48 @@ export default function AdminAnalyticsScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           refreshControl={
             <RefreshControl
-              refreshing={dash.isFetching || analytics.isFetching}
+              refreshing={(dash.isFetching || analytics.isFetching) && !loading}
               onRefresh={() => {
                 void dash.refetch();
                 void analytics.refetch();
               }}
-              tintColor="#0D9488"
+              tintColor={ADMIN.teal}
             />
           }
         >
           <View className="flex-row flex-wrap gap-3">
             {headline.map((item) => (
-              <Card key={item.label} className="w-[47%]">
+              <View key={item.label} className="w-[47%] p-4" style={adminCardStyle}>
                 <Text className="text-xs text-stone-500">{item.label}</Text>
-                <Text className="mt-1 text-xl font-semibold text-stone-900">
+                <Text
+                  className="mt-1 text-2xl font-extrabold text-stone-900"
+                  style={{ letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}
+                >
                   {String(item.value)}
                 </Text>
-              </Card>
+              </View>
             ))}
           </View>
 
-          <Card className="mt-4" shadow={false}>
-            <Text className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              By Role
+          <View className="mt-4 p-4" style={adminCardStyle}>
+            <Text className="mb-3 text-[10px] font-bold uppercase tracking-[2.5px] text-stone-400">
+              By role
             </Text>
-            {byRole.length === 0 ? (
+            {sortedRoles.length === 0 ? (
               <Text className="text-sm text-stone-500">No role breakdown available.</Text>
             ) : (
-              byRole
-                .slice()
-                .sort((x, y) => roleCount(y) - roleCount(x))
-                .map((row) => (
-                  <View
-                    key={row.role}
-                    className="mb-2 flex-row items-center justify-between border-b border-stone-50 pb-2"
-                  >
-                    <Text className="text-sm text-stone-700">{roleLabel(row.role)}</Text>
-                    <Text className="text-sm font-semibold text-stone-900">
-                      {roleCount(row)}
-                    </Text>
-                  </View>
-                ))
+              sortedRoles.map((row, i) => (
+                <RoleBar
+                  key={row.role}
+                  index={i}
+                  label={roleLabel(row.role)}
+                  count={roleCount(row)}
+                  max={maxRole}
+                />
+              ))
             )}
-          </Card>
+          </View>
 
-          {/* Any leftover scalar fields from APIs we didn't map */}
           {Object.entries({ ...d, ...a })
             .filter(
               ([key, v]) =>
@@ -155,12 +224,12 @@ export default function AdminAnalyticsScreen() {
                 typeof v !== 'object',
             )
             .map(([key, value]) => (
-              <Card key={key} className="mt-3" shadow={false}>
+              <View key={key} className="mt-3 p-4" style={adminCardStyle}>
                 <Text className="text-xs text-stone-500">{humanizeKey(key)}</Text>
                 <Text className="mt-1 text-base font-semibold text-stone-900">
                   {String(value)}
                 </Text>
-              </Card>
+              </View>
             ))}
         </ScrollView>
       )}

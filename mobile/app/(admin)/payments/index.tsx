@@ -30,6 +30,7 @@ export default function AdminPaymentsScreen() {
       keyExtractor={(p) => p.id}
       renderItem={(p) => (
         <AdminListRow
+          icon="card-outline"
           title={`${p.currency ?? 'SAR'} ${String(p.amount ?? '—')}`}
           subtitle={p.user?.name ?? p.status}
           meta={`${p.status ?? '—'} · ${p.paymentMethod ?? p.payment_method ?? '—'}${

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,14 +12,22 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
 import { Button, Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
+import { VisitCheckinMap } from '../../../components/maps/VisitCheckinMap';
 import { getSession } from '../../../lib/api/scheduling';
 import {
   checkInVisit,
   checkOutVisit,
+  getGpsReplay,
+  pingVisitLocation,
   validateVisitGps,
   type GeofenceResult,
+  type GpsTarget,
 } from '../../../lib/api/gps';
-import { getForegroundPosition } from '../../../lib/location';
+import {
+  getForegroundPosition,
+  watchForegroundPosition,
+  type ForegroundPosition,
+} from '../../../lib/location';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { toastError } from '../../../lib/toast';
@@ -41,17 +49,32 @@ function geofenceCopy(result: GeofenceResult | null): string {
   return `You are ${result.distanceMeters}m from the address (radius ${result.radiusMeters}m). You can still check in; the coordinator will be flagged.`;
 }
 
+function toCoord(lat?: number | null, lng?: number | null) {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { latitude: lat, longitude: lng };
+}
+
 export default function SupportVisitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [notes, setNotes] = useState('');
   const [geo, setGeo] = useState<GeofenceResult | null>(null);
+  const [target, setTarget] = useState<GpsTarget | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const [you, setYou] = useState<ForegroundPosition | null>(null);
+  const lastValidated = useRef<{ lat: number; lng: number; at: number } | null>(null);
+  const lastPinged = useRef<{ lat: number; lng: number; at: number } | null>(null);
 
   const query = useQuery({
     queryKey: ['support-visit', id],
     queryFn: () => getSession(id),
+    enabled: Boolean(id),
+  });
+
+  const replayQuery = useQuery({
+    queryKey: ['support-visit-gps', id],
+    queryFn: () => getGpsReplay(id),
     enabled: Boolean(id),
   });
 
@@ -60,41 +83,91 @@ export default function SupportVisitDetailScreen() {
   const checkedOut = Boolean(session?.checkOutAt);
 
   useEffect(() => {
-    if (!id || checkedIn) return;
+    const replayTarget = replayQuery.data?.target;
+    if (!replayTarget) return;
+    setTarget((prev) => prev ?? replayTarget);
+  }, [replayQuery.data]);
+
+  useEffect(() => {
+    if (!id || checkedOut) return;
+    let stop: (() => void) | undefined;
     let cancelled = false;
 
-    async function preview() {
+    void (async () => {
+      try {
+        stop = await watchForegroundPosition((pos) => {
+          if (!cancelled) setYou(pos);
+        });
+      } catch (e) {
+        if (!cancelled) setGeoError(apiErrorMessage(e, 'Could not read GPS'));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [id, checkedOut]);
+
+  useEffect(() => {
+    if (!id || !checkedIn || checkedOut || !you) return;
+    const prev = lastPinged.current;
+    const moved =
+      !prev ||
+      Math.abs(prev.lat - you.latitude) > 0.00025 ||
+      Math.abs(prev.lng - you.longitude) > 0.00025;
+    const stale = !prev || Date.now() - prev.at > 20_000;
+    if (!moved && !stale) return;
+    lastPinged.current = { lat: you.latitude, lng: you.longitude, at: Date.now() };
+    void pingVisitLocation(id, you).catch(() => undefined);
+  }, [id, checkedIn, checkedOut, you]);
+
+  useEffect(() => {
+    if (!id || checkedIn || !you) return;
+
+    const prev = lastValidated.current;
+    const moved =
+      !prev ||
+      Math.abs(prev.lat - you.latitude) > 0.0003 ||
+      Math.abs(prev.lng - you.longitude) > 0.0003;
+    const stale = !prev || Date.now() - prev.at > 12_000;
+    if (!moved && !stale) return;
+
+    let cancelled = false;
+    lastValidated.current = { lat: you.latitude, lng: you.longitude, at: Date.now() };
+
+    async function preview(pos: ForegroundPosition) {
       setLocating(true);
       setGeoError(null);
       try {
-        const pos = await getForegroundPosition();
         const result = await validateVisitGps(id, pos);
-        if (!cancelled) setGeo(result.geofence);
+        if (cancelled) return;
+        setGeo(result.geofence);
+        setTarget(result.target);
       } catch (e) {
-        if (!cancelled) {
-          setGeo(null);
-          setGeoError(apiErrorMessage(e, 'Could not read GPS'));
-        }
+        if (!cancelled) setGeoError(apiErrorMessage(e, 'Could not read GPS'));
       } finally {
         if (!cancelled) setLocating(false);
       }
     }
 
-    void preview();
+    void preview(you);
     return () => {
       cancelled = true;
     };
-  }, [id, checkedIn]);
+  }, [id, checkedIn, you]);
 
   const checkInMutation = useMutation({
     mutationFn: async () => {
-      const pos = await getForegroundPosition();
+      const pos = you ?? (await getForegroundPosition());
       return checkInVisit(id, pos);
     },
     onSuccess: async (result) => {
       setGeo(result.geofence);
+      if (result.target) setTarget(result.target);
       await queryClient.invalidateQueries({ queryKey: ['support-visit', id] });
       await queryClient.invalidateQueries({ queryKey: ['support-visits'] });
+      await queryClient.invalidateQueries({ queryKey: ['support-visit-gps', id] });
       const status = result.geofence.status;
       if (status === 'out_of_radius') {
         toast.show(
@@ -110,7 +183,7 @@ export default function SupportVisitDetailScreen() {
 
   const checkOutMutation = useMutation({
     mutationFn: async () => {
-      const pos = await getForegroundPosition();
+      const pos = you ?? (await getForegroundPosition());
       return checkOutVisit(id, {
         ...pos,
         notes: notes.trim() || undefined,
@@ -120,6 +193,7 @@ export default function SupportVisitDetailScreen() {
       setNotes('');
       await queryClient.invalidateQueries({ queryKey: ['support-visit', id] });
       await queryClient.invalidateQueries({ queryKey: ['support-visits'] });
+      await queryClient.invalidateQueries({ queryKey: ['support-visit-gps', id] });
       toast.show('Checked out', { type: 'success' });
     },
     onError: (e) => toastError(toast, e, 'Check-out failed'),
@@ -133,6 +207,24 @@ export default function SupportVisitDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  const dest = toCoord(target?.lat ?? replayQuery.data?.target.lat, target?.lng ?? replayQuery.data?.target.lng);
+  const youCoord = toCoord(you?.latitude, you?.longitude);
+  const address = target?.address ?? replayQuery.data?.target.address ?? null;
+  const radius = geo?.radiusMeters ?? replayQuery.data?.target.radiusMeters ?? null;
+  const patientName = session?.client?.name ?? replayQuery.data?.session.clientName ?? 'Patient';
+
+  const mapBlock = (
+    <View className="mb-4">
+      <VisitCheckinMap
+        destination={dest}
+        destinationLabel={patientName}
+        you={youCoord}
+        radiusMeters={radius}
+        address={address}
+      />
+    </View>
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
@@ -169,6 +261,8 @@ export default function SupportVisitDetailScreen() {
             </View>
           </Card>
 
+          {mapBlock}
+
           {checkedOut ? (
             <Card>
               <Text className="text-sm font-medium text-stone-700">Checked out</Text>
@@ -179,6 +273,9 @@ export default function SupportVisitDetailScreen() {
           ) : checkedIn ? (
             <Card>
               <Text className="text-sm font-medium text-teal-800">Checked in</Text>
+              <Text className="mt-1 text-sm text-stone-500">
+                Live location is sharing with your coordinator while this visit is open.
+              </Text>
               {session.checkInAt ? (
                 <Text className="mt-1 text-sm text-stone-500">
                   {formatDateTime(session.checkInAt)}
@@ -228,11 +325,11 @@ export default function SupportVisitDetailScreen() {
                 </View>
               ) : (
                 <Text className={`mb-3 text-sm ${geofenceTone(geo?.status)}`}>
-                  {locating ? 'Getting your location…' : geofenceCopy(geo)}
+                  {locating && !geo ? 'Getting your location…' : geofenceCopy(geo)}
                 </Text>
               )}
               <Button
-                disabled={locating}
+                disabled={locating && !you}
                 isLoading={checkInMutation.isPending}
                 onPress={() => checkInMutation.mutate()}
               >

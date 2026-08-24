@@ -17,9 +17,6 @@ const coordsSchema = z.object({
 const MAP_ROLES = new Set([
   'care_coordinator',
   'org_admin',
-  'admin',
-  'super_admin',
-  'support_admin',
 ]);
 
 function orgScope(req: Request): string | null {
@@ -27,7 +24,10 @@ function orgScope(req: Request): string | null {
   if (tw.organizationId === '__no_tenant__') {
     throw new AppError('No organization assigned to this account.', 403);
   }
-  return tw.organizationId ?? null;
+  if (!tw.organizationId) {
+    throw new AppError('No organization assigned to this account.', 403);
+  }
+  return tw.organizationId;
 }
 
 function assertMapRole(req: Request): void {
@@ -124,6 +124,32 @@ export class GPSController {
     });
   }
 
+  /** POST /gps/sessions/:id/ping — live location while checked in */
+  static async ping(req: Request, res: Response): Promise<void> {
+    const body = coordsSchema.omit({ notes: true }).parse(req.body);
+    const session = await GPSService.loadSession(req.params.id);
+    const result = await GPSService.applyLocationPing({
+      session,
+      userId: req.user!.userId,
+      coords: { lat: body.latitude, lng: body.longitude },
+      accuracy: body.accuracy ?? null,
+    });
+
+    res.json({
+      pinged: result.pinged,
+      skipped: result.skipped,
+      lastSeenAt: result.lastSeenAt,
+      geofence: result.geofence,
+      coords: result.coords,
+      target: {
+        source: result.target.source,
+        address: result.target.address,
+        lat: result.target.coords?.lat ?? null,
+        lng: result.target.coords?.lng ?? null,
+      },
+    });
+  }
+
   /** POST /gps/sessions/:id/checkout */
   static async checkout(req: Request, res: Response): Promise<void> {
     const body = coordsSchema.parse(req.body);
@@ -158,6 +184,17 @@ export class GPSController {
     const organizationId = orgScope(req);
     const workers = await GPSService.listActiveWorkers(organizationId);
     res.json({ workers });
+  }
+
+  /** GET /gps/compliance — org-scoped check-in / check-out totals */
+  static async compliance(req: Request, res: Response): Promise<void> {
+    assertMapRole(req);
+    const organizationId = orgScope(req);
+    if (!organizationId) {
+      throw new AppError('No organization assigned to this account.', 403);
+    }
+    const stats = await GPSService.complianceStats(organizationId);
+    res.json(stats);
   }
 
   /** GET /gps/logs */

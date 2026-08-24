@@ -18,9 +18,9 @@ import {
   Card,
   EmptyState,
   Input,
-  ScreenHeader,
   StatusBadge,
 } from '../../../components/ui';
+import { FamilyTabHero } from '../../../components/family/FamilyChrome';
 import {
   approveCarePlan,
   carePlanStatusLabel,
@@ -98,7 +98,7 @@ export default function FamilyCarePlanReviewScreen() {
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care plan" showBack />
+        <FamilyTabHero title="Care plan" showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -107,7 +107,7 @@ export default function FamilyCarePlanReviewScreen() {
   if (query.isError || !plan) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care plan" showBack />
+        <FamilyTabHero title="Care plan" showBack />
         <EmptyState
           icon="alert-circle-outline"
           title="Plan not found"
@@ -127,7 +127,7 @@ export default function FamilyCarePlanReviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title={plan.title} subtitle={`Version ${plan.version}`} showBack />
+      <FamilyTabHero title={plan.title} subtitle={`Version ${plan.version}`} showBack />
 
       <KeyboardAvoidingView
         className="flex-1"
@@ -144,17 +144,15 @@ export default function FamilyCarePlanReviewScreen() {
             />
           }
         >
-          <View className="flex-row items-start justify-between gap-3">
-            <View className="flex-1">
-              {plan.notes ? (
-                <Text className="text-sm text-stone-600">{plan.notes}</Text>
-              ) : null}
-            </View>
+          <View className="gap-3">
             <StatusBadge
               status={normalizeCarePlanStatus(plan.status)}
               size="md"
               label={carePlanStatusLabel(plan.status)}
             />
+            {plan.notes ? (
+              <Text className="text-sm leading-5 text-stone-600">{plan.notes}</Text>
+            ) : null}
           </View>
 
           {showCareTeamUpdate ? (

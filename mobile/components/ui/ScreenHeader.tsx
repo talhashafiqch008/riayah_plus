@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
+import { RoleHeroIconButton, RoleTabHero } from '../shell/RoleChrome';
 
 interface Action {
   icon: keyof typeof Ionicons.glyphMap;
@@ -31,39 +31,31 @@ export function ScreenHeader({
     ? { icon: 'chevron-back' as const, onPress: () => router.back() }
     : undefined);
 
+  const rightNode =
+    rightAction && typeof rightAction === 'object' && 'icon' in rightAction ? (
+      <RoleHeroIconButton
+        icon={rightAction.icon}
+        onPress={rightAction.onPress}
+        accessibilityLabel="Action"
+      />
+    ) : (
+      ((rightAction as ReactNode) ?? undefined)
+    );
+
   return (
-    <View className="h-14 flex-row items-center border-b border-stone-100 bg-white px-3">
-      <View className="w-10 items-start">
-        {left ? (
-          <Pressable
+    <RoleTabHero
+      title={title}
+      subtitle={subtitle}
+      left={
+        left ? (
+          <RoleHeroIconButton
+            icon={left.icon}
             onPress={left.onPress}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Ionicons name={left.icon} size={24} color="#1C1917" />
-          </Pressable>
-        ) : null}
-      </View>
-      <View className="flex-1 items-center">
-        <Text className="text-lg font-semibold text-stone-900" numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text className="text-sm text-stone-500" numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      <View className="w-10 items-end">
-        {rightAction && typeof rightAction === 'object' && 'icon' in rightAction ? (
-          <Pressable onPress={rightAction.onPress} hitSlop={12} accessibilityRole="button">
-            <Ionicons name={rightAction.icon} size={22} color="#1C1917" />
-          </Pressable>
-        ) : (
-          (rightAction as ReactNode) ?? null
-        )}
-      </View>
-    </View>
+            accessibilityLabel={shouldBack ? 'Back' : 'Action'}
+          />
+        ) : undefined
+      }
+      right={rightNode}
+    />
   );
 }

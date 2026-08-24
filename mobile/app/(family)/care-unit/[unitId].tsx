@@ -20,9 +20,9 @@ import {
   Chip,
   EmptyState,
   Input,
-  ScreenHeader,
   StatusBadge,
 } from '../../../components/ui';
+import { FamilyTabHero } from '../../../components/family/FamilyChrome';
 import {
   formatCountry,
   getCareUnit,
@@ -105,7 +105,7 @@ export default function FamilyCareUnitDetailScreen() {
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care unit" showBack />
+        <FamilyTabHero title="Care unit" showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -114,7 +114,7 @@ export default function FamilyCareUnitDetailScreen() {
   if (query.isError || !unit) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care unit" showBack />
+        <FamilyTabHero title="Care unit" showBack />
         <EmptyState
           icon="alert-circle-outline"
           title="Care unit not found"
@@ -131,7 +131,7 @@ export default function FamilyCareUnitDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title={unit.name} subtitle="Household" showBack />
+      <FamilyTabHero title={unit.name} subtitle="Household" showBack />
 
       <KeyboardAvoidingView
         className="flex-1"

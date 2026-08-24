@@ -42,8 +42,7 @@ export const ADMIN_NAVIGATION: AdminNavGroup[] = [
       { name: 'Payments', href: '/(admin)/payments', icon: 'card-outline' },
       { name: 'Payouts', href: '/(admin)/payouts', icon: 'cash-outline' },
       { name: 'Assignments', href: '/(admin)/assignments', icon: 'clipboard-outline' },
-      { name: 'Sessions', href: '/(admin)/sessions', icon: 'time-outline' },
-      { name: 'GPS Monitor', href: '/(admin)/gps', icon: 'location-outline' },
+          { name: 'Sessions', href: '/(admin)/sessions', icon: 'time-outline' },
     ],
   },
   {

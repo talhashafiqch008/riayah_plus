@@ -42,8 +42,8 @@ Password (all roles): Password123!
 |---|---|
 | Org admin | `shahbaztayyab1386@gmail.com` |
 | Coordinator | `coordinator-general@mailinator.com` |
-| Clinical | `clinical.general.1785496835@mailinator.com` |
-| Support | `support.general.1785496839@mailinator.com` |
+| Clinical | `clinical-general@demo.com` |
+| Support | `support-general@demo.com` |
 | Family | Faraz Tayyab — `zzohaib953@gmail.com` |
 
 ### Test status legend

@@ -5,8 +5,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Card, EmptyState, StatusBadge } from '../../../components/ui';
+import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { apiClient } from '../../../lib/api/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
 
@@ -131,8 +133,9 @@ export function AssessmentsTab({ episodeId }: { episodeId?: string }) {
 
 export default function EpisodeAssessmentsScreen() {
   return (
-    <View className="flex-1 bg-stone-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+      <FamilyTabHero title="Assessments" subtitle="Consultations for this care journey" showBack />
       <AssessmentsTab />
-    </View>
+    </SafeAreaView>
   );
 }

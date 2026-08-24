@@ -212,11 +212,17 @@ router.get('/reports/financial', requireView('booking'), async (req: Request, re
 
 // GPS compliance
 router.get('/reports/gps-compliance', requireView('booking'), async (_req: Request, res: Response) => {
-  const [total, outOfRadius] = await Promise.all([
+  const [total, outOfRadius, totalCheckouts] = await Promise.all([
     prisma.gpsLog.count({ where: { eventType: 'checkin' } }),
     prisma.gpsLog.count({ where: { eventType: 'checkin', geofenced: false } }),
+    prisma.gpsLog.count({ where: { eventType: 'checkout' } }),
   ]);
-  res.json({ totalCheckins: total, outOfRadius, complianceRate: total > 0 ? ((total - outOfRadius) / total * 100).toFixed(2) : 100 });
+  res.json({
+    totalCheckins: total,
+    totalCheckouts,
+    outOfRadius,
+    complianceRate: total > 0 ? ((total - outOfRadius) / total * 100).toFixed(2) : 100,
+  });
 });
 
 // ── Advanced admin routes ──────────────────────────────────────────────────────

@@ -19,9 +19,9 @@ import {
   Chip,
   EmptyState,
   Input,
-  ScreenHeader,
   StatusBadge,
 } from '../../../../components/ui';
+import { FamilyTabHero } from '../../../../components/family/FamilyChrome';
 import {
   getCareUnit,
   listPatientRevisions,
@@ -158,7 +158,7 @@ export default function FamilyCarePatientDetailScreen() {
   if (unitQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Person" showBack />
+        <FamilyTabHero title="Person" showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -167,7 +167,7 @@ export default function FamilyCarePatientDetailScreen() {
   if (unitQuery.isError || !unit || !patient) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Person" showBack />
+        <FamilyTabHero title="Person" showBack />
         <EmptyState
           icon="alert-circle-outline"
           title="Person not found on this care unit"
@@ -182,7 +182,7 @@ export default function FamilyCarePatientDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title={patient.name} subtitle={unit.name} showBack />
+      <FamilyTabHero title={patient.name} subtitle={unit.name} showBack />
 
       <KeyboardAvoidingView
         className="flex-1"
