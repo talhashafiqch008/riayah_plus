@@ -49,15 +49,20 @@ const riskFlagSchema = z.object({
   recommendedAction: z.string().nullable().optional(),
 });
 
-const draftSchema = z.object({
-  goals: z.array(smartGoalSchema).default([]),
-  services: z.array(plannedServiceSchema).default([]),
-  riskFlags: z.array(riskFlagSchema).optional().default([]),
-  reviewCycle: z.string().nullable().optional(),
-  clinicalNotes: z.string().nullable().optional(),
-  estimatedTotalCost: z.number().nullable().optional(),
-  currency: z.string().optional().default('QAR'),
-});
+const draftSchema = z
+  .object({
+    goals: z.array(smartGoalSchema).optional(),
+    smartGoals: z.array(smartGoalSchema).optional(),
+    services: z.array(plannedServiceSchema).optional(),
+    plannedServices: z.array(plannedServiceSchema).optional(),
+    items: z.array(plannedServiceSchema).optional(),
+    riskFlags: z.array(riskFlagSchema).optional(),
+    reviewCycle: z.string().nullable().optional(),
+    clinicalNotes: z.string().nullable().optional(),
+    estimatedTotalCost: z.number().nullable().optional(),
+    currency: z.string().optional(),
+  })
+  .passthrough();
 
 /** Body accepted from Riayah AI (CarePlanResponse-shaped + optional draftId). */
 export const carePlanDraftCallbackSchema = z.object({
@@ -74,6 +79,16 @@ export const carePlanDraftCallbackSchema = z.object({
 
 export type CarePlanDraftCallbackInput = z.infer<typeof carePlanDraftCallbackSchema>;
 
+type NormalizedAiDraft = {
+  goals: z.infer<typeof smartGoalSchema>[];
+  services: z.infer<typeof plannedServiceSchema>[];
+  riskFlags: z.infer<typeof riskFlagSchema>[];
+  reviewCycle: string | null;
+  clinicalNotes: string | null;
+  estimatedTotalCost: number | null;
+  currency: string;
+};
+
 function draftKey(episodeId: string, draftId?: string, idempotencyKey?: string): string {
   return idempotencyKey || draftId || `episode:${episodeId}`;
 }
@@ -85,25 +100,68 @@ function buildNotes(params: {
   reviewCycle?: string | null;
   riskFlags?: z.infer<typeof riskFlagSchema>[];
 }): string {
-  const lines = [
-    AI_DRAFT_MARKER,
-    `draftKey=${params.key}`,
-    params.model ? `model=${params.model}` : null,
-    params.reviewCycle ? `reviewCycle=${params.reviewCycle}` : null,
-  ].filter(Boolean);
-
-  if (params.riskFlags?.length) {
-    lines.push(`riskFlags=${params.riskFlags.length}`);
-  }
-
-  lines.push('---');
+  const lines = [AI_DRAFT_MARKER, `draftKey=${params.key}`, '---'];
   if (params.clinicalNotes?.trim()) {
     lines.push(params.clinicalNotes.trim());
   } else {
     lines.push('AI-generated care plan draft. Coordinator must review before submit-for-approval.');
   }
-
   return lines.join('\n');
+}
+
+/** Hide upsert metadata from coordinators/family. Marker stays in DB. */
+export function publicCarePlanNotes(notes: string | null | undefined): string | null {
+  if (!notes) return notes ?? null;
+  if (!notes.startsWith(AI_DRAFT_MARKER)) return notes;
+  const idx = notes.indexOf('\n---\n');
+  if (idx === -1) return null;
+  const rest = notes.slice(idx + 5).trim();
+  return rest || null;
+}
+
+export function mergeCarePlanNotesForSave(
+  existing: string | null | undefined,
+  incoming: string | null | undefined,
+): string | null {
+  if (incoming === undefined) return existing ?? null;
+  if (!existing?.startsWith(AI_DRAFT_MARKER)) return incoming;
+  const header = existing.split(/\n---\n/)[0] ?? AI_DRAFT_MARKER;
+  return `${header}\n---\n${incoming?.trim() ?? ''}`;
+}
+
+export function toPublicCarePlan<T extends { notes?: string | null }>(plan: T): T {
+  return { ...plan, notes: publicCarePlanNotes(plan.notes) };
+}
+
+function coerceGoals(raw: unknown): z.infer<typeof smartGoalSchema>[] {
+  if (!Array.isArray(raw)) return [];
+  const mapped = raw.map((row) => (typeof row === 'string' ? { title: row } : row));
+  const parsed = z.array(smartGoalSchema).safeParse(mapped);
+  return parsed.success ? parsed.data : [];
+}
+
+function coerceServices(raw: unknown): z.infer<typeof plannedServiceSchema>[] {
+  if (!Array.isArray(raw)) return [];
+  const mapped = raw.map((row) =>
+    typeof row === 'string' ? { serviceType: row, category: 'general' } : row,
+  );
+  const parsed = z.array(plannedServiceSchema).safeParse(mapped);
+  return parsed.success ? parsed.data : [];
+}
+
+function normalizeAiDraft(
+  draft: CarePlanResponse['draft'] | CarePlanDraftCallbackInput['draft'],
+): NormalizedAiDraft {
+  const raw = (draft ?? {}) as Record<string, unknown>;
+  return {
+    goals: coerceGoals(raw.goals ?? raw.smartGoals ?? raw.SMARTGoals),
+    services: coerceServices(raw.services ?? raw.plannedServices ?? raw.items),
+    riskFlags: Array.isArray(raw.riskFlags) ? (raw.riskFlags as z.infer<typeof riskFlagSchema>[]) : [],
+    reviewCycle: typeof raw.reviewCycle === 'string' ? raw.reviewCycle : null,
+    clinicalNotes: typeof raw.clinicalNotes === 'string' ? raw.clinicalNotes : null,
+    estimatedTotalCost: typeof raw.estimatedTotalCost === 'number' ? raw.estimatedTotalCost : null,
+    currency: typeof raw.currency === 'string' ? raw.currency : 'QAR',
+  };
 }
 
 function formatDuration(minutes: number | null | undefined): string | undefined {
@@ -147,9 +205,15 @@ export class AiCarePlanDraftService {
       );
     }
 
-    const draft = raw.draft;
+    const draft = raw.draft ? normalizeAiDraft(raw.draft as CarePlanResponse['draft']) : null;
     if (!draft) {
       throw new AppError('Callback payload missing draft content.', 422);
+    }
+    if (!draft.goals.length || !draft.services.length) {
+      throw new AppError(
+        'AI care plan draft is missing goals or services. The coordinator flow cannot continue with an empty plan.',
+        422,
+      );
     }
 
     const key = draftKey(raw.episodeId, raw.draftId, raw.idempotencyKey);
@@ -401,18 +465,18 @@ export class AiCarePlanDraftService {
       throw new AppError('AI service returned no care plan draft.', 502);
     }
 
+    const draft = normalizeAiDraft(aiResponse.draft);
+    if (!draft.goals.length || !draft.services.length) {
+      throw new AppError(
+        'AI service returned a draft with no goals or services. Please retry, or create the care plan manually.',
+        502,
+      );
+    }
+
     const persisted = await this.handleCallback({
       episodeId: episode.id,
       draftId: COORDINATOR_TRIGGER_DRAFT_ID,
-      draft: {
-        goals: aiResponse.draft.goals ?? [],
-        services: aiResponse.draft.services ?? [],
-        riskFlags: aiResponse.draft.riskFlags ?? [],
-        reviewCycle: aiResponse.draft.reviewCycle,
-        clinicalNotes: aiResponse.draft.clinicalNotes,
-        estimatedTotalCost: aiResponse.draft.estimatedTotalCost,
-        currency: aiResponse.draft.currency ?? 'QAR',
-      },
+      draft,
       model: aiResponse.model,
       status: aiResponse.status ?? 'draft',
       promptTokens: aiResponse.promptTokens,

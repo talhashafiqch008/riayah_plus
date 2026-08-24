@@ -1,34 +1,62 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { InvoiceController } from '../controllers/billing/InvoiceController';
 import { authenticate } from '../middleware/auth';
+import { requireAdmin, requireCareCoordinator } from '../middleware/rbac';
 import { paymentLimiter } from '../middleware/rateLimiter';
 import { InvoicePDFService } from '../services/InvoicePDFService';
 import { AppError } from '../middleware/errorHandler';
+import { prisma } from '../config/database';
+import { isAdminRole, isFamilyRole } from '../utils/careAccess';
 
 const router = Router();
 router.use(authenticate);
 
 router.get('/', InvoiceController.index);
-router.post('/', InvoiceController.store);
+router.post('/', requireCareCoordinator, InvoiceController.store);
 router.get('/:id', InvoiceController.show);
-router.post('/:id/send', InvoiceController.send);
-router.post('/:id/mark-paid', paymentLimiter, InvoiceController.markPaid);
+router.post('/:id/send', requireCareCoordinator, InvoiceController.send);
+router.post('/:id/mark-paid', requireAdmin, paymentLimiter, InvoiceController.markPaid);
+router.post('/:id/pay', paymentLimiter, InvoiceController.pay);
+router.post('/:id/pay/confirm', paymentLimiter, InvoiceController.confirmPay);
+router.post('/:id/dispute', InvoiceController.dispute);
 
-// PDF download / generation
 router.get('/:id/pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const invoice = await (await import('../config/database')).prisma.invoice.findUnique({ where: { id: req.params.id } });
+    const invoice = await prisma.invoice.findUnique({ where: { id: req.params.id } });
     if (!invoice) throw new AppError('Invoice not found.', 404);
 
-    // Access check: client or admin
-    const isAdmin = ['admin', 'super_admin'].includes(req.user!.role);
-    if (invoice.clientId !== req.user!.userId && !isAdmin) throw new AppError('Forbidden.', 403);
+    const role = req.user!.role;
+    const userId = req.user!.userId;
 
-    // Return existing PDF if already generated
-    if (invoice.pdfUrl) { res.json({ success: true, pdfUrl: invoice.pdfUrl }); return; }
+    if (isAdminRole(role)) {
+      // ok
+    } else if (isFamilyRole(role)) {
+      if (invoice.clientId !== userId) throw new AppError('Forbidden.', 403);
+    } else if (role === 'care_coordinator' || role === 'org_admin') {
+      const [client, caller] = await Promise.all([
+        prisma.user.findUnique({ where: { id: invoice.clientId }, select: { organizationId: true } }),
+        prisma.user.findUnique({ where: { id: userId }, select: { organizationId: true } }),
+      ]);
+      if (!client?.organizationId || client.organizationId !== caller?.organizationId) {
+        throw new AppError('Forbidden.', 403);
+      }
+    } else {
+      throw new AppError('Forbidden.', 403);
+    }
 
-    const pdfUrl = await InvoicePDFService.generateAndUpload(req.params.id);
-    res.json({ success: true, pdfUrl });
+    const pdfBuffer = await InvoicePDFService.generatePdfBuffer(req.params.id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${invoice.invoiceNumber || 'document'}.pdf"`,
+    );
+    res.status(200).send(pdfBuffer);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${invoice.invoiceNumber || 'document'}.pdf"`,
+    );
+    res.status(200).send(pdfBuffer);
   } catch (err) {
     next(err);
   }

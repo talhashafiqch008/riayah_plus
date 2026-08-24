@@ -44,3 +44,4 @@ next-env.d.ts
 # local intake uploads (S3 fallback)
 /uploads/
 .env
+.tmp-m4-cookies/

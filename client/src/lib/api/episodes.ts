@@ -28,6 +28,7 @@ export interface CareEpisode {
   patient?: { id: string; name: string; email?: string };
   coordinator?: { id: string; name: string } | null;
   careRecipient?: { id: string; name: string; externalRef?: string | null } | null;
+  careUnit?: { id: string; name?: string; familyUserId?: string } | null;
   assessments?: {
     id: string;
     status?: string;

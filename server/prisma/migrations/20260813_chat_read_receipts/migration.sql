@@ -1,0 +1,2 @@
+ALTER TABLE "conversation_participants" ADD COLUMN IF NOT EXISTS "lastReadAt" TIMESTAMP(3);
+ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "readAt" TIMESTAMP(3);

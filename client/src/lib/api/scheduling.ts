@@ -1,4 +1,5 @@
 import { client } from './client';
+import { extractApiError } from '@/lib/errors';
 import type { PublicStaffCard } from './staffProfile';
 
 export interface AvailabilitySlot {
@@ -20,6 +21,9 @@ export interface CareSession {
   scheduledAt: string;
   durationMinutes?: number | null;
   notes?: string | null;
+  livekitRoomId?: string | null;
+  recordingUrl?: string | null;
+  recordingStatus?: string | null;
   provider?: PublicStaffCard;
   client?: { id: string; name: string };
 }
@@ -50,10 +54,23 @@ export async function replaceAvailability(
 }
 
 export async function listSessions(params?: { episodeId?: string; providerId?: string }) {
-  const { data } = await client.get<{ sessions: CareSession[] }>('/scheduling/sessions', {
-    params,
-  });
-  return data.sessions;
+  try {
+    const { data } = await client.get<{ sessions: CareSession[] }>('/scheduling/sessions', {
+      params,
+    });
+    return data.sessions ?? [];
+  } catch (error) {
+    throw extractApiError(error);
+  }
+}
+
+export async function getSession(id: string) {
+  try {
+    const { data } = await client.get<{ session: CareSession }>(`/scheduling/sessions/${id}`);
+    return data.session;
+  } catch (error) {
+    throw extractApiError(error);
+  }
 }
 
 export async function bookSession(payload: {
@@ -85,6 +102,13 @@ export async function bookRecurringSessions(payload: {
     skipped: { scheduledAt: string; reason: string }[];
   }>('/scheduling/sessions/recurring', payload);
   return data;
+}
+
+export async function completeSession(id: string) {
+  const { data } = await client.patch<{ session: CareSession }>(`/scheduling/sessions/${id}`, {
+    status: 'completed',
+  });
+  return data.session;
 }
 
 export async function cancelSession(id: string) {

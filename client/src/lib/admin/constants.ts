@@ -72,6 +72,8 @@ export const ADMIN_NAVIGATION: NavGroup[] = [
     title: 'Finance',
     items: [
       { name: 'Payments', href: '/admin/payments', icon: CreditCard },
+      { name: 'Invoices', href: '/admin/invoices', icon: FileText },
+      { name: 'Pricing', href: '/admin/pricing', icon: Building2 },
       { name: 'Payouts', href: '/admin/payouts', icon: DollarSign },
     ],
   },
@@ -89,7 +91,6 @@ export const ADMIN_NAVIGATION: NavGroup[] = [
     title: 'Platform',
     items: [
       { name: 'Organizations', href: '/admin/organizations', icon: Layers },
-      { name: 'Services', href: '/admin/services', icon: Building2 },
       { name: 'Settings', href: '/admin/settings', icon: Settings },
     ],
   },

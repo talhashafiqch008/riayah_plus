@@ -505,7 +505,7 @@ These fields are required by the HealthOS Spec but were not in the conversion fi
 
 | Decision | Current | Proposal Requires | Action needed |
 |---|---|---|---|
-| Telehealth SDK | LiveKit | Daily.co or Twilio Video | Swap SDK before M4 starts |
+| Telehealth SDK | LiveKit | LiveKit (client 2026-08-13; proposal had Daily/Twilio options) | Keep/harden LiveKit — no swap |
 | AI / Gemini chat | Fully implemented | Removed from proposal v2 | Decide: keep as bonus or remove |
 | Payment gateway | Stripe (live) | PayTabs / Fatora / Skipcash (Qatari) | Implement Qatari gateways for M4 |
 | Push notifications | In-app only | Firebase Cloud Messaging | Add FCM integration for M3 |

@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, CreditCard, ShieldCheck, LogOut, Menu, X,
   FileText, AlertTriangle, Settings, BarChart3, Building2, UserCheck, Bell,
-  ChevronDown, ChevronRight, DollarSign, BookOpen, ClipboardList, Layers,
+  ChevronDown, ChevronRight, DollarSign, BookOpen, ClipboardList, Layers, Tag,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -44,6 +44,7 @@ const NAVIGATION: NavGroup[] = [
     items: [
       { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
       { name: 'Payments', href: '/admin/payments', icon: CreditCard },
+      { name: 'Invoices', href: '/admin/invoices', icon: FileText },
       { name: 'Payouts', href: '/admin/payouts', icon: DollarSign },
       { name: 'Assignments', href: '/admin/assignments', icon: ClipboardList },
       { name: 'Sessions', href: '/admin/sessions', icon: BookOpen },
@@ -63,7 +64,7 @@ const NAVIGATION: NavGroup[] = [
     title: 'Config',
     items: [
       { name: 'Organizations', href: '/admin/organizations', icon: Layers },
-      { name: 'Services', href: '/admin/services', icon: Building2 },
+      { name: 'Pricing', href: '/admin/pricing', icon: Tag },
       { name: 'Settings', href: '/admin/settings', icon: Settings },
     ],
   },

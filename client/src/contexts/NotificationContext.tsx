@@ -65,9 +65,9 @@ export function NotificationProvider({ children, userId }: { children: ReactNode
 
  try {
  const result = await getNotifications();
- const notificationsList = result.data?.notifications || result.notifications || [];
- setNotifications(notificationsList.slice(0, 20));
- const unread = notificationsList.filter((n: Notification) => n.is_read === 0).length;
+ const notificationsList = result.notifications || [];
+ setNotifications(notificationsList.slice(0, 20) as unknown as Notification[]);
+ const unread = notificationsList.filter((n) => !n.readAt && n.isRead !== true).length;
  setUnreadCount(unread);
  } catch (error) {
  console.error('Failed to fetch notifications:', error);

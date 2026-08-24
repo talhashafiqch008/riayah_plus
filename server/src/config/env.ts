@@ -43,8 +43,16 @@ export const env = {
   QATAR_PAYMENT_GATEWAY: process.env.QATAR_PAYMENT_GATEWAY || 'paytabs',
   PAYTABS_PROFILE_ID: process.env.PAYTABS_PROFILE_ID || '',
   PAYTABS_SERVER_KEY: process.env.PAYTABS_SERVER_KEY || '',
-  PAYTABS_BASE_URL: process.env.PAYTABS_BASE_URL || 'https://secure.paytabs.sa/payment/request',
+  PAYTABS_BASE_URL:
+    process.env.PAYTABS_BASE_URL || 'https://secure-doha.paytabs.com/payment/request',
   PAYTABS_WEBHOOK_SECRET: process.env.PAYTABS_WEBHOOK_SECRET || '',
+
+  SKIPCASH_CLIENT_ID: process.env.SKIPCASH_CLIENT_ID || '',
+  SKIPCASH_KEY_ID: process.env.SKIPCASH_KEY_ID || '',
+  SKIPCASH_SECRET_KEY: process.env.SKIPCASH_SECRET_KEY || '',
+  SKIPCASH_WEBHOOK_KEY: process.env.SKIPCASH_WEBHOOK_KEY || '',
+  SKIPCASH_BASE_URL:
+    process.env.SKIPCASH_BASE_URL || 'https://skipcashtest.azurewebsites.net',
 
   PUSHER_APP_ID: process.env.PUSHER_APP_ID || '',
   PUSHER_APP_KEY: process.env.PUSHER_APP_KEY || '',

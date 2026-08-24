@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import Decimal from 'decimal.js';
@@ -15,6 +16,43 @@ export class WalletService {
     return this.getOrCreateWallet(userId);
   }
 
+  static async creditWithTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    amount: number,
+    type: string,
+    description?: string,
+    relatedId?: string,
+    relatedType?: string
+  ) {
+    if (!(amount > 0)) {
+      throw new AppError('Credit amount must be positive.', 400);
+    }
+
+    const wallet = await tx.walletBalance.upsert({
+      where: { userId },
+      create: { userId, balance: amount, escrow: 0 },
+      update: { balance: { increment: amount } },
+    });
+
+    const balanceBefore = new Decimal(wallet.balance).minus(amount).toNumber();
+
+    await tx.creditTransaction.create({
+      data: {
+        userId,
+        amount,
+        type,
+        description,
+        relatedId,
+        relatedType,
+        balanceBefore,
+        balanceAfter: Number(wallet.balance),
+      },
+    });
+
+    return wallet;
+  }
+
   static async credit(
     userId: string,
     amount: number,
@@ -23,30 +61,9 @@ export class WalletService {
     relatedId?: string,
     relatedType?: string
   ) {
-    return prisma.$transaction(async (tx) => {
-      const wallet = await tx.walletBalance.upsert({
-        where: { userId },
-        create: { userId, balance: amount, escrow: 0 },
-        update: { balance: { increment: amount } },
-      });
-
-      const balanceBefore = new Decimal(wallet.balance).minus(amount).toNumber();
-
-      await tx.creditTransaction.create({
-        data: {
-          userId,
-          amount,
-          type,
-          description,
-          relatedId,
-          relatedType,
-          balanceBefore,
-          balanceAfter: Number(wallet.balance),
-        },
-      });
-
-      return wallet;
-    });
+    return prisma.$transaction(async (tx) =>
+      this.creditWithTx(tx, userId, amount, type, description, relatedId, relatedType)
+    );
   }
 
   static async debit(

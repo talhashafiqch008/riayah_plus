@@ -25,7 +25,7 @@ export function extractApiError(error: unknown): ApiError {
     const serverMessage = error.response.data?.message || 'Request failed';
     const fieldErrors = error.response.data?.errors;
     const statusCode = error.response.status;
-    return new ApiError(serverMessage, fieldErrors, statusCode);
+    return new ApiError(serverMessage, fieldErrors, statusCode, error.response.data?.details);
   }
   if (error instanceof Error) {
     return new ApiError(error.message);

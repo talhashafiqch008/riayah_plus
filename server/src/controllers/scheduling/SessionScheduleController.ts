@@ -10,10 +10,20 @@ import {
   assertNoProviderConflict,
   expandRecurrence,
 } from '../../services/SchedulingConflictService';
-import { staffPublicUserSelect, toPublicStaffCard } from '../../utils/staffProfile';
+import { toPublicStaffCard } from '../../utils/staffProfile';
+import { InvoiceService } from '../../services/InvoiceService';
+import { TelehealthRoomService } from '../../services/TelehealthRoomService';
 
 const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
 const MAX_DURATION_MINUTES = 480;
+
+/** Family session lists only need clinician name — skip provider_profiles (schema drift on extra columns). */
+const familyProviderSelect = {
+  id: true,
+  name: true,
+  role: true,
+  avatar: true,
+} satisfies Prisma.UserSelect;
 
 const bookSchema = z.object({
   episodeId: z.string().min(1),
@@ -38,7 +48,7 @@ const rescheduleSchema = z.object({
   scheduledAt: z.string().min(1).optional(),
   durationMinutes: z.number().int().positive().max(MAX_DURATION_MINUTES).optional(),
   notes: z.string().max(5000).nullable().optional(),
-  status: z.enum(['pending', 'accepted', 'cancelled']).optional(),
+  status: z.enum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled']).optional(),
 });
 
 function parseScheduledAt(raw: string, mustBeFuture = true): Date {
@@ -142,12 +152,12 @@ export class SessionScheduleController {
 
     const data = await prisma.user.findMany({
       where,
-      select: staffPublicUserSelect,
+      select: familyProviderSelect,
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
       take: 200,
     });
 
-    res.json({ data: data.map(toPublicStaffCard) });
+    res.json({ data: data.map((row) => toPublicStaffCard(row)) });
   }
 
   /** GET /scheduling/sessions?episodeId=&providerId= */
@@ -190,7 +200,9 @@ export class SessionScheduleController {
       orderBy: { scheduledAt: 'asc' },
       take: 100,
       include: {
-        provider: { select: staffPublicUserSelect },
+        provider: {
+          select: familyProviderSelect,
+        },
         client: { select: { id: true, name: true } },
       },
     });
@@ -208,7 +220,9 @@ export class SessionScheduleController {
     const session = await prisma.session.findUnique({
       where: { id: req.params.id },
       include: {
-        provider: { select: staffPublicUserSelect },
+        provider: {
+          select: familyProviderSelect,
+        },
         client: { select: { id: true, name: true } },
         episode: { select: { id: true, title: true, organizationId: true, patientId: true } },
       },
@@ -283,6 +297,8 @@ export class SessionScheduleController {
       data: { sessionId: session.id, episodeId: episode.id },
     });
 
+    const telehealth = await TelehealthRoomService.provisionForSession(session.id);
+
     await AuditService.log({
       userId: req.user!.userId,
       action: 'session_booked',
@@ -292,7 +308,13 @@ export class SessionScheduleController {
       req,
     });
 
-    res.status(201).json({ session });
+    res.status(201).json({
+      session: {
+        ...session,
+        livekitRoomId: telehealth.roomName ?? session.livekitRoomId,
+      },
+      telehealth,
+    });
   }
 
   /** POST /scheduling/sessions/recurring — generate occurrences with per-slot conflict checks */
@@ -340,6 +362,9 @@ export class SessionScheduleController {
         },
       });
       created.push(session);
+      if (type === 'telehealth') {
+        await TelehealthRoomService.provisionForSession(session.id);
+      }
     }
 
     if (body.assignPendingTasks && created.length > 0) {
@@ -411,6 +436,8 @@ export class SessionScheduleController {
       });
     }
 
+    const becameCompleted = body.status === 'completed' && existing.status !== 'completed';
+
     const session = await prisma.session.update({
       where: { id: existing.id },
       data: {
@@ -418,10 +445,21 @@ export class SessionScheduleController {
         durationMinutes,
         ...(body.notes !== undefined ? { notes: body.notes } : {}),
         ...(body.status ? { status: body.status } : {}),
+        ...(becameCompleted ? { completedAt: new Date() } : {}),
       },
     });
 
-    res.json({ session });
+    let invoice;
+    if (becameCompleted) {
+      invoice = await InvoiceService.tryFromSession(session.id, req.user!.userId);
+    }
+
+    let telehealth;
+    if (session.type === 'telehealth' && ['accepted', 'in_progress'].includes(session.status)) {
+      telehealth = await TelehealthRoomService.provisionForSession(session.id);
+    }
+
+    res.json({ session: { ...session, livekitRoomId: telehealth?.roomName ?? session.livekitRoomId }, invoice: invoice ?? undefined, telehealth });
   }
 
   /** DELETE /scheduling/sessions/:id — cancel */
