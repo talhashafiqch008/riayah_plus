@@ -43,5 +43,12 @@ next-env.d.ts
 
 # local intake uploads (S3 fallback)
 /uploads/
+
+# Environment (secrets — keep .env.example / .env.test tracked)
 .env
+.env.local
+.env.development.local
+.env.production.local
+.env.*.local
+
 .tmp-m4-cookies/

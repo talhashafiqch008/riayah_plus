@@ -376,12 +376,119 @@ export async function triggerAiCarePlanDraft(episodeId: string) {
   return data as { message?: string; data?: unknown; carePlan?: unknown };
 }
 
-export async function listIntakeQueue(params?: { status?: string; limit?: number; page?: number }) {
+export async function listIntakeQueue(params?: {
+  status?: string;
+  urgency?: string;
+  limit?: number;
+  page?: number;
+}) {
   const { data } = await apiClient.get('/api/intake/queue', { params });
   return {
-    data: (data.data ?? []) as { id: string; status?: string }[],
+    data: (data.data ?? []) as {
+      id: string;
+      status?: string;
+      urgencyLevel?: string | null;
+      reasonForCare?: string | null;
+      serviceInterests?: string[];
+      submittedAt?: string | null;
+      createdAt?: string;
+      careUnit?: { id: string; name: string } | null;
+      careRecipient?: { id: string; name: string } | null;
+      familyUser?: { id: string; name: string; email: string } | null;
+      careEpisode?: { id: string; title?: string; status?: string } | null;
+    }[],
     total: (data.total ?? data.data?.length ?? 0) as number,
   };
+}
+
+export type ServiceCategory =
+  | 'speech_therapy'
+  | 'occupational_therapy'
+  | 'behavioral_support'
+  | 'physiotherapy'
+  | 'nursing'
+  | 'companion_care';
+
+export type UrgencyLevel = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface IntakeRecord {
+  id: string;
+  status: string;
+  urgencyLevel?: UrgencyLevel | string | null;
+  reasonForCare: string;
+  medicalHistory?: string | null;
+  currentMeds?: string | null;
+  diagnoses: string[];
+  serviceInterests?: ServiceCategory[];
+  primaryCaregiverName?: string | null;
+  primaryCaregiverPhone?: string | null;
+  primaryCaregiverRelation?: string | null;
+  submittedAt?: string;
+  wizardPayload?: Record<string, unknown> | null;
+  careUnit?: { id: string; name: string } | null;
+  careRecipient?: {
+    id: string;
+    name: string;
+    dateOfBirth?: string | null;
+    gender?: string | null;
+  } | null;
+  familyUser?: { id: string; name: string; email: string } | null;
+  careEpisode?: { id: string; title?: string; status?: string } | null;
+  documents?: {
+    id: string;
+    name: string;
+    category?: string | null;
+    mimeType?: string | null;
+    url?: string;
+    createdAt?: string;
+  }[];
+  reviewSummary?: Record<string, unknown> | null;
+}
+
+export async function getIntake(id: string) {
+  const { data } = await apiClient.get(`/api/intake/${id}`);
+  return (data.data ?? data) as IntakeRecord;
+}
+
+export async function reviewIntake(
+  id: string,
+  payload: {
+    keyConcerns: string[];
+    urgencyIndicators: string[];
+    suggestedServiceCategories: ServiceCategory[];
+    riskFlags?: string[];
+    createEpisode?: boolean;
+    episodeTitle?: string;
+    notes?: string;
+  },
+) {
+  const { data } = await apiClient.post(`/api/intake/${id}/review`, payload);
+  return (data.data ?? data) as {
+    intake: IntakeRecord;
+    episode: { id: string; title?: string; status?: string } | null;
+  };
+}
+
+export async function updateIntakeStatus(id: string, status: string, reason?: string) {
+  const { data } = await apiClient.patch(`/api/intake/${id}/status`, {
+    status,
+    ...(reason ? { reason } : {}),
+  });
+  return (data.data ?? data) as IntakeRecord;
+}
+
+export async function updateIntakeUrgency(id: string, urgencyLevel: UrgencyLevel) {
+  const { data } = await apiClient.patch(`/api/intake/${id}/urgency`, { urgencyLevel });
+  return (data.data ?? data) as IntakeRecord;
+}
+
+export async function createCoordinatorDocumentRequest(payload: {
+  targetUserId: string;
+  documentType: string;
+  description?: string;
+}) {
+  const { data } = await apiClient.post('/api/document-requests', payload);
+  return data;
 }
 
 export async function approveCarePlan(id: string) {
@@ -405,16 +512,7 @@ export async function cosignCarePlan(id: string, notes?: string) {
 }
 
 /* --------------------------------------------------------- care units / people */
-
-export type ServiceCategory =
-  | 'speech_therapy'
-  | 'occupational_therapy'
-  | 'behavioral_support'
-  | 'physiotherapy'
-  | 'nursing'
-  | 'companion_care';
-
-export type UrgencyLevel = 'low' | 'medium' | 'high' | 'urgent';
+/* ServiceCategory + UrgencyLevel defined with intake helpers above */
 
 export interface CarePatient {
   id: string;

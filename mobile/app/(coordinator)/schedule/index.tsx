@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
 import { Button, Card, EmptyState, Input, ScreenHeader, StatusBadge } from '../../../components/ui';
+import { SelectDropdown } from '../../../components/SelectDropdown';
 import { listEpisodes, type CareEpisode } from '../../../lib/api/care';
 import {
   bookRecurringSessions,
@@ -27,12 +28,19 @@ import {
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 
 type SlotDraft = { dayOfWeek: number; startTime: string; endTime: string; isAvailable: boolean };
+type SessionType = 'telehealth' | 'in_person' | 'home_visit';
 
 const DEFAULT_SLOTS: SlotDraft[] = [
   { dayOfWeek: 1, startTime: '09:00', endTime: '17:00', isAvailable: true },
 ];
 
 const TIME_SLOTS = ['09:00', '11:00', '14:00', '16:00'];
+
+const SESSION_TYPES: { id: SessionType; label: string }[] = [
+  { id: 'telehealth', label: 'Telehealth (video call)' },
+  { id: 'in_person', label: 'In-person' },
+  { id: 'home_visit', label: 'Home visit' },
+];
 
 function nextFourteenDays() {
   const out: { iso: string; day: string; date: string }[] = [];
@@ -75,6 +83,7 @@ export default function CoordinatorScheduleScreen() {
 
   const [providerId, setProviderId] = useState('');
   const [episodeId, setEpisodeId] = useState('');
+  const [sessionType, setSessionType] = useState<SessionType>('telehealth');
   const [slots, setSlots] = useState<SlotDraft[]>(DEFAULT_SLOTS);
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
@@ -95,6 +104,24 @@ export default function CoordinatorScheduleScreen() {
 
   const staff = staffQuery.data ?? [];
   const episodes = episodesQuery.data?.data ?? [];
+
+  const episodeOptions = useMemo(
+    () =>
+      episodes.map((ep) => ({
+        id: ep.id,
+        label: episodeOptionLabel(ep),
+      })),
+    [episodes],
+  );
+
+  const staffOptions = useMemo(
+    () =>
+      staff.map((s) => ({
+        id: s.id,
+        label: staffOptionLabel(s),
+      })),
+    [staff],
+  );
 
   useEffect(() => {
     if (!providerId && staff.length === 1) setProviderId(staff[0].id);
@@ -167,6 +194,7 @@ export default function CoordinatorScheduleScreen() {
           providerId,
           scheduledAt,
           durationMinutes,
+          type: sessionType,
           assignPendingTasks: assignTasks,
           recurrence: { frequency: 'weekly', count },
         });
@@ -176,6 +204,7 @@ export default function CoordinatorScheduleScreen() {
         providerId,
         scheduledAt,
         durationMinutes,
+        type: sessionType,
         assignPendingTasks: assignTasks,
       });
     },
@@ -261,38 +290,23 @@ export default function CoordinatorScheduleScreen() {
 
         <Card shadow>
           <Text className="font-semibold text-stone-900">Staff availability</Text>
-          <Text className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Staff member
-          </Text>
-          {staff.length === 0 ? (
-            <Text className="text-sm text-amber-700">
-              No schedulable staff in your organization yet. Invite support or clinical staff from
-              the Org portal.
-            </Text>
-          ) : (
-            <View className="gap-2">
-              {staff.map((s) => {
-                const selected = providerId === s.id;
-                return (
-                  <Pressable
-                    key={s.id}
-                    onPress={() => setProviderId(s.id)}
-                    className={`rounded-xl border px-3 py-2.5 ${
-                      selected ? 'border-teal-600 bg-teal-50' : 'border-stone-200 bg-white'
-                    }`}
-                  >
-                    <Text
-                      className={`text-sm ${
-                        selected ? 'font-medium text-teal-700' : 'text-stone-700'
-                      }`}
-                    >
-                      {staffOptionLabel(s)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          <View className="mt-3">
+            {staff.length === 0 ? (
+              <Text className="text-sm text-amber-700">
+                No schedulable staff in your organization yet. Invite support or clinical staff from
+                the Org portal.
+              </Text>
+            ) : (
+              <SelectDropdown
+                label="Staff member"
+                placeholder="Select staff…"
+                options={staffOptions}
+                value={providerId}
+                onChange={setProviderId}
+                emptyText="No staff match that search."
+              />
+            )}
+          </View>
           {selectedStaff ? (
             <Text className="mt-2 text-sm text-stone-500">{selectedStaff.name}</Text>
           ) : null}
@@ -394,37 +408,41 @@ export default function CoordinatorScheduleScreen() {
 
         <Card className="mt-4" shadow>
           <Text className="font-semibold text-stone-900">Book session</Text>
-          <Text className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Care episode
-          </Text>
-          {episodes.length === 0 ? (
-            <Text className="text-sm text-amber-700">
-              No episodes yet. Complete intake review to create a care journey first.
-            </Text>
-          ) : (
-            <View className="gap-2">
-              {episodes.map((ep) => {
-                const selected = episodeId === ep.id;
-                return (
-                  <Pressable
-                    key={ep.id}
-                    onPress={() => setEpisodeId(ep.id)}
-                    className={`rounded-xl border px-3 py-2.5 ${
-                      selected ? 'border-teal-600 bg-teal-50' : 'border-stone-200 bg-white'
-                    }`}
-                  >
-                    <Text
-                      className={`text-sm ${
-                        selected ? 'font-medium text-teal-700' : 'text-stone-700'
-                      }`}
-                    >
-                      {episodeOptionLabel(ep)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+
+          <View className="mt-3 gap-4">
+            {episodes.length === 0 ? (
+              <Text className="text-sm text-amber-700">
+                No episodes yet. Complete intake review to create a care journey first.
+              </Text>
+            ) : (
+              <SelectDropdown
+                label="Care episode"
+                placeholder="Select episode…"
+                options={episodeOptions}
+                value={episodeId}
+                onChange={setEpisodeId}
+                emptyText="No episodes match that search."
+              />
+            )}
+
+            <SelectDropdown
+              label="Assign to staff"
+              placeholder="Select staff…"
+              options={staffOptions}
+              value={providerId}
+              onChange={setProviderId}
+              emptyText="No staff match that search."
+            />
+
+            <SelectDropdown
+              label="Session type"
+              placeholder="Select type…"
+              options={SESSION_TYPES}
+              value={sessionType}
+              onChange={(id) => setSessionType(id as SessionType)}
+              searchable={false}
+            />
+          </View>
 
           <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-stone-400">
             Date
@@ -553,6 +571,7 @@ export default function CoordinatorScheduleScreen() {
                   <Text className="flex-1 font-medium text-stone-900">
                     {formatDateTime(s.scheduledAt)}
                     {s.durationMinutes ? ` · ${s.durationMinutes}m` : ''}
+                    {s.type ? ` · ${s.type.replace(/_/g, ' ')}` : ''}
                   </Text>
                   <StatusBadge status={s.status} />
                 </View>

@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
 import { Button, Card, EmptyState } from '../../components/ui';
+import { SelectDropdown } from '../../components/SelectDropdown';
 import { FAMILY, FamilyTabHero } from '../../components/family/FamilyChrome';
 import { listEpisodes } from '../../lib/api/care';
 import {
@@ -24,6 +25,13 @@ import { queryClient } from '../../lib/query/client';
 import { toastError } from '../../lib/toast';
 
 const DURATIONS = [30, 45, 60] as const;
+type SessionType = 'telehealth' | 'in_person' | 'home_visit';
+
+const SESSION_TYPES: { id: SessionType; label: string }[] = [
+  { id: 'telehealth', label: 'Telehealth (video call)' },
+  { id: 'in_person', label: 'In-person' },
+  { id: 'home_visit', label: 'Home visit' },
+];
 
 function localYmd(d: Date): string {
   const y = d.getFullYear();
@@ -78,6 +86,7 @@ export default function FamilyBookSessionScreen() {
   const days = useMemo(() => nextFourteenDays(), []);
 
   const [episodeId, setEpisodeId] = useState<string | null>(params.episodeId ?? null);
+  const [sessionType, setSessionType] = useState<SessionType>('telehealth');
   const [durationMinutes, setDurationMinutes] = useState<(typeof DURATIONS)[number]>(60);
   const [dateYmd, setDateYmd] = useState<string | null>(days[0]?.ymd ?? null);
   const [slotStart, setSlotStart] = useState<string | null>(null);
@@ -89,6 +98,17 @@ export default function FamilyBookSessionScreen() {
 
   const episodes = (episodesQuery.data?.data ?? []).filter((e) => e.status !== 'closed');
   const effectiveEpisodeId = episodeId ?? episodes[0]?.id ?? null;
+
+  const episodeOptions = useMemo(
+    () =>
+      episodes.map((ep) => ({
+        id: ep.id,
+        label: ep.careRecipient?.name
+          ? `${ep.title} · ${ep.careRecipient.name}`
+          : ep.title,
+      })),
+    [episodes],
+  );
 
   const clinicianQuery = useQuery({
     queryKey: ['family-clinician', effectiveEpisodeId],
@@ -114,7 +134,7 @@ export default function FamilyBookSessionScreen() {
         episodeId: effectiveEpisodeId,
         scheduledAt: slotStart,
         durationMinutes,
-        type: 'telehealth',
+        type: sessionType,
       });
     },
     onSuccess: (data) => {
@@ -129,7 +149,6 @@ export default function FamilyBookSessionScreen() {
         typeof (data.invoice as { invoiceId?: unknown }).invoiceId === 'string'
           ? (data.invoice as { invoiceId: string }).invoiceId
           : undefined;
-      // Mobile has /(family)/invoices/[id] — unlike web billing URLs.
       if (invoiceId) {
         router.replace(`/(family)/invoices/${invoiceId}` as never);
         return;
@@ -161,36 +180,19 @@ export default function FamilyBookSessionScreen() {
           />
         ) : (
           <View className="gap-4">
-            {episodes.length > 1 ? (
-              <Card shadow>
-                <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                  Care journey
-                </Text>
-                <View className="gap-2">
-                  {episodes.map((ep) => {
-                    const selected = effectiveEpisodeId === ep.id;
-                    return (
-                      <Pressable
-                        key={ep.id}
-                        onPress={() => {
-                          setEpisodeId(ep.id);
-                          setSlotStart(null);
-                        }}
-                        className={`rounded-xl border px-3 py-2 ${
-                          selected ? 'border-teal-600 bg-teal-50' : 'border-stone-200 bg-white'
-                        }`}
-                      >
-                        <Text
-                          className={`text-sm ${selected ? 'font-semibold text-teal-800' : 'text-stone-700'}`}
-                        >
-                          {ep.title}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </Card>
-            ) : null}
+            <Card shadow>
+              <SelectDropdown
+                label="Care journey"
+                placeholder="Select care journey…"
+                options={episodeOptions}
+                value={effectiveEpisodeId ?? ''}
+                onChange={(id) => {
+                  setEpisodeId(id);
+                  setSlotStart(null);
+                }}
+                emptyText="No care journeys match that search."
+              />
+            </Card>
 
             <Card shadow>
               <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
@@ -218,6 +220,17 @@ export default function FamilyBookSessionScreen() {
 
             {clinician ? (
               <>
+                <Card shadow>
+                  <SelectDropdown
+                    label="Session type"
+                    placeholder="Select type…"
+                    options={SESSION_TYPES}
+                    value={sessionType}
+                    onChange={(id) => setSessionType(id as SessionType)}
+                    searchable={false}
+                  />
+                </Card>
+
                 <Card shadow>
                   <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
                     Duration
@@ -301,7 +314,7 @@ export default function FamilyBookSessionScreen() {
                   ) : slots.length === 0 ? (
                     <Text className="text-sm text-stone-500">
                       {slotsQuery.data?.message ??
-                        'No hours on this weekday. Try Sun / Mon / Wed if that matches the clinician profile, or ask your coordinator to set availability.'}
+                        'No hours on this weekday. Try another date, or ask your coordinator to set availability.'}
                     </Text>
                   ) : (
                     <View className="gap-3">
@@ -348,7 +361,9 @@ export default function FamilyBookSessionScreen() {
                   Confirm booking
                 </Button>
                 <Text className="text-center text-xs text-stone-500">
-                  Telehealth sessions create an invoice — pay before joining the video room.
+                  {sessionType === 'telehealth'
+                    ? 'Telehealth sessions create an invoice — pay before joining the video room.'
+                    : 'Your care team will confirm the visit details after booking.'}
                 </Text>
               </>
             ) : null}

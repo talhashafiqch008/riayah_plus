@@ -23,6 +23,7 @@ import { apiClient } from '../../../lib/api/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
 
 type UiFilter = 'pending' | 'in_review' | 'approved' | 'rejected' | 'all';
+type UrgencyFilter = '' | 'urgent' | 'high' | 'medium' | 'low';
 
 interface IntakeQueueItem {
   id: string;
@@ -50,6 +51,14 @@ const FILTERS: { key: UiFilter; label: string }[] = [
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
   { key: 'all', label: 'All' },
+];
+
+const URGENCY_FILTERS: { key: UrgencyFilter; label: string }[] = [
+  { key: '', label: 'All urgency' },
+  { key: 'urgent', label: 'Urgent' },
+  { key: 'high', label: 'High' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'low', label: 'Low' },
 ];
 
 function apiStatusForFilter(filter: UiFilter): string | undefined {
@@ -81,14 +90,21 @@ function isUrgent(level?: string | null): boolean {
   return level === 'urgent' || level === 'high';
 }
 
-async function fetchQueue(filter: UiFilter): Promise<QueueResponse> {
+async function fetchQueue(filter: UiFilter, urgency: UrgencyFilter): Promise<QueueResponse> {
+  const urgencyParam = urgency || undefined;
+
   if (filter === 'approved') {
     const [validated, created] = await Promise.all([
       apiClient.get<QueueResponse>('/api/intake/queue', {
-        params: { status: 'validated', page: 1, limit: 50 },
+        params: { status: 'validated', page: 1, limit: 50, ...(urgencyParam ? { urgency: urgencyParam } : {}) },
       }),
       apiClient.get<QueueResponse>('/api/intake/queue', {
-        params: { status: 'episode_created', page: 1, limit: 50 },
+        params: {
+          status: 'episode_created',
+          page: 1,
+          limit: 50,
+          ...(urgencyParam ? { urgency: urgencyParam } : {}),
+        },
       }),
     ]);
     const merged = [...(validated.data.data ?? []), ...(created.data.data ?? [])];
@@ -111,6 +127,7 @@ async function fetchQueue(filter: UiFilter): Promise<QueueResponse> {
       page: 1,
       limit: 50,
       ...(status ? { status } : {}),
+      ...(urgencyParam ? { urgency: urgencyParam } : {}),
     },
   });
   return res.data;
@@ -118,10 +135,11 @@ async function fetchQueue(filter: UiFilter): Promise<QueueResponse> {
 
 export default function CoordinatorIntakeQueueScreen() {
   const [filter, setFilter] = useState<UiFilter>('pending');
+  const [urgency, setUrgency] = useState<UrgencyFilter>('');
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['intake-queue', filter],
-    queryFn: () => fetchQueue(filter),
+    queryKey: ['intake-queue', filter, urgency],
+    queryFn: () => fetchQueue(filter, urgency),
   });
 
   const items = data?.data ?? [];
@@ -143,7 +161,8 @@ export default function CoordinatorIntakeQueueScreen() {
           contentContainerStyle={{
             alignItems: 'center',
             paddingHorizontal: 16,
-            paddingVertical: 12,
+            paddingTop: 12,
+            paddingBottom: 8,
             gap: 8,
           }}
         >
@@ -162,6 +181,38 @@ export default function CoordinatorIntakeQueueScreen() {
               >
                 <Text
                   className={`text-sm ${active ? 'font-semibold text-teal-700' : 'text-stone-600'}`}
+                >
+                  {f.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingBottom: 12,
+            gap: 8,
+          }}
+        >
+          {URGENCY_FILTERS.map((f) => {
+            const active = urgency === f.key;
+            return (
+              <Pressable
+                key={f.key || 'all-urgency'}
+                onPress={() => setUrgency(f.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={{ flexShrink: 0 }}
+                className={`rounded-full border px-3 py-1.5 ${
+                  active ? 'border-amber-500 bg-amber-50' : 'border-stone-200 bg-white'
+                }`}
+              >
+                <Text
+                  className={`text-xs ${active ? 'font-semibold text-amber-700' : 'text-stone-500'}`}
                 >
                   {f.label}
                 </Text>
