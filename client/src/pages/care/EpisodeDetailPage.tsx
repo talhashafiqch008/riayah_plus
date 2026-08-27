@@ -16,7 +16,6 @@ import {
   type ClinicianOption,
 } from '@/lib/api/assessments';
 import {
-  familyAssessmentStatusLabel,
   familyEpisodeStatusLabel,
 } from '@/lib/familyLanguage';
 import { buildFamilyJourneyMilestones } from '@/lib/familyJourneyMilestones';
@@ -28,7 +27,7 @@ type Props = {
   basePath: string;
   /** Coordinator can advance episode status. */
   canTransition?: boolean;
-  /** Family (or staff) can book a consultation/assessment on this episode. */
+  /** Family can book care sessions (open slots) on this episode. */
   canSchedule?: boolean;
 };
 
@@ -173,7 +172,7 @@ export default function EpisodeDetailPage({
   const [scheduledAt, setScheduledAt] = useState('');
   const [scheduling, setScheduling] = useState(false);
 
-  const showScheduleForm = canSchedule || canTransition;
+  const showAssessmentScheduleForm = canTransition;
   const familyFacing = canSchedule && !canTransition;
 
   const load = useCallback(async () => {
@@ -195,14 +194,14 @@ export default function EpisodeDetailPage({
   }, [load]);
 
   useEffect(() => {
-    if (!showScheduleForm) return;
+    if (!showAssessmentScheduleForm) return;
     void listClinicians()
       .then((list) => {
         setClinicians(list);
         if (list[0]) setAssessorId(list[0].id);
       })
       .catch(() => undefined);
-  }, [showScheduleForm]);
+  }, [showAssessmentScheduleForm]);
 
   const nextStatuses = useMemo(
     () => (episode ? allowedEpisodeTransitions(episode.status) : []),
@@ -237,12 +236,12 @@ export default function EpisodeDetailPage({
         type: assessmentType,
         scheduledAt: new Date(scheduledAt).toISOString(),
       });
-      toast.success(familyFacing ? 'Consultation booked' : 'Assessment scheduled');
+      toast.success('Assessment scheduled');
       setScheduledAt('');
       await load();
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error(familyFacing ? 'Booking failed' : 'Schedule failed');
+      else toast.error('Schedule failed');
     } finally {
       setScheduling(false);
     }
@@ -581,35 +580,32 @@ export default function EpisodeDetailPage({
           <li className="ml-4">
             <span
               className={`absolute -left-1.5 mt-1.5 size-3 rounded-full ${
-                (episode.assessments?.length ?? 0) > 0 ? 'bg-sky-500' : 'bg-stone-200'
+                (episode.sessions?.length ?? 0) > 0 ? 'bg-sky-500' : 'bg-stone-200'
               }`}
             />
             <p className="text-sm font-medium text-stone-900">
-              {familyFacing ? 'Consultations' : 'Assessments'}
+              {familyFacing ? 'Care sessions' : 'Assessments'}
             </p>
             <p className="text-xs text-stone-500">
-              {(episode.assessments?.length ?? 0) > 0
-                ? `${episode.assessments!.length} ${familyFacing ? 'booked' : 'linked'}`
-                : familyFacing
-                  ? 'None booked yet'
+              {familyFacing
+                ? (episode.sessions?.length ?? 0) > 0
+                  ? `${episode.sessions!.length} booked`
+                  : 'None booked yet'
+                : (episode.assessments?.length ?? 0) > 0
+                  ? `${episode.assessments!.length} linked`
                   : 'None scheduled yet'}
             </p>
           </li>
         </ol>
       </div>
 
-      {/* Assessments / Consultations */}
+      {/* Assessments — coordinator / clinical only */}
+      {!familyFacing ? (
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-stone-900">
-          {familyFacing ? 'Consultations' : 'Assessments'}
-        </h3>
+        <h3 className="text-sm font-semibold text-stone-900">Assessments</h3>
 
         {(episode.assessments?.length ?? 0) === 0 ? (
-          <p className="text-sm text-stone-500">
-            {familyFacing
-              ? 'No consultations booked for this care journey yet.'
-              : 'No assessments linked to this episode yet.'}
-          </p>
+          <p className="text-sm text-stone-500">No assessments linked to this episode yet.</p>
         ) : (
           <ul className="space-y-3">
             {episode.assessments!.map((a) => (
@@ -619,13 +615,11 @@ export default function EpisodeDetailPage({
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-stone-900 capitalize">
-                    {a.type || (familyFacing ? 'consultation' : 'assessment')}
+                    {a.type || 'assessment'}
                     {a.scheduledAt ? ` · ${new Date(a.scheduledAt).toLocaleString()}` : ''}
                   </span>
                   <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-900">
-                    {familyFacing
-                      ? familyAssessmentStatusLabel(a.status || 'scheduled')
-                      : (a.status || 'scheduled').replace(/_/g, ' ')}
+                    {(a.status || 'scheduled').replace(/_/g, ' ')}
                   </span>
                 </div>
                 {a.assessor ? (
@@ -639,11 +633,9 @@ export default function EpisodeDetailPage({
           </ul>
         )}
 
-        {showScheduleForm && episode.status !== 'closed' && (
+        {showAssessmentScheduleForm && episode.status !== 'closed' && (
           <div className="pt-3 border-t space-y-3">
-            <p className="text-xs font-semibold text-stone-500">
-              {familyFacing ? 'Book a consultation' : 'Schedule assessment'}
-            </p>
+            <p className="text-xs font-semibold text-stone-500">Schedule assessment</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 <span className="text-xs font-semibold text-stone-500">Clinician</span>
@@ -697,17 +689,32 @@ export default function EpisodeDetailPage({
               className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-2"
             >
               {scheduling && <Loader2 className="size-4 animate-spin" />}
-              {familyFacing ? 'Book consultation' : 'Schedule assessment'}
+              Schedule assessment
             </button>
           </div>
         )}
       </div>
+      ) : null}
 
-      {/* Sessions / support workers */}
+      {/* Sessions */}
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-stone-900">Sessions</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-stone-900">Sessions</h3>
+          {familyFacing && episode.status !== 'closed' ? (
+            <Link
+              to={`/family/bookings/book?episodeId=${episode.id}`}
+              className="rounded-xl bg-teal-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-teal-700"
+            >
+              Book session
+            </Link>
+          ) : null}
+        </div>
         {(episode.sessions?.length ?? 0) === 0 ? (
-          <p className="text-sm text-stone-500">No care sessions scheduled for this episode yet.</p>
+          <p className="text-sm text-stone-500">
+            {familyFacing
+              ? 'No care sessions yet. Book an open slot with your assigned clinician.'
+              : 'No care sessions scheduled for this episode yet.'}
+          </p>
         ) : (
           <ul className="space-y-3">
             {episode.sessions!.map((s) => (

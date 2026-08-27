@@ -69,7 +69,7 @@ export default function FamilyTelehealthPage() {
       ) : upcoming.length === 0 && past.length === 0 ? (
         <div className="rounded-xl border border-dashed border-stone-200 bg-white p-10 text-center">
           <Video className="mx-auto size-10 text-stone-300" />
-          <p className="mt-3 text-stone-600">No video sessions yet. Your coordinator will book them.</p>
+          <p className="mt-3 text-stone-600">No video sessions yet. Book one from Appointments.</p>
         </div>
       ) : (
         <div className="space-y-6">

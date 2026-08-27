@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useToast } from 'react-native-toast-notifications';
 import { Button } from '../../../components/ui';
 import { ROLE, RoleTabHero } from '../../../components/shell/RoleChrome';
-import { LiveKitRoomWebView } from '../../../components/telehealth/LiveKitRoomWebView';
+import { TelehealthVideoRoom } from '../../../components/telehealth/TelehealthVideoRoom';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { getSession, type CareSession } from '../../../lib/api/scheduling';
 import {
@@ -129,7 +129,7 @@ export default function ClinicalTelehealthJoinScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#1c1917' }} edges={['top']}>
         <RoleTabHero title="Telehealth" subtitle="In call" showBack />
-        <LiveKitRoomWebView
+        <TelehealthVideoRoom
           token={join.token}
           serverUrl={join.serverUrl}
           onDisconnected={() => setShowVideo(false)}

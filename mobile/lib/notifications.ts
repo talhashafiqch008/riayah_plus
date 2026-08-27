@@ -1,23 +1,48 @@
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { apiClient } from './api/client';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
 
-/** Register Expo push token with the API. Safe no-op on simulator / failure. */
+function isExpoGo(): boolean {
+  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
+
+/** Lazy-load so Expo Go does not crash on import (push APIs removed in SDK 53+). */
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (isExpoGo()) return null;
+  try {
+    return await import('expo-notifications');
+  } catch {
+    return null;
+  }
+}
+
+let handlerConfigured = false;
+
+async function ensureHandler(Notifications: NotificationsModule): Promise<void> {
+  if (handlerConfigured) return;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  handlerConfigured = true;
+}
+
+/** Register Expo push token with the API. Safe no-op on Expo Go / simulator / failure. */
 export async function registerPushToken(): Promise<void> {
   try {
-    // expo-constants: avoid bundling expo-device just for a simulator check
     if (Constants.isDevice === false) return;
+
+    const Notifications = await loadNotifications();
+    if (!Notifications) return;
+
+    await ensureHandler(Notifications);
 
     const { status: existing } = await Notifications.getPermissionsAsync();
     let finalStatus = existing;
@@ -27,7 +52,13 @@ export async function registerPushToken(): Promise<void> {
     }
     if (finalStatus !== 'granted') return;
 
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    // Expo push needs an EAS projectId; without it this throws loudly on device.
+    const projectId =
+      Constants.easConfig?.projectId ??
+      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
+    if (!projectId) return;
+
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {

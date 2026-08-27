@@ -1,5 +1,5 @@
 import { Fragment, Suspense } from 'react';
-import { Navigate, Route } from 'react-router-dom';
+import { Navigate, Route, useParams } from 'react-router-dom';
 import { RoleRoute } from './RoleRoute';
 import { HealthRoleLayout } from '@/layouts/HealthRoleLayout';
 import { ROLE_SHELLS } from '@/config/proposalRoleShells';
@@ -14,6 +14,8 @@ import FamilyTelehealthPage from '@/pages/family/FamilyTelehealthPage';
 import FamilyTelehealthJoinPage, {
   FamilyAppointmentJoinRedirect,
 } from '@/pages/family/FamilyTelehealthJoinPage';
+import FamilyAppointmentsPage from '@/pages/family/FamilyAppointmentsPage';
+import FamilyBookSessionPage from '@/pages/family/FamilyBookSessionPage';
 import RoleMessagesPage from '@/pages/roles/RoleMessagesPage';
 import CoordinatorIntakeQueuePage from '@/pages/coordinator/CoordinatorIntakeQueuePage';
 import CoordinatorCarePlansPage from '@/pages/coordinator/CoordinatorCarePlansPage';
@@ -45,6 +47,12 @@ const PageSpinner = () => (
     <div className="animate-spin rounded-full size-10 border-b-2 border-teal-600" />
   </div>
 );
+
+/** Legacy /family/invoices/:id → billing detail */
+function FamilyInvoiceIdRedirect() {
+  const { id } = useParams();
+  return <Navigate to={id ? `/family/billing/${id}` : '/family/billing'} replace />;
+}
 
 const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; description?: string }[]> = {
   family: [
@@ -252,7 +260,15 @@ export const proposalRoleRouteElements = (
                   path="/family/bookings"
                   element={
                     <Suspense fallback={<PageSpinner />}>
-                      <AssessmentSchedulePage mode="family" />
+                      <FamilyAppointmentsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/family/bookings/book"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <FamilyBookSessionPage />
                     </Suspense>
                   }
                 />
@@ -273,6 +289,10 @@ export const proposalRoleRouteElements = (
                   }
                 />
                 <Route path="/family/invoices" element={<Navigate to="/family/billing" replace />} />
+                <Route
+                  path="/family/invoices/:id"
+                  element={<FamilyInvoiceIdRedirect />}
+                />
                 <Route
                   path="/family/quotations"
                   element={<Navigate to="/family/billing?tab=quotations" replace />}

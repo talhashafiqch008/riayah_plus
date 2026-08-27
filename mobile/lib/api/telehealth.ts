@@ -18,6 +18,19 @@ export function isTelehealthConsentRequired(error: unknown): boolean {
   return err.response.data?.details?.code === 'telehealth_consent_required';
 }
 
+export function isTelehealthPaymentRequired(error: unknown): boolean {
+  const err = error as { response?: { status?: number; data?: { details?: { code?: string } } } };
+  if (err.response?.status !== 403) return false;
+  return err.response.data?.details?.code === 'telehealth_payment_required';
+}
+
+export function telehealthPaymentInvoiceId(error: unknown): string | null {
+  if (!isTelehealthPaymentRequired(error)) return null;
+  const err = error as { response?: { data?: { details?: { invoiceId?: string } } } };
+  const id = err.response?.data?.details?.invoiceId;
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
 export function isLiveKitUrlReady(url?: string | null): boolean {
   if (!url) return false;
   const trimmed = url.trim();

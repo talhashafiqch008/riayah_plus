@@ -11,8 +11,10 @@ import {
   getTelehealthRecording,
   isLiveKitUrlReady,
   isTelehealthConsentRequired,
+  isTelehealthPaymentRequired,
   joinTelehealthRoom,
   sessionJoinRoomName,
+  telehealthPaymentInvoiceId,
   type TelehealthJoin,
   type TelehealthRecording,
 } from '@/lib/api/telehealth';
@@ -27,6 +29,8 @@ export default function FamilyTelehealthJoinPage() {
   const [session, setSession] = useState<CareSession | null>(null);
   const [join, setJoin] = useState<TelehealthJoin | null>(null);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [needsPayment, setNeedsPayment] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -47,11 +51,23 @@ export default function FamilyTelehealthJoinPage() {
         const next = await joinTelehealthRoom(roomName);
         setJoin(next);
         setNeedsConsent(false);
+        setNeedsPayment(false);
+        setPaymentInvoiceId(null);
         setError(null);
         return next;
       } catch (err: unknown) {
+        if (isTelehealthPaymentRequired(err)) {
+          setNeedsPayment(true);
+          setPaymentInvoiceId(telehealthPaymentInvoiceId(err));
+          setNeedsConsent(false);
+          setJoin(null);
+          setError(isApiError(err) ? err.message : 'Payment required before joining');
+          return null;
+        }
         if (isTelehealthConsentRequired(err)) {
           setNeedsConsent(true);
+          setNeedsPayment(false);
+          setPaymentInvoiceId(null);
           setJoin(null);
           return null;
         }
@@ -81,13 +97,13 @@ export default function FamilyTelehealthJoinPage() {
   }, [load]);
 
   useEffect(() => {
-    if (needsConsent || join?.phase !== 'waiting' || !session) return undefined;
+    if (needsConsent || needsPayment || join?.phase !== 'waiting' || !session) return undefined;
     const roomName = sessionJoinRoomName(session);
     const timer = window.setInterval(() => {
       void requestJoin(roomName).catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [join?.phase, needsConsent, requestJoin, session]);
+  }, [join?.phase, needsConsent, needsPayment, requestJoin, session]);
 
   useEffect(() => {
     if (recording?.status !== 'stopping') return undefined;
@@ -168,7 +184,41 @@ export default function FamilyTelehealthJoinPage() {
           </div>
         </div>
 
-        {needsConsent && (
+        {needsPayment && (
+          <div className="mt-6 space-y-4">
+            <p className="text-sm text-stone-700">
+              Payment is required before you can join this video visit. Pay the invoice, then return
+              here to continue.
+            </p>
+            {error && <p className="text-sm text-rose-700">{error}</p>}
+            <div className="flex flex-wrap gap-3">
+              {paymentInvoiceId ? (
+                <Link
+                  to={`/family/billing/${paymentInvoiceId}`}
+                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+                >
+                  Pay invoice
+                </Link>
+              ) : (
+                <Link
+                  to="/family/billing"
+                  className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+                >
+                  Open billing
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-800 hover:bg-stone-50"
+              >
+                I&apos;ve paid — try again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!needsPayment && needsConsent && (
           <div className="mt-6 space-y-4">
             <p className="text-sm text-stone-700">
               Before you join a video session, confirm you agree to receive care over a live video
@@ -194,7 +244,7 @@ export default function FamilyTelehealthJoinPage() {
           </div>
         )}
 
-        {!needsConsent && join?.phase === 'waiting' && (
+        {!needsPayment && !needsConsent && join?.phase === 'waiting' && (
           <div className="mt-6 space-y-3">
             <p className="text-stone-800 font-medium">You are in the waiting room.</p>
             <p className="text-sm text-stone-600">
@@ -206,7 +256,7 @@ export default function FamilyTelehealthJoinPage() {
           </div>
         )}
 
-        {!needsConsent && join?.phase === 'in_call' && (
+        {!needsPayment && !needsConsent && join?.phase === 'in_call' && (
           <div className="mt-6 space-y-2">
             <p className="font-medium text-stone-800">You have been admitted.</p>
             <p className="text-sm text-stone-600">
@@ -216,7 +266,9 @@ export default function FamilyTelehealthJoinPage() {
           </div>
         )}
 
-        {error && !needsConsent && <p className="mt-6 text-sm text-rose-700">{error}</p>}
+        {error && !needsConsent && !needsPayment && (
+          <p className="mt-6 text-sm text-rose-700">{error}</p>
+        )}
       </div>
 
       {(recording?.recordingUrl || recording?.status) && (
@@ -235,3 +287,4 @@ export default function FamilyTelehealthJoinPage() {
     </div>
   );
 }
+

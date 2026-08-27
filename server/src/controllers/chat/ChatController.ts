@@ -73,7 +73,7 @@ export class ChatController {
     });
 
     const io = req.app.locals.io;
-    emitNewMessage(io, message);
+    await emitNewMessage(io, message);
     res.status(201).json({ data: message });
   }
 
@@ -94,7 +94,7 @@ export class ChatController {
         content: body.content,
       });
       const io = req.app.locals.io;
-      emitNewMessage(io, message);
+      await emitNewMessage(io, message);
       res.status(201).json({ data: message });
       return;
     }
@@ -114,13 +114,22 @@ export class ChatController {
   }
 
   static async downloadAttachment(req: Request, res: Response): Promise<void> {
-    const { full, fileName } = await ChatMessageService.attachmentPath(
+    const attachment = await ChatMessageService.resolveAttachmentForDownload(
       req.params.conversationId,
       req.user!.userId,
       req.params.fileName,
     );
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/^.*?-/, '')}"`);
-    res.sendFile(full);
+    const downloadName = attachment.fileName.replace(/^.*?-/, '');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+    if (attachment.source === 's3') {
+      if (attachment.contentType) res.setHeader('Content-Type', attachment.contentType);
+      if (attachment.contentLength != null) {
+        res.setHeader('Content-Length', String(attachment.contentLength));
+      }
+      attachment.body.pipe(res);
+      return;
+    }
+    res.sendFile(attachment.full);
   }
 
   static async editMessage(req: Request, res: Response): Promise<void> {

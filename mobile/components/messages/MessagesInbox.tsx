@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -23,6 +25,7 @@ import {
   conversationHasUnread,
   conversationTypeLabel,
   createConversationThread,
+  downloadConversationAttachment,
   listConversationMessages,
   listConversations,
   markConversationRead,
@@ -31,7 +34,7 @@ import {
   type ChatMessage,
   type Conversation,
 } from '../../lib/api/conversations';
-import { connectRealtime, subscribeChatRealtime } from '../../lib/realtime';
+import { getRealtimeSocket, joinConversationRoom, leaveConversationRoom, subscribeChatRealtime } from '../../lib/realtime';
 
 type StartOption = {
   episodeId: string;
@@ -133,16 +136,14 @@ export function MessagesInbox({
 
   useEffect(() => {
     if (!token) return;
-    const socket = connectRealtime(token);
+    const socket = getRealtimeSocket(token);
+    if (!socket) return;
     const unsub = subscribeChatRealtime(socket, {
       onMessage: () => {
         void loadThreads();
       },
     });
-    return () => {
-      unsub();
-      socket.disconnect();
-    };
+    return unsub;
   }, [token, loadThreads]);
 
   async function onStart(option: StartOption) {
@@ -271,6 +272,7 @@ type MessageThreadProps = {
 
 export function MessageThread({ conversationId, basePath, tone = 'role' }: MessageThreadProps) {
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const myId = String(useAuthStore((s) => s.user?.id ?? ''));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -279,7 +281,16 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
   const [file, setFile] = useState<{ uri: string; name: string; mimeType?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  const scrollToLatest = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated });
+      // Keyboard / layout settle — second pass so the bubble stays visible
+      setTimeout(() => listRef.current?.scrollToEnd({ animated }), 120);
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -287,17 +298,19 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
         listConversationMessages(conversationId),
         listConversations(),
       ]);
-      setMessages([...rows].reverse());
+      // API already returns oldest → newest; do not reverse (that put the latest at the top)
+      setMessages(rows);
       const thread = threads.find((t) => t.id === conversationId);
       const other = thread ? otherParticipant(thread, myId) : undefined;
       setTitle(other?.name ?? thread?.title ?? 'Conversation');
       await markConversationRead(conversationId);
+      scrollToLatest(false);
     } catch (e: unknown) {
       toast.show(apiErrorMessage(e, 'Failed to load thread'), { type: 'danger' });
     } finally {
       setLoading(false);
     }
-  }, [conversationId, myId, toast]);
+  }, [conversationId, myId, toast, scrollToLatest]);
 
   useEffect(() => {
     void load();
@@ -305,22 +318,26 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
 
   useEffect(() => {
     if (!token) return;
-    const socket = connectRealtime(token);
-    socket.emit('join_conversation', conversationId);
+    const socket = getRealtimeSocket(token);
+    if (!socket) return;
+    joinConversationRoom(socket, conversationId);
     const unsub = subscribeChatRealtime(socket, {
       onMessage: (raw) => {
         const msg = raw as ChatMessage;
         if (msg.conversationId !== conversationId) return;
-        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
         void markConversationRead(conversationId);
+        scrollToLatest(true);
       },
     });
     return () => {
-      socket.emit('leave_conversation', conversationId);
+      leaveConversationRoom(socket, conversationId);
       unsub();
-      socket.disconnect();
     };
-  }, [token, conversationId]);
+  }, [token, conversationId, scrollToLatest]);
 
   async function onPickFile() {
     const result = await DocumentPicker.getDocumentAsync({
@@ -330,6 +347,18 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
     setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType });
+  }
+
+  async function onOpenAttachment(message: ChatMessage) {
+    if (!message.fileUrl || openingAttachmentId) return;
+    setOpeningAttachmentId(message.id);
+    try {
+      await downloadConversationAttachment(conversationId, message.fileUrl);
+    } catch (e: unknown) {
+      toast.show(apiErrorMessage(e, 'Could not open attachment'), { type: 'danger' });
+    } finally {
+      setOpeningAttachmentId(null);
+    }
   }
 
   async function onSend() {
@@ -346,7 +375,7 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
       setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
       setDraft('');
       setFile(null);
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      scrollToLatest(true);
     } catch (e: unknown) {
       toast.show(apiErrorMessage(e, 'Could not send message'), { type: 'danger' });
     } finally {
@@ -357,8 +386,13 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
   const Hero = tone === 'family' ? FamilyTabHero : RoleTabHero;
   const bg = tone === 'family' ? FAMILY.stone50 : ROLE.stone50;
 
-  const sorted = useMemo(() => messages, [messages]);
-
+  const sorted = useMemo(
+    () =>
+      [...messages].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      ),
+    [messages],
+  );
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top']}>
       <Hero title={title} subtitle="Secure messaging" showBack />
@@ -367,13 +401,20 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
           <ActivityIndicator color={ROLE.teal} />
         </View>
       ) : (
-        <>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        >
           <FlatList
             ref={listRef}
             data={sorted}
             keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             contentContainerStyle={{ padding: 16, paddingBottom: 8, flexGrow: 1 }}
-            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+            onContentSizeChange={() => scrollToLatest(false)}
+            onLayout={() => scrollToLatest(false)}
             ListEmptyComponent={
               <EmptyState icon="chatbubble-outline" title="No messages yet" subtitle="Say hello to start the conversation." />
             }
@@ -392,9 +433,28 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
                       </Text>
                     ) : null}
                     {item.fileUrl ? (
-                      <Text className={`mt-1 text-xs ${mine ? 'text-teal-50' : 'text-teal-700'}`}>
-                        {attachmentDisplayName(item.fileUrl)}
-                      </Text>
+                      <Pressable
+                        onPress={() => void onOpenAttachment(item)}
+                        disabled={openingAttachmentId === item.id}
+                        className="mt-1 flex-row items-center gap-1"
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open attachment ${attachmentDisplayName(item.fileUrl)}`}
+                      >
+                        {openingAttachmentId === item.id ? (
+                          <ActivityIndicator size="small" color={mine ? '#fff' : ROLE.teal} />
+                        ) : (
+                          <Ionicons
+                            name="attach"
+                            size={14}
+                            color={mine ? '#ccfbf1' : '#0f766e'}
+                          />
+                        )}
+                        <Text
+                          className={`text-xs underline ${mine ? 'text-teal-50' : 'text-teal-700'}`}
+                        >
+                          {attachmentDisplayName(item.fileUrl)}
+                        </Text>
+                      </Pressable>
                     ) : null}
                   </View>
                   <Text className={`mt-1 text-[10px] text-stone-400 ${mine ? 'text-right' : ''}`}>
@@ -405,7 +465,10 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
             }}
           />
 
-          <View className="border-t border-stone-200 bg-white px-3 pb-3 pt-2">
+          <View
+            className="border-t border-stone-200 bg-white px-3 pt-2"
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+          >
             {file ? (
               <View className="mb-2 flex-row items-center justify-between rounded-lg bg-stone-100 px-3 py-2">
                 <Text className="flex-1 text-xs text-stone-600" numberOfLines={1}>
@@ -453,7 +516,7 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
               <Text className="text-xs font-medium text-stone-400">Back to inbox</Text>
             </Pressable>
           </View>
-        </>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );

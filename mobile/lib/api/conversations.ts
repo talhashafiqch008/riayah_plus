@@ -1,4 +1,7 @@
 import { apiClient } from './client';
+import { Linking, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 
 export type ConversationUser = {
   id: string;
@@ -70,8 +73,19 @@ export function conversationTypeLabel(type: string): string {
 }
 
 export function attachmentFileName(fileUrl: string): string | null {
-  const part = fileUrl.split('/').pop();
-  return part || null;
+  const trimmed = fileUrl.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('chat/')) {
+    return trimmed.split('/').pop() ?? null;
+  }
+  try {
+    const url = new URL(trimmed);
+    const part = url.pathname.split('/').pop();
+    return part ? decodeURIComponent(part) : null;
+  } catch {
+    const part = trimmed.split('/').pop();
+    return part ? decodeURIComponent(part) : null;
+  }
 }
 
 export function attachmentDisplayName(fileUrl: string): string {
@@ -83,6 +97,63 @@ export function conversationAttachmentPath(conversationId: string, fileUrl: stri
   const name = attachmentFileName(fileUrl);
   if (!name) return null;
   return `/api/conversations/${conversationId}/files/${encodeURIComponent(name)}`;
+}
+
+function attachmentMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'doc') return 'application/msword';
+  if (ext === 'docx') {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return 'application/octet-stream';
+}
+
+/** Download a thread attachment with auth and open it in the system viewer (not the share sheet). */
+export async function downloadConversationAttachment(
+  conversationId: string,
+  fileUrl: string,
+): Promise<string> {
+  const path = conversationAttachmentPath(conversationId, fileUrl);
+  if (!path) throw new Error('Invalid attachment.');
+
+  const displayName = attachmentDisplayName(fileUrl);
+  const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!dir) throw new Error('File storage is unavailable on this device.');
+
+  const safeName = displayName.replace(/[^\w.\-() ]+/g, '_');
+  const target = `${dir}${safeName}`;
+  const baseURL = String(apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
+  const authHeader = apiClient.defaults.headers.common.Authorization;
+  const mimeType = attachmentMimeType(displayName);
+
+  const result = await FileSystem.downloadAsync(`${baseURL}${path}`, target, {
+    headers: authHeader ? { Authorization: String(authHeader) } : undefined,
+  });
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error('Could not download attachment');
+  }
+
+  if (Platform.OS === 'android') {
+    const contentUri = await FileSystem.getContentUriAsync(result.uri);
+    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      data: contentUri,
+      flags: 1,
+      type: mimeType,
+    });
+  } else {
+    const canOpen = await Linking.canOpenURL(result.uri);
+    if (!canOpen) {
+      throw new Error('No app available to open this file.');
+    }
+    await Linking.openURL(result.uri);
+  }
+
+  return result.uri;
 }
 
 export async function listConversations(params?: { episodeId?: string; type?: string }) {

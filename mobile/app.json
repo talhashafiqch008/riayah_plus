@@ -12,14 +12,22 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.raiyahplus.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Riayah Plus uses your location only when you check in or out of a visit, to confirm you are at the patient's address."
+        "NSLocationWhenInUseUsageDescription": "Riayah Plus uses your location only when you check in or out of a visit, to confirm you are at the patient's address.",
+        "NSCameraUsageDescription": "Riayah Plus needs camera access for telehealth video visits.",
+        "NSMicrophoneUsageDescription": "Riayah Plus needs microphone access for telehealth video visits."
       }
     },
     "android": {
       "package": "com.raiyahplus.app",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PROJECTION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#0D9488",
@@ -34,6 +42,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
       "expo-secure-store",
       [
@@ -49,7 +58,14 @@
           "color": "#0D9488"
         }
       ],
-      "expo-camera",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Riayah Plus needs camera access for telehealth video visits.",
+          "microphonePermission": "Riayah Plus needs microphone access for telehealth video visits.",
+          "recordAudioAndroid": true
+        }
+      ],
       "expo-local-authentication",
       [
         "expo-splash-screen",
@@ -62,7 +78,17 @@
             "backgroundColor": "#1C1917"
           }
         }
-      ]
+      ],
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication",
+            "enableScreenShareService": true
+          }
+        }
+      ],
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "reactCompiler": true

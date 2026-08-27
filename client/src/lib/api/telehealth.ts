@@ -19,6 +19,21 @@ export function isTelehealthConsentRequired(error: unknown): boolean {
   return (details as { code?: string }).code === 'telehealth_consent_required';
 }
 
+export function isTelehealthPaymentRequired(error: unknown): boolean {
+  if (!isApiError(error) || error.statusCode !== 403) return false;
+  const details = error.details;
+  if (!details || typeof details !== 'object') return false;
+  return (details as { code?: string }).code === 'telehealth_payment_required';
+}
+
+export function telehealthPaymentInvoiceId(error: unknown): string | null {
+  if (!isTelehealthPaymentRequired(error) || !isApiError(error)) return null;
+  const details = error.details;
+  if (!details || typeof details !== 'object') return null;
+  const id = (details as { invoiceId?: unknown }).invoiceId;
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
 export function isLiveKitUrlReady(url?: string | null): boolean {
   if (!url) return false;
   const trimmed = url.trim();

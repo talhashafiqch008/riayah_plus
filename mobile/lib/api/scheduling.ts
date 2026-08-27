@@ -86,6 +86,55 @@ export async function bookSession(payload: {
   return (data.session ?? data.data ?? data) as CareSession;
 }
 
+export type OpenSlot = { start: string; end: string; status?: 'available' | 'booked' | 'past' };
+
+export async function getFamilyAssignedClinician(episodeId: string) {
+  const { data } = await apiClient.get('/api/scheduling/family/clinician', {
+    params: { episodeId },
+  });
+  return data as {
+    episodeId: string;
+    clinician: ScheduleStaffOption | null;
+    message?: string;
+  };
+}
+
+export async function listFamilyOpenSlots(params: {
+  episodeId: string;
+  date: string;
+  durationMinutes?: number;
+}) {
+  const { data } = await apiClient.get('/api/scheduling/family/open-slots', { params });
+  return data as {
+    episodeId: string;
+    date: string;
+    durationMinutes: number;
+    clinician: ScheduleStaffOption;
+    timezone?: string;
+    hasAvailability: boolean;
+    windows: { dayOfWeek: number; startTime: string; endTime: string }[];
+    slots: OpenSlot[];
+    openSlots?: OpenSlot[];
+    message?: string;
+  };
+}
+
+/** Family self-book — clinician is server-resolved (coordinator-assigned). */
+export async function bookFamilySession(payload: {
+  episodeId: string;
+  scheduledAt: string;
+  durationMinutes?: number;
+  type?: 'telehealth' | 'in_person' | 'home_visit';
+  notes?: string;
+}) {
+  const { data } = await apiClient.post('/api/scheduling/family/sessions', payload);
+  return data as {
+    session: CareSession;
+    clinician: ScheduleStaffOption;
+    invoice?: { created?: boolean; invoiceId?: string };
+  };
+}
+
 export async function bookRecurringSessions(payload: {
   episodeId: string;
   providerId: string;

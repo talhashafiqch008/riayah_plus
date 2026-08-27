@@ -15,6 +15,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
+import com.oney.WebRTCModule.WebRTCModuleOptions
 
 class MainApplication : Application(), ReactApplication {
 
@@ -47,6 +48,9 @@ class MainApplication : Application(), ReactApplication {
     }
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+    // Force-enable LiveKit media-projection FGS (Android 14+ screen share).
+    // Expo meta-data "true" can be read as a string, so getBoolean() may miss it.
+    WebRTCModuleOptions.getInstance().enableMediaProjectionService = true
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {

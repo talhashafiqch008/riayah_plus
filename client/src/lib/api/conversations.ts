@@ -70,8 +70,20 @@ export function conversationTypeLabel(type: string): string {
 }
 
 export function attachmentFileName(fileUrl: string): string | null {
-  const part = fileUrl.split('/').pop();
-  return part || null;
+  const trimmed = fileUrl.trim();
+  if (!trimmed) return null;
+  // Stored as S3/local key: chat/{conversationId}/{uuid}-{name}
+  if (trimmed.startsWith('chat/')) {
+    return trimmed.split('/').pop() ?? null;
+  }
+  try {
+    const url = new URL(trimmed);
+    const part = url.pathname.split('/').pop();
+    return part ? decodeURIComponent(part) : null;
+  } catch {
+    const part = trimmed.split('/').pop();
+    return part ? decodeURIComponent(part) : null;
+  }
 }
 
 export function attachmentDisplayName(fileUrl: string): string {

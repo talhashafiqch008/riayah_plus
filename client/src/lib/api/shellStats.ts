@@ -4,6 +4,7 @@ import { getDocumentsStatistics } from './documents';
 import { listEpisodes } from './episodes';
 import { listIntakeQueue } from './intake';
 import { getUnreadNotificationCount } from './notifications';
+import { listSessions } from './scheduling';
 import { client } from './client';
 
 export type ShellStat = { label: string; value: string };
@@ -90,9 +91,13 @@ async function fetchFamilyStats(): Promise<ShellStat[]> {
       return res.total ?? 0;
     }),
     safeCount(async () => {
-      const res = await listAssessments({ status: 'scheduled', limit: 50 });
+      const sessions = await listSessions();
       const now = Date.now();
-      return (res.data ?? []).filter((a) => new Date(a.scheduledAt).getTime() >= now).length;
+      return sessions.filter(
+        (s) =>
+          ['pending', 'accepted', 'in_progress'].includes(s.status) &&
+          new Date(s.scheduledAt).getTime() >= now,
+      ).length;
     }),
     safeCount(async () => {
       const count = await getUnreadNotificationCount();
@@ -102,7 +107,7 @@ async function fetchFamilyStats(): Promise<ShellStat[]> {
 
   return [
     { label: 'Active care journeys', value: String(activeEpisodes) },
-    { label: 'Upcoming appointments', value: String(upcomingVisits) },
+    { label: 'Upcoming sessions', value: String(upcomingVisits) },
     { label: 'Unread alerts', value: String(unread) },
   ];
 }

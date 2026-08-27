@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
@@ -117,16 +118,65 @@ export class ChatMessageService {
   }
 
   static async attachmentPath(conversationId: string, actorId: string, fileName: string) {
+    const resolved = await this.resolveAttachmentForDownload(conversationId, actorId, fileName);
+    if (resolved.source !== 'local') {
+      throw new AppError('Attachment not found.', 404);
+    }
+    return { full: resolved.full, fileName: resolved.fileName, key: resolved.key };
+  }
+
+  static async resolveAttachmentForDownload(
+    conversationId: string,
+    actorId: string,
+    fileName: string,
+  ): Promise<
+    | {
+        source: 'local';
+        full: string;
+        fileName: string;
+        key: string;
+      }
+    | {
+        source: 's3';
+        body: Readable;
+        fileName: string;
+        key: string;
+        contentType?: string;
+        contentLength?: number;
+      }
+  > {
     await ConversationService.requireParticipant(conversationId, actorId);
-    const key = `chat/${conversationId}/${fileName}`;
+    const decodedName = decodeURIComponent(fileName);
+    const key = `chat/${conversationId}/${decodedName}`;
     if (!isChatAttachmentKey(conversationId, key)) {
       throw new AppError('Invalid attachment.', 400);
     }
+
+    if (s3 && s3Configured) {
+      try {
+        const obj = await s3.send(
+          new GetObjectCommand({ Bucket: env.AWS_BUCKET, Key: key }),
+        );
+        if (!obj.Body) throw new AppError('Attachment not found.', 404);
+        return {
+          source: 's3',
+          body: obj.Body as Readable,
+          fileName: decodedName,
+          key,
+          contentType: obj.ContentType,
+          contentLength: obj.ContentLength,
+        };
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw new AppError('Attachment not found.', 404);
+      }
+    }
+
     const dir = path.join(LOCAL_CHAT_ROOT, conversationId);
-    const full = path.join(dir, fileName);
+    const full = path.join(dir, decodedName);
     if (!full.startsWith(dir + path.sep)) throw new AppError('Invalid attachment.', 400);
     if (!fs.existsSync(full)) throw new AppError('Attachment not found.', 404);
-    return { full, fileName, key };
+    return { source: 'local', full, fileName: decodedName, key };
   }
 
   private static async storeAttachment(conversationId: string, file: ChatUpload): Promise<string> {

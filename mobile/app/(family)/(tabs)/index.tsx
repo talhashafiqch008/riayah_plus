@@ -25,7 +25,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Avatar } from '../../../components/ui';
 import { apiClient } from '../../../lib/api/client';
-import { listAssessments, listEpisodes, type Assessment } from '../../../lib/api/care';
+import { listEpisodes } from '../../../lib/api/care';
+import { listSessions, type CareSession } from '../../../lib/api/scheduling';
 import { formatDateTime, greetingForNow } from '../../../lib/format';
 import { useAuthStore } from '../../../stores/authStore';
 
@@ -53,7 +54,7 @@ interface DashboardStats {
   activeEpisodes: number;
   upcomingAppointments: number;
   unreadAlerts: number;
-  nextAppointment: Assessment | null;
+  nextAppointment: CareSession | null;
 }
 
 async function fetchStats(): Promise<DashboardStats> {
@@ -68,11 +69,17 @@ async function fetchStats(): Promise<DashboardStats> {
     })(),
     (async () => {
       try {
-        const res = await listAssessments({ status: 'scheduled', limit: 50 });
+        const sessions = await listSessions();
         const now = Date.now();
-        const upcoming = (res.data ?? [])
-          .filter((a) => new Date(a.scheduledAt).getTime() >= now)
-          .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+        const upcoming = sessions
+          .filter(
+            (s) =>
+              ['pending', 'accepted', 'in_progress'].includes(s.status) &&
+              new Date(s.scheduledAt).getTime() >= now,
+          )
+          .sort(
+            (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+          );
         return { count: upcoming.length, next: upcoming[0] ?? null };
       } catch {
         return { count: 0, next: null };
@@ -417,7 +424,7 @@ export default function FamilyHomeScreen() {
                       Next visit
                     </Text>
                     <Text className="mt-0.5 text-[15px] font-semibold text-stone-900">
-                      {next.assessor?.name ?? next.type.replace(/_/g, ' ')}
+                      {next.provider?.name ?? next.type.replace(/_/g, ' ')}
                     </Text>
                     <Text className="mt-0.5 text-xs text-stone-400">{formatDateTime(next.scheduledAt)}</Text>
                   </View>

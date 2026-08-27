@@ -25,7 +25,17 @@ export type InvoiceLineItem = {
 };
 
 export type CompletionInvoiceResult =
-  | { created: false; reason: 'already_exists' | 'no_billable_amount' | 'not_completed'; invoiceId?: string }
+  | {
+      created: false;
+      reason:
+        | 'already_exists'
+        | 'no_billable_amount'
+        | 'not_completed'
+        | 'not_telehealth'
+        | 'telehealth_prepaid'
+        | 'cancelled';
+      invoiceId?: string;
+    }
   | { created: true; invoiceId: string; invoiceNumber: string; total: number; currency: string; status: string };
 
 function generateInvoiceNumber(): string {
@@ -154,9 +164,70 @@ async function persistInvoice(opts: {
 }
 
 /**
- * Auto-invoice after a care session is completed. Idempotent via Invoice.sessionId unique.
+ * Auto-invoice helpers. Telehealth is billed on book (pay-to-join);
+ * in-person / home visit still bill on completion. Idempotent via Invoice.sessionId unique.
  */
 export class InvoiceService {
+  /**
+   * Create a payable invoice when a telehealth session is booked.
+   * Uses scheduled duration (not check-in/out). Idempotent.
+   */
+  static async createFromTelehealthBooking(
+    sessionId: string,
+    actorUserId?: string,
+  ): Promise<CompletionInvoiceResult> {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        invoice: { select: { id: true } },
+        episode: { select: { id: true, patientId: true, careUnit: { select: { familyUserId: true } } } },
+      },
+    });
+    if (!session) throw new AppError('Session not found.', 404);
+
+    if (session.type !== 'telehealth') {
+      return { created: false, reason: 'not_telehealth' };
+    }
+    if (session.status === 'cancelled') {
+      return { created: false, reason: 'cancelled' };
+    }
+    if (session.invoice) {
+      return { created: false, reason: 'already_exists', invoiceId: session.invoice.id };
+    }
+
+    const serviceCode = SESSION_TYPE_SERVICE.telehealth;
+    const catalog = await resolveCatalogService(serviceCode);
+    const unitPrice = catalog ? Number(catalog.baseRate) : 0;
+    if (!(unitPrice > 0)) {
+      logger.warn('Telehealth booking invoice skipped — no catalog rate', { sessionId, serviceCode });
+      return { created: false, reason: 'no_billable_amount' };
+    }
+
+    const hours = billableHours({ durationMinutes: session.durationMinutes });
+    const label = catalog?.name ?? serviceCode;
+    const clientId =
+      session.episode?.careUnit?.familyUserId ?? session.episode?.patientId ?? session.clientId;
+
+    return persistInvoice({
+      clientId,
+      episodeId: session.episodeId,
+      sessionId: session.id,
+      lineItems: [
+        {
+          description: `Telehealth session — ${label} (${hours}h)`,
+          quantity: hours,
+          unitPrice,
+          serviceType: serviceCode,
+          category: catalog?.category ?? 'medical',
+        },
+      ],
+      notes: `Auto-generated on telehealth booking. sessionId=${session.id}. Pay before joining the video room.`,
+      alreadyPaid: false,
+      actorUserId,
+      notify: true,
+    });
+  }
+
   static async createFromSessionCompletion(
     sessionId: string,
     actorUserId?: string,
@@ -169,6 +240,15 @@ export class InvoiceService {
       },
     });
     if (!session) throw new AppError('Session not found.', 404);
+
+    // Telehealth is prepaid at booking — never double-bill on complete.
+    if (session.type === 'telehealth') {
+      return {
+        created: false,
+        reason: 'telehealth_prepaid',
+        invoiceId: session.invoice?.id,
+      };
+    }
 
     if (session.status !== 'completed') {
       return { created: false, reason: 'not_completed' };
@@ -192,8 +272,7 @@ export class InvoiceService {
     });
 
     const label = catalog?.name ?? serviceCode;
-    const typeLabel =
-      session.type === 'telehealth' ? 'Telehealth' : session.type === 'home_visit' ? 'Home visit' : 'In-person';
+    const typeLabel = session.type === 'home_visit' ? 'Home visit' : 'In-person';
 
     const clientId =
       session.episode?.careUnit?.familyUserId ?? session.episode?.patientId ?? session.clientId;
@@ -293,6 +372,22 @@ export class InvoiceService {
       return await this.createFromSessionCompletion(sessionId, actorUserId);
     } catch (err) {
       logger.error('Session invoice generation failed', {
+        sessionId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Never throw — used from book hooks so scheduling cannot break. */
+  static async tryFromTelehealthBooking(
+    sessionId: string,
+    actorUserId?: string,
+  ): Promise<CompletionInvoiceResult | null> {
+    try {
+      return await this.createFromTelehealthBooking(sessionId, actorUserId);
+    } catch (err) {
+      logger.error('Telehealth booking invoice generation failed', {
         sessionId,
         message: err instanceof Error ? err.message : String(err),
       });

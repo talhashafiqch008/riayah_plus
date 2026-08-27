@@ -1,30 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from 'react-native-toast-notifications';
 import { Button } from '../../../components/ui';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
-import { LiveKitRoomWebView } from '../../../components/telehealth/LiveKitRoomWebView';
+import { TelehealthVideoRoom } from '../../../components/telehealth/TelehealthVideoRoom';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { getSession, type CareSession } from '../../../lib/api/scheduling';
 import {
   grantTelehealthConsent,
   isLiveKitUrlReady,
   isTelehealthConsentRequired,
+  isTelehealthPaymentRequired,
   joinTelehealthRoom,
   sessionJoinRoomName,
+  telehealthPaymentInvoiceId,
   type TelehealthJoin,
 } from '../../../lib/api/telehealth';
 
 export default function FamilyTelehealthJoinScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const sessionId = String(id ?? '');
+  const router = useRouter();
   const toast = useToast();
   const [session, setSession] = useState<CareSession | null>(null);
   const [join, setJoin] = useState<TelehealthJoin | null>(null);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [needsPayment, setNeedsPayment] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -36,11 +41,23 @@ export default function FamilyTelehealthJoinScreen() {
         const next = await joinTelehealthRoom(roomName);
         setJoin(next);
         setNeedsConsent(false);
+        setNeedsPayment(false);
+        setPaymentInvoiceId(null);
         setError(null);
         return next;
       } catch (err: unknown) {
+        if (isTelehealthPaymentRequired(err)) {
+          setNeedsPayment(true);
+          setPaymentInvoiceId(telehealthPaymentInvoiceId(err));
+          setNeedsConsent(false);
+          setJoin(null);
+          setError(apiErrorMessage(err, 'Payment required before joining'));
+          return null;
+        }
         if (isTelehealthConsentRequired(err)) {
           setNeedsConsent(true);
+          setNeedsPayment(false);
+          setPaymentInvoiceId(null);
           setJoin(null);
           return null;
         }
@@ -70,13 +87,13 @@ export default function FamilyTelehealthJoinScreen() {
   }, [load]);
 
   useEffect(() => {
-    if (needsConsent || join?.phase !== 'waiting' || !session) return undefined;
+    if (needsConsent || needsPayment || join?.phase !== 'waiting' || !session) return undefined;
     const roomName = sessionJoinRoomName(session);
     const timer = setInterval(() => {
       void requestJoin(roomName).catch(() => undefined);
     }, 5000);
     return () => clearInterval(timer);
-  }, [join?.phase, needsConsent, requestJoin, session]);
+  }, [join?.phase, needsConsent, needsPayment, requestJoin, session]);
 
   async function onGrantConsent() {
     if (!agreed || !session) return;
@@ -99,7 +116,7 @@ export default function FamilyTelehealthJoinScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#1c1917' }} edges={['top']}>
         <FamilyTabHero title="Video visit" subtitle="In call" showBack />
-        <LiveKitRoomWebView
+        <TelehealthVideoRoom
           token={join.token}
           serverUrl={join.serverUrl}
           onDisconnected={() => setJoin(null)}
@@ -124,7 +141,28 @@ export default function FamilyTelehealthJoinScreen() {
             </Text>
           ) : null}
 
-          {needsConsent ? (
+          {needsPayment ? (
+            <View className="rounded-2xl border border-stone-200 bg-white p-4">
+              <Text className="text-base font-semibold text-stone-900">Payment required</Text>
+              <Text className="mt-2 text-sm leading-5 text-stone-600">
+                Pay the session invoice before you can join this video visit. After paying, return
+                here and try again.
+              </Text>
+              {error ? <Text className="mt-2 text-sm text-rose-700">{error}</Text> : null}
+              <View className="mt-4 gap-3">
+                {paymentInvoiceId ? (
+                  <Button
+                    onPress={() => router.push(`/(family)/invoices/${paymentInvoiceId}`)}
+                  >
+                    Pay invoice
+                  </Button>
+                ) : null}
+                <Button variant="secondary" onPress={() => void load()}>
+                  I've paid — try again
+                </Button>
+              </View>
+            </View>
+          ) : needsConsent ? (
             <View className="rounded-2xl border border-stone-200 bg-white p-4">
               <Text className="text-base font-semibold text-stone-900">Consent required</Text>
               <Text className="mt-2 text-sm leading-5 text-stone-600">

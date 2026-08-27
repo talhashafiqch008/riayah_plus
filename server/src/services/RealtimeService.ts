@@ -1,4 +1,5 @@
 import { Server as SocketIOServer } from 'socket.io';
+import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { assertUserActive, verifyAccessToken, wasLoggedOutAll } from '../middleware/auth';
 import { ConversationService } from './ConversationService';
@@ -21,14 +22,36 @@ export function emitNotification(userId: string, payload: unknown): void {
   realtimeIo?.to(notificationUserRoom(userId)).emit('notification', payload);
 }
 
-export function emitNewMessage(
+export async function emitNewMessage(
   io: SocketIOServer | undefined,
-  message: { receiverId?: string | null; conversationId?: string | null },
-): void {
-  if (!io) return;
-  if (message.receiverId) io.to(chatUserRoom(message.receiverId)).emit('new_message', message);
-  if (message.conversationId) {
-    io.to(conversationRoom(message.conversationId)).emit('new_message', message);
+  message: {
+    id?: string;
+    receiverId?: string | null;
+    senderId?: string | null;
+    conversationId?: string | null;
+  },
+): Promise<void> {
+  const bus = io ?? realtimeIo;
+  if (!bus) return;
+
+  // Plain JSON so Socket.IO clients always get serializable fields (Prisma dates, etc.)
+  const payload = JSON.parse(JSON.stringify(message)) as typeof message;
+
+  const userIds = new Set<string>();
+  if (payload.receiverId) userIds.add(payload.receiverId);
+  if (payload.senderId) userIds.add(payload.senderId);
+
+  if (payload.conversationId) {
+    bus.to(conversationRoom(payload.conversationId)).emit('new_message', payload);
+    const links = await prisma.conversationParticipant.findMany({
+      where: { conversationId: payload.conversationId },
+      select: { userId: true },
+    });
+    for (const link of links) userIds.add(link.userId);
+  }
+
+  for (const userId of userIds) {
+    bus.to(chatUserRoom(userId)).emit('new_message', payload);
   }
 }
 

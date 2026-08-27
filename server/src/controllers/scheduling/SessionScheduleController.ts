@@ -68,17 +68,14 @@ async function loadEpisodeForSchedule(req: Request, episodeId: string) {
       coordinatorId: true,
       title: true,
       status: true,
+      careUnitId: true,
+      careUnit: { select: { familyUserId: true } },
     },
   });
   if (!episode) throw new AppError('Care episode not found.', 404);
 
-  if (FAMILY_ROLES.includes(req.user!.role)) {
-    if (episode.patientId !== req.user!.userId) {
-      throw new AppError('Forbidden.', 403);
-    }
-  } else {
-    assertTenantOrgAccess(req, episode.organizationId);
-  }
+  const { assertEpisodeAccess } = await import('../../utils/careAccess');
+  await assertEpisodeAccess(req, episode);
   return episode;
 }
 
@@ -187,7 +184,13 @@ export class SessionScheduleController {
     } else if (['support_worker', 'clinical_staff', 'doctor', 'nurse', 'physiotherapist', 'therapist', 'caregiver'].includes(req.user!.role)) {
       where.providerId = req.user!.userId;
     } else if (FAMILY_ROLES.includes(req.user!.role)) {
-      where.clientId = req.user!.userId;
+      // Family may be care-unit account holder; sessions use episode.patientId as clientId
+      where.episode = {
+        OR: [
+          { careUnit: { familyUserId: req.user!.userId } },
+          { patientId: req.user!.userId },
+        ],
+      };
     } else {
       // coordinator/admin: scope via episodes in org — never return unscoped sessions
       const orgId = req.tenant?.organizationId;
@@ -299,6 +302,11 @@ export class SessionScheduleController {
 
     const telehealth = await TelehealthRoomService.provisionForSession(session.id);
 
+    let invoice = null;
+    if (session.type === 'telehealth') {
+      invoice = await InvoiceService.tryFromTelehealthBooking(session.id, req.user!.userId);
+    }
+
     await AuditService.log({
       userId: req.user!.userId,
       action: 'session_booked',
@@ -314,6 +322,7 @@ export class SessionScheduleController {
         livekitRoomId: telehealth.roomName ?? session.livekitRoomId,
       },
       telehealth,
+      invoice: invoice ?? undefined,
     });
   }
 
@@ -364,6 +373,7 @@ export class SessionScheduleController {
       created.push(session);
       if (type === 'telehealth') {
         await TelehealthRoomService.provisionForSession(session.id);
+        await InvoiceService.tryFromTelehealthBooking(session.id, req.user!.userId);
       }
     }
 
@@ -455,11 +465,17 @@ export class SessionScheduleController {
     }
 
     let telehealth;
+    let bookingInvoice;
     if (session.type === 'telehealth' && ['accepted', 'in_progress'].includes(session.status)) {
       telehealth = await TelehealthRoomService.provisionForSession(session.id);
+      bookingInvoice = await InvoiceService.tryFromTelehealthBooking(session.id, req.user!.userId);
     }
 
-    res.json({ session: { ...session, livekitRoomId: telehealth?.roomName ?? session.livekitRoomId }, invoice: invoice ?? undefined, telehealth });
+    res.json({
+      session: { ...session, livekitRoomId: telehealth?.roomName ?? session.livekitRoomId },
+      invoice: invoice ?? bookingInvoice ?? undefined,
+      telehealth,
+    });
   }
 
   /** DELETE /scheduling/sessions/:id — cancel */

@@ -10,6 +10,7 @@ import { TelehealthRoomService } from '../../services/TelehealthRoomService';
 import { TelehealthContextService } from '../../services/TelehealthContextService';
 import { TelehealthNoteService } from '../../services/TelehealthNoteService';
 import { TelehealthConsentService } from '../../services/TelehealthConsentService';
+import { TelehealthPaymentService } from '../../services/TelehealthPaymentService';
 import { TelehealthRecordingService } from '../../services/TelehealthRecordingService';
 import { sanitizedString } from '../../utils/sanitize';
 import {
@@ -51,6 +52,7 @@ export class TelehealthController {
     const session = await loadSessionForRoom(roomName);
     if (session) {
       assertCanJoinSession(session, actor);
+      await TelehealthPaymentService.assertSessionPaid(session, actor);
       await TelehealthConsentService.assertJoinConsent(actor);
       const join = await TelehealthRoomService.prepareSessionJoin(session, actor);
       const token = await issueLiveKitJoinToken({

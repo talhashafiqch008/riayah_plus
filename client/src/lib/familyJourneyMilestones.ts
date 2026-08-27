@@ -29,11 +29,9 @@ function episodeProgressRank(status: string): number {
 /** Family-facing care journey milestones (R5). */
 export function buildFamilyJourneyMilestones(episode: CareEpisode): FamilyMilestone[] {
   const rank = episodeProgressRank(episode.status);
-  const assessments = episode.assessments ?? [];
-  const consultationBooked = assessments.some(
-    (a) => a.status === 'scheduled' || a.status === 'completed' || a.status === 'no_show',
-  );
-  const consultationCompleted = assessments.some((a) => a.status === 'completed');
+  const sessions = episode.sessions ?? [];
+  const sessionBooked = sessions.some((s) => s.status !== 'cancelled');
+  const sessionCompleted = sessions.some((s) => s.status === 'completed');
 
   const raw: Omit<FamilyMilestone, 'current'>[] = [
     {
@@ -56,15 +54,15 @@ export function buildFamilyJourneyMilestones(episode: CareEpisode): FamilyMilest
     },
     {
       id: 'booked',
-      label: 'Consultation booked',
-      description: 'A consultation has been scheduled.',
-      done: consultationBooked,
+      label: 'Session booked',
+      description: 'A care session has been scheduled.',
+      done: sessionBooked,
     },
     {
       id: 'completed',
-      label: 'Consultation completed',
-      description: 'Your clinician has finished the consultation.',
-      done: consultationCompleted,
+      label: 'Session completed',
+      description: 'Your clinician has finished a care session.',
+      done: sessionCompleted,
     },
     {
       id: 'careplan',
