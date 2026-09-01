@@ -1,8 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
@@ -12,23 +10,14 @@ import {
   UPLOAD_MAX_BYTES,
 } from '../utils/uploadAllowlist';
 import { sanitizePlainText } from '../utils/sanitize';
+import {
+  assertPhiS3UploadConfigured,
+  createPhiS3Client,
+  isPhiS3Configured,
+  putPhiObject,
+} from '../utils/phiS3';
 import { ConversationService } from './ConversationService';
 import { chatMessageType, isChatAttachmentKey, unreadMessageWhere } from './chatMessageRules';
-
-const LOCAL_CHAT_ROOT = path.join(process.cwd(), 'uploads', 'chat');
-
-const s3Configured = Boolean(
-  env.AWS_ACCESS_KEY_ID?.trim() && env.AWS_SECRET_ACCESS_KEY?.trim() && env.AWS_BUCKET?.trim(),
-);
-const s3 = s3Configured
-  ? new S3Client({
-      region: env.AWS_DEFAULT_REGION,
-      credentials: {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      },
-    })
-  : null;
 
 export { chatMessageType, isChatAttachmentKey, unreadMessageWhere };
 
@@ -117,66 +106,43 @@ export class ChatMessageService {
     };
   }
 
-  static async attachmentPath(conversationId: string, actorId: string, fileName: string) {
-    const resolved = await this.resolveAttachmentForDownload(conversationId, actorId, fileName);
-    if (resolved.source !== 'local') {
-      throw new AppError('Attachment not found.', 404);
-    }
-    return { full: resolved.full, fileName: resolved.fileName, key: resolved.key };
-  }
-
   static async resolveAttachmentForDownload(
     conversationId: string,
     actorId: string,
     fileName: string,
-  ): Promise<
-    | {
-        source: 'local';
-        full: string;
-        fileName: string;
-        key: string;
-      }
-    | {
-        source: 's3';
-        body: Readable;
-        fileName: string;
-        key: string;
-        contentType?: string;
-        contentLength?: number;
-      }
-  > {
+  ): Promise<{
+    body: Readable;
+    fileName: string;
+    key: string;
+    contentType?: string;
+    contentLength?: number;
+  }> {
     await ConversationService.requireParticipant(conversationId, actorId);
+    if (!isPhiS3Configured()) {
+      throw new AppError('Chat attachment storage is not configured.', 503);
+    }
+
     const decodedName = decodeURIComponent(fileName);
     const key = `chat/${conversationId}/${decodedName}`;
     if (!isChatAttachmentKey(conversationId, key)) {
       throw new AppError('Invalid attachment.', 400);
     }
 
-    if (s3 && s3Configured) {
-      try {
-        const obj = await s3.send(
-          new GetObjectCommand({ Bucket: env.AWS_BUCKET, Key: key }),
-        );
-        if (!obj.Body) throw new AppError('Attachment not found.', 404);
-        return {
-          source: 's3',
-          body: obj.Body as Readable,
-          fileName: decodedName,
-          key,
-          contentType: obj.ContentType,
-          contentLength: obj.ContentLength,
-        };
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-        throw new AppError('Attachment not found.', 404);
-      }
+    const s3 = createPhiS3Client();
+    try {
+      const obj = await s3.send(new GetObjectCommand({ Bucket: env.AWS_BUCKET, Key: key }));
+      if (!obj.Body) throw new AppError('Attachment not found.', 404);
+      return {
+        body: obj.Body as Readable,
+        fileName: decodedName,
+        key,
+        contentType: obj.ContentType,
+        contentLength: obj.ContentLength,
+      };
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      throw new AppError('Attachment not found.', 404);
     }
-
-    const dir = path.join(LOCAL_CHAT_ROOT, conversationId);
-    const full = path.join(dir, decodedName);
-    if (!full.startsWith(dir + path.sep)) throw new AppError('Invalid attachment.', 400);
-    if (!fs.existsSync(full)) throw new AppError('Attachment not found.', 404);
-    return { source: 'local', full, fileName: decodedName, key };
   }
 
   private static async storeAttachment(conversationId: string, file: ChatUpload): Promise<string> {
@@ -189,28 +155,17 @@ export class ChatMessageService {
       throw new AppError(`File exceeds ${UPLOAD_MAX_BYTES} byte limit.`, 422);
     }
 
+    assertPhiS3UploadConfigured('Chat attachment storage');
+
     const safeName = sanitizeUploadFilename(file.originalname);
     const key = `chat/${conversationId}/${uuidv4()}-${safeName}`;
 
-    if (s3 && s3Configured) {
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: env.AWS_BUCKET,
-          Key: key,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-          ContentDisposition: 'attachment',
-        }),
-      );
-      return key;
-    }
-
-    const dir = path.join(LOCAL_CHAT_ROOT, conversationId);
-    fs.mkdirSync(dir, { recursive: true });
-    const fileName = key.slice(`chat/${conversationId}/`.length);
-    const full = path.join(dir, fileName);
-    if (!full.startsWith(dir + path.sep)) throw new AppError('Invalid file path.', 400);
-    fs.writeFileSync(full, file.buffer);
+    await putPhiObject('chat_attachment', {
+      key,
+      body: file.buffer,
+      contentType: file.mimetype,
+      contentDisposition: 'attachment',
+    });
     return key;
   }
 }

@@ -34,44 +34,69 @@ const session = {
   providerId: 'prov-1',
   clientId: 'fam-1',
   status: 'accepted',
-  episode: { coordinatorId: 'coord-1' },
+  episode: { coordinatorId: 'coord-1', organizationId: 'org-1' },
 };
 
 describe('canJoinSessionRoom', () => {
-  it('allows client, provider, episode coordinator, and admin', () => {
+  it('allows client, provider, and assigned episode coordinator', () => {
     expect(canJoinSessionRoom(session, { userId: 'fam-1', role: 'family' })).toBe(true);
     expect(canJoinSessionRoom(session, { userId: 'prov-1', role: 'clinical_staff' })).toBe(true);
     expect(canJoinSessionRoom(session, { userId: 'coord-1', role: 'care_coordinator' })).toBe(true);
-    expect(canJoinSessionRoom(session, { userId: 'admin-1', role: 'admin' })).toBe(true);
   });
 
-  it('rejects a stranger', () => {
+  it('allows org_admin in the same organization only', () => {
+    expect(
+      canJoinSessionRoom(session, {
+        userId: 'oa-1',
+        role: 'org_admin',
+        organizationId: 'org-1',
+      }),
+    ).toBe(true);
+    expect(
+      canJoinSessionRoom(session, {
+        userId: 'oa-2',
+        role: 'org_admin',
+        organizationId: 'other-org',
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects platform admin and strangers without a care relationship', () => {
+    expect(canJoinSessionRoom(session, { userId: 'admin-1', role: 'admin' })).toBe(false);
     expect(canJoinSessionRoom(session, { userId: 'other', role: 'family' })).toBe(false);
     expect(canJoinSessionRoom(session, { userId: 'other', role: 'clinical_staff' })).toBe(false);
+    expect(canJoinSessionRoom(session, { userId: 'coord-2', role: 'care_coordinator' })).toBe(false);
   });
 });
 
 describe('canCreateSessionRoom', () => {
-  it('allows the assigned provider, coordinator, and admin', () => {
+  it('allows the assigned provider and coordinator only', () => {
     expect(canCreateSessionRoom(session, { userId: 'prov-1', role: 'clinical_staff' })).toBe(true);
     expect(canCreateSessionRoom(session, { userId: 'coord-1', role: 'care_coordinator' })).toBe(true);
-    expect(canCreateSessionRoom(session, { userId: 'admin-1', role: 'admin' })).toBe(true);
   });
 
-  it('rejects family and other coordinators', () => {
+  it('rejects family, other coordinators, org_admin, and platform admin', () => {
     expect(canCreateSessionRoom(session, { userId: 'fam-1', role: 'family' })).toBe(false);
     expect(canCreateSessionRoom(session, { userId: 'coord-2', role: 'care_coordinator' })).toBe(false);
+    expect(
+      canCreateSessionRoom(session, {
+        userId: 'oa-1',
+        role: 'org_admin',
+        organizationId: 'org-1',
+      }),
+    ).toBe(false);
+    expect(canCreateSessionRoom(session, { userId: 'admin-1', role: 'admin' })).toBe(false);
   });
 });
 
 describe('meeting join guards', () => {
   const meeting = { hostId: 'host-1', participantId: 'fam-1', status: 'scheduled' };
 
-  it('allows host, participant, and admin', () => {
+  it('allows host and participant only', () => {
     expect(canJoinMeeting(meeting, { userId: 'host-1', role: 'clinical_staff' })).toBe(true);
     expect(canJoinMeeting(meeting, { userId: 'fam-1', role: 'family' })).toBe(true);
-    expect(canJoinMeeting(meeting, { userId: 'admin-1', role: 'admin' })).toBe(true);
     expect(canJoinMeeting(meeting, { userId: 'other', role: 'family' })).toBe(false);
+    expect(canJoinMeeting(meeting, { userId: 'admin-1', role: 'admin' })).toBe(false);
   });
 
   it('blocks ended or cancelled meetings', () => {

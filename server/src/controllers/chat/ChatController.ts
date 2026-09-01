@@ -121,21 +121,19 @@ export class ChatController {
     );
     const downloadName = attachment.fileName.replace(/^.*?-/, '');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
-    if (attachment.source === 's3') {
-      if (attachment.contentType) res.setHeader('Content-Type', attachment.contentType);
-      if (attachment.contentLength != null) {
-        res.setHeader('Content-Length', String(attachment.contentLength));
-      }
-      attachment.body.pipe(res);
-      return;
+    if (attachment.contentType) res.setHeader('Content-Type', attachment.contentType);
+    if (attachment.contentLength != null) {
+      res.setHeader('Content-Length', String(attachment.contentLength));
     }
-    res.sendFile(attachment.full);
+    attachment.body.pipe(res);
   }
 
   static async editMessage(req: Request, res: Response): Promise<void> {
     const { content } = z.object({ content: z.string() }).parse(req.body);
     const message = await prisma.message.findUnique({ where: { id: req.params.id } });
     if (!message) throw new AppError('Message not found.', 404);
+    if (!message.conversationId) throw new AppError('Message is not part of a conversation.', 400);
+    await ConversationService.requireParticipant(message.conversationId, req.user!.userId);
     if (message.senderId !== req.user!.userId) throw new AppError('Forbidden.', 403);
 
     const updated = await prisma.message.update({
@@ -148,6 +146,8 @@ export class ChatController {
   static async deleteMessage(req: Request, res: Response): Promise<void> {
     const message = await prisma.message.findUnique({ where: { id: req.params.id } });
     if (!message) throw new AppError('Message not found.', 404);
+    if (!message.conversationId) throw new AppError('Message is not part of a conversation.', 400);
+    await ConversationService.requireParticipant(message.conversationId, req.user!.userId);
     if (message.senderId !== req.user!.userId) throw new AppError('Forbidden.', 403);
 
     await prisma.message.update({ where: { id: message.id }, data: { deletedAt: new Date() } });

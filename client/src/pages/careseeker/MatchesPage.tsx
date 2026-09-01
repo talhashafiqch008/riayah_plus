@@ -12,7 +12,6 @@ import MatchFilters, { FilterValues } from '../../components/MatchFilters';
 import { matchingAPI } from '../../lib/api/matching';
 import { MatchResult } from '../../lib/matching-engine';
 import { useAuth } from '../../contexts/AuthContext';
-import { STORAGE_KEYS } from '../../lib/storage-keys';
 
 
 
@@ -101,13 +100,10 @@ export default function MatchesPage() {
   setError(null);
 
   try {
-  const userStr = localStorage.getItem(STORAGE_KEYS.user);
-  if (!userStr) {
+  if (!user) {
   navigate('/careseeker/login');
   return;
   }
-
-  const user = JSON.parse(userStr);
 
   const location = userLocation || { latitude: 25.2854, longitude: 51.5310 };
 

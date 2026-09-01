@@ -6,6 +6,10 @@ import { AppError } from '../middleware/errorHandler';
 import { logger } from '../config/logger';
 import { AuditService } from './AuditService';
 import { notifyBillingEvent } from './BillingNotificationService';
+import {
+  acquirePaytabsTranRefLock,
+  releasePaytabsTranRefLock,
+} from '../utils/paytabsWebhookLock';
 
 interface PaymentInitOptions {
   invoiceId: string;
@@ -28,6 +32,21 @@ function isPublicHttpsUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function assertPaytabsCallbackIncluded(callbackUrl: string): boolean {
+  if (isPublicHttpsUrl(callbackUrl)) return true;
+  logger.warn('PayTabs callback URL omitted — not a public HTTPS endpoint', {
+    callbackUrl,
+    hint: 'Set BACKEND_URL to a public https:// API URL for IPN webhooks',
+  });
+  if (env.isProd) {
+    throw new AppError(
+      'PayTabs callback URL must be a public HTTPS endpoint in production. Configure BACKEND_URL.',
+      503,
+    );
+  }
+  return false;
 }
 
 export function paytabsQueryUrl(requestUrl: string): string {
@@ -54,6 +73,7 @@ export class QatariPaymentService {
     }
 
     try {
+      const includeCallback = assertPaytabsCallbackIncluded(opts.callbackUrl);
       const payload = {
         profile_id: Number(env.PAYTABS_PROFILE_ID) || env.PAYTABS_PROFILE_ID,
         tran_type: 'sale',
@@ -63,7 +83,7 @@ export class QatariPaymentService {
         cart_amount: opts.amount,
         cart_description: opts.description ?? `Invoice payment - ${opts.invoiceId}`,
         return: opts.returnUrl,
-        ...(isPublicHttpsUrl(opts.callbackUrl) ? { callback: opts.callbackUrl } : {}),
+        ...(includeCallback ? { callback: opts.callbackUrl } : {}),
         customer_details: {
           name: opts.customerName,
           email: opts.customerEmail,
@@ -105,26 +125,16 @@ export class QatariPaymentService {
   }
 
   /**
-   * Validate PayTabs webhook authenticity.
-   * Accepts:
-   * - Authorization header matching PAYTABS_SERVER_KEY, or
-   * - signature / x-paytabs-signature HMAC-SHA256 of raw body with PAYTABS_WEBHOOK_SECRET / server key
-   *
-   * Sandbox IPN often has neither. Callers then verify via queryTransaction().
+   * Validate PayTabs webhook authenticity via HMAC only (H6).
+   * PAYTABS_SERVER_KEY must not authenticate webhooks — use PAYTABS_WEBHOOK_SECRET.
    */
   static hasWebhookSignature(
     headers: Record<string, string | string[] | undefined>,
     rawBody: string | Buffer | undefined,
     payload: Record<string, unknown>,
   ): boolean {
-    const serverKey = env.PAYTABS_SERVER_KEY?.trim();
-    const webhookSecret = env.PAYTABS_WEBHOOK_SECRET?.trim() || serverKey;
-    if (!serverKey && !webhookSecret) return false;
-
-    const authHeader = String(headers.authorization ?? headers.Authorization ?? '').trim();
-    if (serverKey && authHeader && authHeader === serverKey) {
-      return true;
-    }
+    const webhookSecret = env.PAYTABS_WEBHOOK_SECRET?.trim();
+    if (!webhookSecret) return false;
 
     const providedSig = String(
       headers['x-paytabs-signature'] ??
@@ -213,16 +223,16 @@ export class QatariPaymentService {
     const status = paymentResult?.response_status;
 
     if (status === 'A') {
-      await this.handleWebhook(
-        {
-          ...payload,
-          tran_ref: String(payload.tran_ref ?? pending.gatewayRef),
-          cart_id: String(payload.cart_id ?? invoiceId),
-          payment_result: paymentResult,
+      await this.fulfillPaytabsPayment({
+        tran_ref: String(payload.tran_ref ?? pending.gatewayRef),
+        cart_id: String(payload.cart_id ?? invoiceId),
+        payment_result: {
+          response_status: paymentResult?.response_status ?? 'A',
         },
-        { authorization: env.PAYTABS_SERVER_KEY },
-        JSON.stringify(payload),
-      );
+        cart_amount: payload.cart_amount as number | string | undefined,
+        cart_currency: payload.cart_currency as string | undefined,
+        payload,
+      });
       return { paid: true };
     }
 
@@ -245,26 +255,16 @@ export class QatariPaymentService {
     headers: Record<string, string | string[] | undefined> = {},
     rawBody?: string | Buffer,
   ) {
-    if (!env.PAYTABS_SERVER_KEY?.trim() && !env.PAYTABS_WEBHOOK_SECRET?.trim()) {
-      throw new AppError('PayTabs webhook is not configured.', 503);
+    if (!env.PAYTABS_WEBHOOK_SECRET?.trim()) {
+      throw new AppError('PayTabs webhook secret is not configured.', 503);
     }
 
     const signed = this.hasWebhookSignature(headers, rawBody, payload);
     if (!signed) {
-      const notifyRef = String(payload.tran_ref ?? '').trim();
-      if (!notifyRef) {
-        logger.warn('PayTabs webhook authentication failed (no signature, no tran_ref)');
-        throw new AppError('Invalid PayTabs webhook signature.', 401);
-      }
-      const live = await this.queryTransaction(notifyRef);
-      const liveStatus = (live?.payment_result as { response_status?: string } | undefined)
-        ?.response_status;
-      if (!live || !liveStatus) {
-        logger.warn('PayTabs webhook authentication failed (query miss)', { notifyRef });
-        throw new AppError('Invalid PayTabs webhook signature.', 401);
-      }
-      payload = { ...payload, ...live, tran_ref: String(live.tran_ref ?? notifyRef) };
-      logger.info('PayTabs IPN accepted after query verify', { tran_ref: payload.tran_ref });
+      logger.warn('PayTabs webhook rejected — missing or invalid HMAC signature', {
+        tran_ref: payload.tran_ref,
+      });
+      throw new AppError('Invalid PayTabs webhook signature.', 401);
     }
 
     const { tran_ref, cart_id, payment_result, cart_amount, cart_currency } = payload as {
@@ -278,6 +278,51 @@ export class QatariPaymentService {
     if (!tran_ref || !cart_id) {
       throw new AppError('Invalid PayTabs webhook payload.', 400);
     }
+
+    return QatariPaymentService.fulfillPaytabsPayment({
+      tran_ref,
+      cart_id,
+      payment_result,
+      cart_amount,
+      cart_currency,
+      payload,
+    });
+  }
+
+  /**
+   * Mark invoice/booking paid after PayTabs success.
+   * Used by HMAC webhooks (after verify) and return-url confirm (query API).
+   */
+  private static async fulfillPaytabsPayment(opts: {
+    tran_ref: string;
+    cart_id: string;
+    payment_result: { response_status: string };
+    cart_amount?: number | string;
+    cart_currency?: string;
+    payload: Record<string, unknown>;
+  }) {
+    const lockAcquired = await acquirePaytabsTranRefLock(opts.tran_ref);
+    if (!lockAcquired) {
+      logger.info('PayTabs fulfillment duplicate in-flight', { tran_ref: opts.tran_ref });
+      return { duplicate: true, inFlight: true };
+    }
+
+    try {
+      return await QatariPaymentService.processSignedWebhook(opts);
+    } finally {
+      await releasePaytabsTranRefLock(opts.tran_ref);
+    }
+  }
+
+  private static async processSignedWebhook(opts: {
+    tran_ref: string;
+    cart_id: string;
+    payment_result: { response_status: string };
+    cart_amount?: number | string;
+    cart_currency?: string;
+    payload: Record<string, unknown>;
+  }) {
+    const { tran_ref, cart_id, payment_result, cart_amount, cart_currency, payload } = opts;
 
     // Idempotency: already processed this gateway ref as paid
     const existingPaid = await prisma.payment.findFirst({
@@ -326,18 +371,34 @@ export class QatariPaymentService {
           data: { status: 'paid', paidAt: new Date() },
         });
 
-        await tx.payment.create({
-          data: {
+        const pendingPayment = await tx.payment.findFirst({
+          where: {
             invoiceId: invoice.id,
-            userId: invoice.clientId,
-            amount: invoice.total,
-            currency: invoice.currency,
-            status: 'paid',
             gateway: 'paytabs',
             gatewayRef: tran_ref,
-            gatewayResponse: payload as object,
+            status: 'pending',
           },
         });
+
+        if (pendingPayment) {
+          await tx.payment.update({
+            where: { id: pendingPayment.id },
+            data: { status: 'paid', gatewayResponse: payload as object },
+          });
+        } else {
+          await tx.payment.create({
+            data: {
+              invoiceId: invoice.id,
+              userId: invoice.clientId,
+              amount: invoice.total,
+              currency: invoice.currency,
+              status: 'paid',
+              gateway: 'paytabs',
+              gatewayRef: tran_ref,
+              gatewayResponse: payload as object,
+            },
+          });
+        }
       });
 
       await notifyBillingEvent({

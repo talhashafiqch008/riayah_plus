@@ -1,21 +1,26 @@
 import { AccessToken, WebhookReceiver } from 'livekit-server-sdk';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
-import { isAdminRole, isCoordinatorRole } from '../utils/careAccess';
+import { canOrgAdminAccessEpisode, isCoordinatorRole } from '../utils/careAccess';
 
-export type TelehealthActor = { userId: string; role: string };
+export type TelehealthActor = {
+  userId: string;
+  role: string;
+  organizationId?: string | null;
+};
 
 export type SessionAccessRow = {
   providerId: string;
   clientId: string;
   status: string;
-  episode?: { coordinatorId: string } | null;
+  episode?: { coordinatorId: string; organizationId?: string | null } | null;
 };
 
 export type MeetingAccessRow = {
   hostId: string;
   participantId: string;
   status: string;
+  episodeOrganizationId?: string | null;
 };
 
 export function sessionRoomName(sessionId: string): string {
@@ -75,28 +80,45 @@ export function admitParticipant(control: TelehealthControl, userId: string): Te
   };
 }
 
+export function isDirectSessionParticipant(session: SessionAccessRow, actor: TelehealthActor): boolean {
+  return session.providerId === actor.userId || session.clientId === actor.userId;
+}
+
+export function isAssignedEpisodeCoordinator(session: SessionAccessRow, actor: TelehealthActor): boolean {
+  return isCoordinatorRole(actor.role) && session.episode?.coordinatorId === actor.userId;
+}
+
 export function canJoinSessionRoom(session: SessionAccessRow, actor: TelehealthActor): boolean {
-  if (isAdminRole(actor.role)) return true;
-  if (session.providerId === actor.userId) return true;
-  if (session.clientId === actor.userId) return true;
-  if (session.episode?.coordinatorId === actor.userId) return true;
+  if (isDirectSessionParticipant(session, actor)) return true;
+  if (isAssignedEpisodeCoordinator(session, actor)) return true;
+  if (canOrgAdminAccessEpisode(actor, session.episode?.organizationId)) return true;
   return false;
 }
 
 export function canCreateSessionRoom(session: SessionAccessRow, actor: TelehealthActor): boolean {
-  if (isAdminRole(actor.role)) return true;
   if (session.providerId === actor.userId) return true;
-  if (isCoordinatorRole(actor.role) && session.episode?.coordinatorId === actor.userId) return true;
+  if (isAssignedEpisodeCoordinator(session, actor)) return true;
   return false;
 }
 
-export function canJoinMeeting(meeting: MeetingAccessRow, actor: TelehealthActor): boolean {
-  if (isAdminRole(actor.role)) return true;
+export function isDirectMeetingParticipant(meeting: MeetingAccessRow, actor: TelehealthActor): boolean {
   return meeting.hostId === actor.userId || meeting.participantId === actor.userId;
 }
 
+export function canJoinMeeting(meeting: MeetingAccessRow, actor: TelehealthActor): boolean {
+  if (isDirectMeetingParticipant(meeting, actor)) return true;
+  if (canOrgAdminAccessEpisode(actor, meeting.episodeOrganizationId)) return true;
+  return false;
+}
+
+export function meetingAccessRow(
+  meeting: Pick<MeetingAccessRow, 'hostId' | 'participantId' | 'status'>,
+  episodeOrganizationId?: string | null,
+): MeetingAccessRow {
+  return { ...meeting, episodeOrganizationId };
+}
+
 export function canAdmitMeeting(meeting: Pick<MeetingAccessRow, 'hostId'>, actor: TelehealthActor): boolean {
-  if (isAdminRole(actor.role)) return true;
   return meeting.hostId === actor.userId;
 }
 

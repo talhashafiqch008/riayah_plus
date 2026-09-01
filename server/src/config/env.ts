@@ -28,6 +28,11 @@ export const env = {
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
   AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION || 'me-south-1',
   AWS_BUCKET: process.env.AWS_BUCKET || '',
+  /** Default KMS key for PHI S3 uploads (purpose-specific keys override). */
+  AWS_KMS_KEY_ID: process.env.AWS_KMS_KEY_ID || '',
+  TELEHEALTH_RECORDING_KMS_KEY: process.env.TELEHEALTH_RECORDING_KMS_KEY || '',
+  CHAT_ATTACHMENT_KMS_KEY: process.env.CHAT_ATTACHMENT_KMS_KEY || '',
+  INVOICE_PDF_KMS_KEY: process.env.INVOICE_PDF_KMS_KEY || '',
 
   MAIL_HOST: process.env.MAIL_HOST || 'smtp.gmail.com',
   MAIL_PORT: parseInt(process.env.MAIL_PORT || '587', 10),
@@ -87,8 +92,10 @@ export const env = {
   SENTRY_DSN: process.env.SENTRY_DSN || '',
   SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT || 'development',
 
-  /** AES key material for GDPR data-export files at rest (falls back to JWT_ACCESS_SECRET). */
+  /** AES key material for GDPR data-export files at rest (required in production). */
   DATA_EXPORT_ENCRYPTION_KEY: process.env.DATA_EXPORT_ENCRYPTION_KEY || '',
+  /** AES key material for telehealth recording transcripts at rest (required in production). */
+  RECORDING_TRANSCRIPT_ENCRYPTION_KEY: process.env.RECORDING_TRANSCRIPT_ENCRYPTION_KEY || '',
   /** How long an encrypted export remains downloadable (hours). */
   DATA_EXPORT_TTL_HOURS: parseInt(process.env.DATA_EXPORT_TTL_HOURS || '24', 10),
 
@@ -96,16 +103,46 @@ export const env = {
   isProd: process.env.NODE_ENV === 'production',
 };
 
-// A-3: refuse to start in production with default JWT secrets
-if (process.env.NODE_ENV === 'production') {
-  const DEFAULT_SECRETS = ['change-me-access-secret', 'change-me-refresh-secret'];
+// A-3: refuse to start in deployed environments with default JWT secrets (M11)
+const DEFAULT_JWT_SECRETS = ['change-me-access-secret', 'change-me-refresh-secret'];
+const isLocalDev = (process.env.NODE_ENV || 'development') === 'development';
+
+if (!isLocalDev) {
   if (
-    DEFAULT_SECRETS.includes(env.JWT_ACCESS_SECRET) ||
-    DEFAULT_SECRETS.includes(env.JWT_REFRESH_SECRET)
+    DEFAULT_JWT_SECRETS.includes(env.JWT_ACCESS_SECRET) ||
+    DEFAULT_JWT_SECRETS.includes(env.JWT_REFRESH_SECRET)
   ) {
     throw new Error(
       'FATAL: JWT_ACCESS_SECRET or JWT_REFRESH_SECRET is still set to its default placeholder. ' +
-        'Generate secure random secrets and set them in your environment before running in production.',
+        'Generate secure random secrets and set them in your environment before running outside local development.',
+    );
+  }
+}
+
+// Production-only encryption / KMS guards
+if (process.env.NODE_ENV === 'production') {
+  if (!env.DATA_EXPORT_ENCRYPTION_KEY?.trim()) {
+    throw new Error(
+      'FATAL: DATA_EXPORT_ENCRYPTION_KEY must be set in production. ' +
+        'Do not reuse JWT secrets for encrypted GDPR exports.',
+    );
+  }
+
+  if (!env.RECORDING_TRANSCRIPT_ENCRYPTION_KEY?.trim()) {
+    throw new Error(
+      'FATAL: RECORDING_TRANSCRIPT_ENCRYPTION_KEY must be set in production for encrypted telehealth transcripts at rest.',
+    );
+  }
+
+  if (!env.TELEHEALTH_RECORDING_KMS_KEY?.trim()) {
+    throw new Error(
+      'FATAL: TELEHEALTH_RECORDING_KMS_KEY must be set in production for encrypted telehealth recordings at rest.',
+    );
+  }
+
+  if (!env.CHAT_ATTACHMENT_KMS_KEY?.trim()) {
+    throw new Error(
+      'FATAL: CHAT_ATTACHMENT_KMS_KEY must be set in production for encrypted chat attachments at rest.',
     );
   }
 }

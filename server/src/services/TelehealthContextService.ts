@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
-import { isAdminRole, isFamilyRole } from '../utils/careAccess';
+import { isFamilyRole } from '../utils/careAccess';
 import { canJoinMeeting, canJoinSessionRoom, type TelehealthActor } from './LiveKitAccess';
 
 const LIVE_PLAN = new Set(['approved', 'active']);
@@ -42,10 +42,9 @@ export function noteVisibleToViewer(
   note: { authorId: string; isPrivate: boolean },
   actor: TelehealthActor,
 ): boolean {
-  if (!note.isPrivate) return true;
   if (isFamilyRole(actor.role)) return false;
+  if (!note.isPrivate) return true;
   if (note.authorId === actor.userId) return true;
-  if (isAdminRole(actor.role)) return true;
   return CLINICAL_ROLES.has(actor.role);
 }
 
@@ -75,12 +74,14 @@ export function shapeTelehealthContext(input: {
   notes: ContextNote[];
 }) {
   const items = (input.carePlan?.items ?? []).map(({ unitCost: _unitCost, ...item }) => item);
-  const notes = input.notes
-    .filter((n) => noteVisibleToViewer(n, input.viewer))
-    .map(({ authorId, ...rest }) => ({
-      ...rest,
-      author: rest.author ?? undefined,
-    }));
+  const notes = isFamilyRole(input.viewer.role)
+    ? []
+    : input.notes
+        .filter((n) => noteVisibleToViewer(n, input.viewer))
+        .map(({ authorId, ...rest }) => ({
+          ...rest,
+          author: rest.author ?? undefined,
+        }));
 
   return {
     episode: input.episode,
@@ -102,7 +103,7 @@ export class TelehealthContextService {
   static async forSession(sessionId: string, actor: TelehealthActor) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canJoinSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);

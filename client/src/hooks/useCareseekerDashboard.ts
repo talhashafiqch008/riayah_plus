@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getCareseekerDashboard } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 interface CareCategory {
@@ -85,7 +86,7 @@ const CATEGORY_PROVIDER_MAP: Record<string, string[]> = {
   home_support: ['Household Support', 'Gardener'],
 };
 
-async function fetchDashboard(): Promise<DashboardData> {
+async function fetchDashboard(userCountry: 'QA' | 'EG'): Promise<DashboardData> {
   let onboardingData: Record<string, unknown> | null = null;
   try {
     const draft = localStorage.getItem(STORAGE_KEYS.careseekerOnboardingDraft);
@@ -95,17 +96,6 @@ async function fetchDashboard(): Promise<DashboardData> {
     }
   } catch (e) {
     console.error('Error loading onboarding draft:', e);
-  }
-
-  let userCountry: 'QA' | 'EG' = 'QA';
-  try {
-    const userData = localStorage.getItem(STORAGE_KEYS.user);
-    if (userData) {
-      const user = JSON.parse(userData);
-      userCountry = user.country === 'EGY' ? 'EG' : 'QA';
-    }
-  } catch (e) {
-    console.error('Error loading user data:', e);
   }
 
   const careCategoriesMap: Record<string, { name: string; icon: string }> = {
@@ -180,11 +170,16 @@ async function fetchDashboard(): Promise<DashboardData> {
 }
 
 export function useCareseekerDashboard() {
+  const { user } = useAuth();
+  const userCountry: 'QA' | 'EG' =
+    user?.country === 'EGY' || user?.country === 'EG' ? 'EG' : 'QA';
+
   return useQuery<DashboardData, Error>({
-    queryKey: ['careseeker', 'dashboard'],
-    queryFn: fetchDashboard,
+    queryKey: ['careseeker', 'dashboard', userCountry],
+    queryFn: () => fetchDashboard(userCountry),
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    enabled: Boolean(user),
   });
 }
 

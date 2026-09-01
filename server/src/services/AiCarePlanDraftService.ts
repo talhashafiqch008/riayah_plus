@@ -9,6 +9,8 @@ import {
   type CarePlanPayload,
   type CarePlanResponse,
 } from './RiayahAiClient';
+import { assertAiCarePlanConsent } from '../utils/aiCarePlanConsent';
+import { AuditService } from './AuditService';
 
 /** Marker stored in CarePlan.notes so AI drafts can be found for idempotent upserts. */
 export const AI_DRAFT_MARKER = '[riayah-ai-draft]';
@@ -415,6 +417,8 @@ export class AiCarePlanDraftService {
     });
     if (!episode) throw new AppError('Episode not found.', 404);
 
+    await assertAiCarePlanConsent(params.actorId);
+
     const payload = buildCarePlanPayloadFromEpisode(episode, {
       familyConsultationNotes: params.familyConsultationNotes,
       outputLanguage: params.outputLanguage,
@@ -423,6 +427,18 @@ export class AiCarePlanDraftService {
     let aiResponse: CarePlanResponse | null = null;
     let lastAiError: RiayahAiError | null = null;
     const maxAttempts = 3;
+
+    await AuditService.log({
+      userId: params.actorId,
+      action: 'ai_care_plan_request',
+      entity: 'care_episode',
+      entityId: episode.id,
+      metadata: {
+        processor: 'riayah_ai',
+        consentType: 'ai_care_plan',
+        outputLanguage: params.outputLanguage ?? 'en',
+      },
+    });
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -504,17 +520,7 @@ export class AiCarePlanDraftService {
   }
 }
 
-function stringifyFindings(findings: unknown): string | null {
-  if (findings == null) return null;
-  if (typeof findings === 'string') return findings;
-  try {
-    return JSON.stringify(findings);
-  } catch {
-    return String(findings);
-  }
-}
-
-function buildCarePlanPayloadFromEpisode(
+export function buildCarePlanPayloadFromEpisode(
   episode: {
     id: string;
     title: string;
@@ -565,12 +571,8 @@ function buildCarePlanPayloadFromEpisode(
         : {}),
     },
     patient: {
-      dateOfBirth: episode.careRecipient?.dateOfBirth
-        ? episode.careRecipient.dateOfBirth.toISOString().slice(0, 10)
-        : null,
       gender: episode.careRecipient?.gender ?? null,
       diagnoses,
-      ...(episode.medicalHistory ? { medicalHistory: episode.medicalHistory } : {}),
     },
     episode: {
       title: episode.title,
@@ -579,16 +581,12 @@ function buildCarePlanPayloadFromEpisode(
         ? URGENCY_TO_AI[episode.urgencyLevel] ?? episode.urgencyLevel
         : null,
       serviceInterests: episode.serviceInterests,
-      ...(episode.medicalHistory ? { medicalHistory: episode.medicalHistory } : {}),
-      currentMeds: episode.currentMeds
-        ? episode.currentMeds.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
-        : [],
       diagnoses,
       observedChallenges: episode.observedChallenges ?? [],
     },
     assessments: episode.assessments.map((a) => ({
       type: a.type,
-      findings: stringifyFindings(a.findings),
+      findings: null,
       recommendations: recs(a.recommendations),
     })),
   };

@@ -9,6 +9,7 @@ import { PayoutIdempotencyService } from '../services/PayoutIdempotencyService';
 import { InvoiceService } from '../services/InvoiceService';
 import { TelehealthReminderService } from '../services/TelehealthReminderService';
 import { anonymizeUser } from '../utils/anonymizeUser';
+import { runRetentionPurgeBatch } from '../services/RetentionPurgeService';
 
 export function startScheduler(): void {
   logger.info('Starting cron scheduler');
@@ -452,6 +453,15 @@ export function startScheduler(): void {
       }
     } catch (err) {
       logger.error('retention:purge-expired-data-exports failed', { err });
+    }
+  });
+
+  // ── retention:m4-purge — daily (G8: messages, meetings, sessions, documents) ─
+  cron.schedule('30 6 * * *', async () => {
+    try {
+      await runRetentionPurgeBatch();
+    } catch (err) {
+      logger.error('retention:m4-purge failed', { err });
     }
   });
 

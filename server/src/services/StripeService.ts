@@ -20,6 +20,31 @@ export class StripeService {
     return list.data;
   }
 
+  /**
+   * C2: Ensure a payment method belongs to this Stripe customer before attach/use.
+   * Unattached PMs are allowed only for attach (post–setup-intent).
+   */
+  static async assertPaymentMethodOwnedByCustomer(
+    paymentMethodId: string,
+    customerId: string,
+    mode: 'attach' | 'use',
+  ): Promise<void> {
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+    const pmCustomer =
+      typeof pm.customer === 'string' ? pm.customer : pm.customer?.id ?? null;
+
+    if (pmCustomer) {
+      if (pmCustomer !== customerId) {
+        throw new AppError('Forbidden. Payment method not found on your account.', 403);
+      }
+      return;
+    }
+
+    if (mode === 'use') {
+      throw new AppError('Forbidden. Payment method not found on your account.', 403);
+    }
+  }
+
   static async attachPaymentMethod(paymentMethodId: string, customerId: string): Promise<void> {
     await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
   }

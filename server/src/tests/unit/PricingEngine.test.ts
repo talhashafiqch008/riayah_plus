@@ -1,7 +1,20 @@
 import '../helpers/prismaMock';
+import { prismaMock } from '../helpers/prismaMock';
 import { PricingEngine } from '../../services/PricingEngine';
+import { AppError } from '../../middleware/errorHandler';
 
 describe('PricingEngine', () => {
+  beforeEach(() => {
+    prismaMock.serviceType.findFirst.mockResolvedValue({
+      id: 'svc-home-care',
+      code: 'home_care',
+      name: 'Home Care',
+      type: 'home_care',
+      baseRate: 50 as never,
+      category: 'care',
+      currency: 'QAR',
+    });
+  });
   describe('calculatePrice', () => {
     const base = {
       serviceType: 'home_care',
@@ -48,6 +61,13 @@ describe('PricingEngine', () => {
         breakdown.urgencySurcharge +
         breakdown.platformFee;
       expect(result.total).toBeCloseTo(expected, 2);
+    });
+
+    it('fails closed when service is missing from catalog', async () => {
+      prismaMock.serviceType.findFirst.mockResolvedValue(null);
+      await expect(
+        PricingEngine.calculate({ ...base, serviceType: 'unknown_service_xyz' }),
+      ).rejects.toThrow(AppError);
     });
   });
 

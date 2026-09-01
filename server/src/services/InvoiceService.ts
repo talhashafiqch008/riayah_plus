@@ -5,6 +5,7 @@ import { notifyBillingEvent } from './BillingNotificationService';
 import { AuditService } from './AuditService';
 import { InvoicePDFService } from './InvoicePDFService';
 import { resolveCatalogService } from './ServiceCatalog';
+import { normalizeLineItems } from '../utils/invoiceLineItems';
 
 const DEFAULT_TAX_RATE = 0.05;
 const DEFAULT_CURRENCY = 'QAR';
@@ -20,7 +21,7 @@ export type InvoiceLineItem = {
   description: string;
   quantity: number;
   unitPrice: number;
-  serviceType: string;
+  serviceType?: string;
   category?: string;
 };
 
@@ -89,7 +90,10 @@ async function persistInvoice(opts: {
   actorUserId?: string;
   notify: boolean;
 }): Promise<CompletionInvoiceResult> {
-  const { subtotal, taxAmount, total } = calculateTotals(opts.lineItems, DEFAULT_TAX_RATE);
+  const { subtotal, taxAmount, total } = calculateTotals(
+    normalizeLineItems(opts.lineItems),
+    DEFAULT_TAX_RATE,
+  );
   if (!(total > 0)) {
     return { created: false, reason: 'no_billable_amount' };
   }
@@ -115,7 +119,7 @@ async function persistInvoice(opts: {
       paidAt: opts.alreadyPaid ? new Date() : null,
       dueDate,
       notes: opts.notes,
-      lineItems: opts.lineItems,
+      lineItems: normalizeLineItems(opts.lineItems),
     },
   });
 

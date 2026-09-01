@@ -5,23 +5,26 @@ import { AISessionController } from '../controllers/ai/AISessionController';
 import { GeminiChatService } from '../services/GeminiChatService';
 import aiDoctorController from '../controllers/AIDoctorController';
 import { publicAiLimiter, aiLimiter } from '../middleware/rateLimiter';
+import { assertAiChatConsent } from '../utils/aiChatConsent';
+import { assertContentPolicy } from '../utils/contentPolicy';
 import { z } from 'zod';
 
 const router = Router();
 
-// Note: POST /ai/callbacks/care-plan-draft is registered in routes/index.ts
-// BEFORE auth.routes (auth.routes' global authenticate would otherwise 401 it).
-
-// ── Public (unauthenticated) Gemini endpoint ──────────────────────────────────
-router.post('/public/chat', publicAiLimiter, async (req: Request, res: Response, next: NextFunction) => {
+// ── Authenticated Gemini chat (legacy path; prefer /chat) ───────────────────────
+router.post('/public/chat', publicAiLimiter, authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { message, sessionId } = z.object({
       message: z.string().min(1).max(1000),
       sessionId: z.string().optional(),
     }).parse(req.body);
 
-    const convId = sessionId ?? `public-${Date.now()}`;
-    const reply = await GeminiChatService.sendMessage('public', convId, message);
+    assertContentPolicy(message);
+    const userId = req.user!.userId;
+    await assertAiChatConsent(userId);
+
+    const convId = sessionId ?? `ai-${userId}`;
+    const reply = await GeminiChatService.sendMessage(userId, convId, message);
     res.json({ success: true, reply, sessionId: convId });
   } catch (err) {
     next(err);

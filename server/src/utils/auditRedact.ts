@@ -87,3 +87,20 @@ export function redactForAudit(value: unknown, depth = 0): unknown {
   }
   return output;
 }
+
+/** Strip query strings from URLs before logging (tokens, reset codes, emails). */
+export function redactUrlForLog(originalUrl: string): string {
+  const q = originalUrl.indexOf('?');
+  return q < 0 ? originalUrl : originalUrl.slice(0, q);
+}
+
+/** Redact email addresses in log metadata. */
+export function redactEmailForLog(value: string | string[]): string | string[] {
+  const mask = (email: string) => {
+    const at = email.indexOf('@');
+    if (at <= 1) return '[REDACTED_EMAIL]';
+    return `${email[0]}***${email.slice(at)}`;
+  };
+  if (Array.isArray(value)) return value.map(mask);
+  return mask(value);
+}
