@@ -26,6 +26,9 @@ function lazy_page(fn: () => Promise<{ default: ComponentType }>) {
 
 // ─── Public pages ─────────────────────────────────────────────────────────────
 const HomePage            = lazy(() => import('@/pages/public/HomePage'));
+const AboutPage           = lazy(() => import('@/pages/public/AboutPage'));
+const BlogIndexPage       = lazy(() => import('@/pages/public/BlogIndexPage'));
+const BlogDetailPage      = lazy(() => import('@/pages/public/BlogDetailPage'));
 const BrowsePage          = lazy(() => import('@/pages/public/BrowsePage'));
 const FindCarePage        = lazy(() => import('@/pages/public/FindCarePage'));
 const FindSupportPage     = lazy(() => import('@/pages/public/FindSupportPage'));
@@ -131,6 +134,11 @@ export function AppRoutes() {
 
         {/* ── Public routes ─────────────────────────────────────────── */}
         <Route path="/"                element={<S><HomePage /></S>} />
+        <Route path="/about"           element={<S><AboutPage /></S>} />
+        <Route path="/blog"            element={<S><BlogIndexPage /></S>} />
+        <Route path="/blog/:slug"      element={<S><BlogDetailPage /></S>} />
+        <Route path="/knowledge-hub"   element={<Navigate to="/blog" replace />} />
+        <Route path="/knowledge-hub/:slug" element={<S><BlogDetailPage /></S>} />
         <Route path="/browse"          element={<S><BrowsePage /></S>} />
         <Route path="/find-care"       element={<S><FindCarePage /></S>} />
         <Route path="/find-support"    element={<S><FindSupportPage /></S>} />

@@ -1,0 +1,118 @@
+{
+  "hero": {
+    "badge": "About Riayah Plus",
+    "titleLine1": "Care Built Around People,",
+    "titleLine2": "Families and Real Life",
+    "subtitle": "Riayah Plus was created with a simple belief: care should be organised around the person, not around disconnected services."
+  },
+  "origins": {
+    "eyebrow": "Our Origins & Experience",
+    "title": "From Australian experience to care designed for our region",
+    "p1": "Our journey started in Australia, where we gained first-hand experience working within a mature disability and aged-care environment. Through our experience with MyNDIC, we saw the value of person-centred care, structured support, trained care teams, family involvement, and continuous monitoring of outcomes.",
+    "p2": "We also saw something equally important: good care is not simply about providing a nurse, therapist or support worker. It is about understanding the person, knowing their goals, coordinating the people involved in their care, and making sure the plan is actually being followed.",
+    "highlight": "That foundational experience inspired the vision and structure behind Riayah Plus.",
+    "australianInsight": {
+      "title": "Adapted, Not Simply Copied",
+      "p1": "Australia has developed strong approaches to disability and aged care (such as My Aged Care and NDIS), with an emphasis on individual needs, dignity, choice, independence, and the involvement of families in care decisions.",
+      "p2": "But we do not believe that a model should simply be copied from one country and transferred to another. Riayah Plus takes the lessons we learned in Australia and adapts them to the realities, culture, and values of Qatar, the GCC, and the wider Middle East.",
+      "regionalValuesTitle": "Respecting Regional Family Dynamics",
+      "regionalValuesDesc": "Families in our region often play a central role in caring for their loved ones. Children are deeply involved in the care of aging parents, and parents coordinate every aspect of support for a child with a disability. Decisions are made collectively, and trust is the foundation between a family and its care team. We designed Riayah Plus around that reality."
+    }
+  },
+  "coreValues": {
+    "eyebrow": "Our Core Pillars",
+    "title": "Combining global standards with regional values",
+    "subtitle": "Our goal is to combine clinical excellence with the cultural foundations that matter most to families in Qatar and the GCC.",
+    "items": [
+      {
+        "title": "Family Involvement",
+        "desc": "Keeping the family informed, respected, and in active partnership throughout every care decision."
+      },
+      {
+        "title": "Respect & Dignity",
+        "desc": "Upholding the personal autonomy, comfort, and honour of every person receiving care."
+      },
+      {
+        "title": "Privacy & Discretion",
+        "desc": "Ensuring the utmost confidentiality and modesty within the home and across all digital health records."
+      },
+      {
+        "title": "Cultural Understanding",
+        "desc": "Care designed to harmonize with local traditions, societal norms, and community life."
+      },
+      {
+        "title": "Continuity of Care",
+        "desc": "Seamless handovers, enduring clinician relationships, and persistent progress tracking."
+      },
+      {
+        "title": "Technology with Purpose",
+        "desc": "Smart systems that eliminate administrative friction so human care remains genuine and attentive."
+      }
+    ]
+  },
+  "journey": {
+    "eyebrow": "The Care Ecosystem",
+    "title": "More than a service. A complete care journey.",
+    "subtitle": "A person receiving care interacts with several professionals over time: doctors, nurses, physiotherapists, occupational therapists, psychologists, support workers, and coordinators.",
+    "problemTitle": "The Fragmentation Problem",
+    "problemDesc": "When services operate in silos, reports are scattered in different clinics, appointments are managed separately, families have to repeatedly re-explain their story, and clinicians lack the complete clinical picture.",
+    "solutionTitle": "How Riayah Brings It Together",
+    "solutionDesc": "Riayah Plus connects the entire care journey: assessments, medical reports, goals, care plans, multi-disciplinary services, appointments, progress tracking, and scheduled reviews into one unified ecosystem with the family at the center."
+  },
+  "coordinatorSpotlight": {
+    "eyebrow": "The Family at the Centre",
+    "title": "Families shouldn't have to become care managers",
+    "subtitle": "We believe families should not have to carry the stress of managing schedules, records, and clinician handoffs just to get the right support.",
+    "coordinatorRole": "The Care Coordinator is not there to control the family, they are there to make care easier.",
+    "bullets": [
+      "Understand your family's unique goals, daily routines, and cultural preferences.",
+      "Coordinate with doctors, home nurses, therapists, and support specialists.",
+      "Organize and synchronize home visits, assessments, and telehealth check-ins.",
+      "Monitor session notes and ensure the individualized Care Plan is faithfully executed."
+    ]
+  },
+  "technology": {
+    "eyebrow": "Purposeful Technology",
+    "title": "Technology that supports people, not replaces them",
+    "subtitle": "Riayah Plus is powered by advanced technology, but technology is not the centre of our philosophy. Care is.",
+    "p1": "Our platform organizes health information, connects care teams, simplifies family communication, coordinates appointments, and visualizes milestone progress in real time.",
+    "p2": "Artificial intelligence assists our clinical teams by summarizing multi-disciplinary notes, organizing reports, and accelerating care plan structuring.",
+    "callout": "Clinical decisions always remain with qualified healthcare professionals. We believe AI should empower doctors and nurses to provide more attentive, human-centered care, not replace human judgement."
+  },
+  "vision": {
+    "eyebrow": "Our Broader Vision",
+    "title": "Building a new standard for disability and aged care",
+    "subtitle": "Our ambition goes beyond creating another healthcare app. We are building a lasting culture of care across Qatar and the region.",
+    "pillars": [
+      {
+        "title": "Trained Care Teams",
+        "desc": "Investing in rigorous professional training and modern specialized geriatric & disability care standards."
+      },
+      {
+        "title": "Career Pathways",
+        "desc": "Fostering rewarding, respected long-term career pathways for nurses, therapists, and care workers."
+      },
+      {
+        "title": "Empowered Families",
+        "desc": "Educating and supporting families with complete transparency and actionable health guidance."
+      },
+      {
+        "title": "Structured Accountability",
+        "desc": "Delivering care with consistent oversight, measurable outcomes, and rigorous clinical governance."
+      }
+    ],
+    "gccTitle": "Global Expertise. Local Vision.",
+    "gccDesc": "Drawing on our experience within advanced care systems in Australia, we understand how care can be more structured, person-centered, and goal-oriented. Today, we bring these learnings and reshape them to fit the needs, values, and culture of our families and communities across Qatar and the wider region.",
+    "manifesto": {
+      "line1": "Care that understands the person.",
+      "line2": "Technology that connects the journey.",
+      "line3": "A system built around the family."
+    }
+  },
+  "cta": {
+    "title": "Join us in reshaping family care",
+    "subtitle": "Experience the difference of structured, compassionate disability and aged care designed around your loved ones.",
+    "bookButton": "Book a Consultation",
+    "homeButton": "Explore Our Services"
+  }
+}

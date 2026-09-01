@@ -1,0 +1,162 @@
+/* Landing CTA buttons — same fill hover language as landing cards */
+
+.landing-btn {
+  --landing-btn-fill: #0d9488;
+  --landing-btn-fg: #0f172a;
+  --landing-btn-bg: #ffffff;
+  --landing-btn-border: rgba(15, 23, 42, 0.1);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 2px solid var(--landing-btn-border);
+  background: var(--landing-btn-bg);
+  color: var(--landing-btn-fg);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+    transform 0.15s cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.landing-btn:active {
+  transform: scale(0.98);
+}
+
+.landing-btn--solid {
+  --landing-btn-bg: #0d9488;
+  --landing-btn-fg: #ffffff;
+  --landing-btn-border: #0d9488;
+  --landing-btn-fill: #0b3b3e;
+  box-shadow: 0 12px 28px -10px rgba(13, 148, 136, 0.45);
+}
+
+.landing-btn--outline {
+  --landing-btn-bg: #ffffff;
+  --landing-btn-fg: #0d9488;
+  --landing-btn-border: #0d9488;
+  --landing-btn-fill: #0d9488;
+}
+
+.landing-btn--soft {
+  --landing-btn-bg: #f8fafc;
+  --landing-btn-fg: #0f172a;
+  --landing-btn-border: #e2e8f0;
+  --landing-btn-fill: #0d9488;
+}
+
+.landing-btn--on-dark {
+  --landing-btn-bg: #ffffff;
+  --landing-btn-fg: #0d9488;
+  --landing-btn-border: #ffffff;
+  --landing-btn-fill: #ccfbf1;
+}
+
+.landing-btn--boxy {
+  border-radius: 12px;
+}
+
+.landing-btn__fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--landing-btn-fill);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.landing-btn[data-fill='left'] .landing-btn__fill {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+[dir='rtl'] .landing-btn[data-fill='left'] .landing-btn__fill {
+  transform-origin: right center;
+}
+
+.landing-btn[data-fill='right'] .landing-btn__fill {
+  transform: scaleX(0);
+  transform-origin: right center;
+}
+
+[dir='rtl'] .landing-btn[data-fill='right'] .landing-btn__fill {
+  transform-origin: left center;
+}
+
+.landing-btn[data-fill='top'] .landing-btn__fill {
+  transform: scaleY(0);
+  transform-origin: center top;
+}
+
+.landing-btn[data-fill='bottom'] .landing-btn__fill {
+  transform: scaleY(0);
+  transform-origin: center bottom;
+}
+
+.landing-btn[data-fill='center'] .landing-btn__fill {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: 160%;
+  padding-bottom: 160%;
+  height: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+}
+
+.landing-btn[data-fill='none'] .landing-btn__fill {
+  display: none;
+}
+
+.landing-btn__label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-btn:not([data-fill='none']):hover[data-fill='left'] .landing-btn__fill,
+  .landing-btn:not([data-fill='none']):hover[data-fill='right'] .landing-btn__fill {
+    transform: scaleX(1);
+  }
+
+  .landing-btn:not([data-fill='none']):hover[data-fill='top'] .landing-btn__fill,
+  .landing-btn:not([data-fill='none']):hover[data-fill='bottom'] .landing-btn__fill {
+    transform: scaleY(1);
+  }
+
+  .landing-btn:not([data-fill='none']):hover[data-fill='center'] .landing-btn__fill {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .landing-btn--outline:not([data-fill='none']):hover,
+  .landing-btn--soft:not([data-fill='none']):hover {
+    color: #f0f7f6;
+    border-color: var(--landing-btn-fill);
+  }
+
+  .landing-btn--solid:not([data-fill='none']):hover {
+    color: #f0f7f6;
+    border-color: var(--landing-btn-fill);
+  }
+
+  .landing-btn--on-dark:not([data-fill='none']):hover {
+    color: #0b3b3e;
+    border-color: var(--landing-btn-fill);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-btn__fill {
+    transition-duration: 0.01ms !important;
+  }
+}

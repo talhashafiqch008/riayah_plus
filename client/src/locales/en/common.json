@@ -1,0 +1,23 @@
+{
+  "actions": {
+    "continue": "Continue",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "scrollToTop": "Back to top",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "language": {
+    "en": "English",
+    "ar": "العربية",
+    "switchToEn": "English",
+    "switchToAr": "العربية"
+  }
+}

@@ -6,6 +6,8 @@ import { I18nProvider } from '@/components/I18nProvider';
 import { MotionProvider } from '@/components/MotionProvider';
 import { SentryProvider } from '@/components/SentryProvider';
 import { CookieConsentBanner } from '@/components/CookieConsentBanner';
+import { ScrollToTop } from '@/components/ScrollToTop';
+import { BackToTopButton } from '@/components/landing/BackToTopButton';
 import { AppRoutes } from '@/routes';
 import { AuthGate } from '@/routes/AuthGate';
 
@@ -19,7 +21,9 @@ export default function App() {
               <MotionProvider>
                 <SentryProvider>
                   <AuthGate>
+                    <ScrollToTop />
                     <AppRoutes />
+                    <BackToTopButton />
                     <CookieConsentBanner />
                   </AuthGate>
                 </SentryProvider>

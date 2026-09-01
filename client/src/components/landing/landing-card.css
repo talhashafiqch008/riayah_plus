@@ -1,0 +1,211 @@
+/* Soft medical cards — mock-aligned, with optional fill hover */
+
+.landing-card {
+  --landing-fill: #0d9488;
+  --landing-radius: 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--landing-radius);
+  isolation: isolate;
+  transition: border-color 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+    transform 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.landing-card--light {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 30px -18px rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+}
+
+.landing-card--mist {
+  background: #f4faf9;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+}
+
+.landing-card--dark {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f0f7f6;
+}
+
+.landing-card__fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--landing-fill);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.landing-card[data-fill='left'] .landing-card__fill {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+[dir='rtl'] .landing-card[data-fill='left'] .landing-card__fill {
+  transform-origin: right center;
+}
+
+.landing-card[data-fill='right'] .landing-card__fill {
+  transform: scaleX(0);
+  transform-origin: right center;
+}
+
+[dir='rtl'] .landing-card[data-fill='right'] .landing-card__fill {
+  transform-origin: left center;
+}
+
+.landing-card[data-fill='top'] .landing-card__fill {
+  transform: scaleY(0);
+  transform-origin: center top;
+}
+
+.landing-card[data-fill='bottom'] .landing-card__fill {
+  transform: scaleY(0);
+  transform-origin: center bottom;
+}
+
+.landing-card[data-fill='center'] .landing-card__fill {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: 160%;
+  padding-bottom: 160%;
+  height: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+}
+
+.landing-card[data-fill='none'] .landing-card__fill {
+  display: none;
+}
+
+.landing-card__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.landing-card .lc-title {
+  transition: color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.landing-card--light .lc-title,
+.landing-card--mist .lc-title {
+  color: #0f172a;
+}
+
+.landing-card--dark .lc-title {
+  color: #f0f7f6;
+}
+
+.landing-card .lc-muted {
+  transition: color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.landing-card--light .lc-muted,
+.landing-card--mist .lc-muted {
+  color: #64748b;
+}
+
+.landing-card--dark .lc-muted {
+  color: rgba(240, 247, 246, 0.55);
+}
+
+.landing-card .lc-accent,
+.landing-card .lc-icon-wrap,
+.landing-card .lc-bar,
+.landing-card .lc-rule,
+.landing-card .lc-ghost-num,
+.landing-card .lc-avatar,
+.landing-card .lc-badge,
+.landing-card .lc-btn-link {
+  transition: color 0.3s cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 0.3s cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-card:not([data-fill='none']):hover[data-fill='left'] .landing-card__fill,
+  .landing-card:not([data-fill='none']):hover[data-fill='right'] .landing-card__fill {
+    transform: scaleX(1);
+  }
+
+  .landing-card:not([data-fill='none']):hover[data-fill='top'] .landing-card__fill,
+  .landing-card:not([data-fill='none']):hover[data-fill='bottom'] .landing-card__fill {
+    transform: scaleY(1);
+  }
+
+  .landing-card:not([data-fill='none']):hover[data-fill='center'] .landing-card__fill {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .landing-card:hover {
+    box-shadow: 0 16px 40px -16px rgba(15, 23, 42, 0.22);
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-title {
+    color: #f0f7f6 !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-muted,
+  .landing-card:not([data-fill='none']):hover .lc-accent {
+    color: rgba(240, 247, 246, 0.78) !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-icon-wrap {
+    background-color: rgba(255, 255, 255, 0.18) !important;
+    color: #f0f7f6 !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-icon-wrap svg {
+    color: #f0f7f6 !important;
+    stroke: #f0f7f6;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-ghost-num {
+    color: rgba(255, 255, 255, 0.22) !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-avatar {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-badge {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    color: #f0f7f6 !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-btn-link {
+    color: #ffffff !important;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-btn-link svg {
+    color: #ffffff !important;
+    stroke: #ffffff;
+  }
+
+  .landing-card:not([data-fill='none']):hover .lc-rule {
+    border-color: rgba(240, 247, 246, 0.2) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-card__fill,
+  .landing-card .lc-title,
+  .landing-card .lc-muted {
+    transition-duration: 0.01ms !important;
+  }
+}
