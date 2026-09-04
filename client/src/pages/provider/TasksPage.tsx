@@ -9,13 +9,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import type { User } from '@/contexts/AuthContext';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 
 
 
 // Role detection helper
-const getRoleInfo = () => {
+const getRoleInfo = (authUser: User | null) => {
  if (typeof window === 'undefined') return { role: 'SUPPORT_WORKER', roleCategory: 'SUPPORT' };
 
  try {
@@ -31,13 +32,10 @@ const getRoleInfo = () => {
  }
  }
 
- // Fallback to user data
- const userData = localStorage.getItem(STORAGE_KEYS.user);
- if (userData) {
- const user = JSON.parse(userData);
+ if (authUser) {
  return {
- role: user.role?.toUpperCase() || 'SUPPORT_WORKER',
- roleCategory: ['DOCTOR', 'NURSE', 'ALLIED_HEALTH'].includes(user.role?.toUpperCase()) ? 'CLINICAL' : 'SUPPORT'
+ role: authUser.role?.toUpperCase() || 'SUPPORT_WORKER',
+ roleCategory: ['DOCTOR', 'NURSE', 'ALLIED_HEALTH'].includes(authUser.role?.toUpperCase()) ? 'CLINICAL' : 'SUPPORT'
  };
  }
  } catch (e) {
@@ -643,12 +641,12 @@ export default function TasksPage() {
  const [filter, setFilter] = useState<string>('all');
  const [showIncidentForm, setShowIncidentForm] = useState(false);
 
- // Get role info on mount
+ // Get role info when auth user is available
  useEffect(() => {
- const info = getRoleInfo();
+ const info = getRoleInfo(user);
  setRoleInfo(info);
  setTasks(getTasksForRole(info.role));
- }, []);
+ }, [user]);
 
  const filteredTasks = tasks.filter(t => {
  if (filter === 'all') return true;

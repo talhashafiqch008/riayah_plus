@@ -2,6 +2,23 @@ import { Request, Response, NextFunction } from 'express';
 import { StripeService } from '../../services/StripeService';
 import { AppError } from '../../middleware/errorHandler';
 import { prisma } from '../../config/database';
+import { AuditService } from '../../services/AuditService';
+
+async function denyPaymentMethodAccess(
+  userId: string,
+  paymentMethodId: string,
+  action: string,
+  req: Request,
+): Promise<never> {
+  await AuditService.log({
+    userId,
+    action,
+    entity: 'PaymentMethod',
+    entityId: paymentMethodId,
+    req,
+  });
+  throw new AppError('Forbidden. Payment method not found on your account.', 403);
+}
 
 export class PaymentMethodController {
   // GET /api/payment-methods
@@ -40,6 +57,16 @@ export class PaymentMethodController {
 
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
       const customerId = await StripeService.getOrCreateCustomer(userId, user!.email, user!.name);
+
+      try {
+        await StripeService.assertPaymentMethodOwnedByCustomer(paymentMethodId, customerId, 'attach');
+      } catch (err) {
+        if (err instanceof AppError && err.statusCode === 403) {
+          await denyPaymentMethodAccess(userId, paymentMethodId, 'payment_method_attach_denied', req);
+        }
+        throw err;
+      }
+
       await StripeService.attachPaymentMethod(paymentMethodId, customerId);
 
       res.json({ success: true, message: 'Payment method saved.' });
@@ -56,9 +83,15 @@ export class PaymentMethodController {
 
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
       const customerId = await StripeService.getOrCreateCustomer(userId, user!.email, user!.name);
-      const methods = await StripeService.listPaymentMethods(customerId);
-      const owned = methods.some((m) => m.id === paymentMethodId);
-      if (!owned) throw new AppError('Forbidden. Payment method not found on your account.', 403);
+
+      try {
+        await StripeService.assertPaymentMethodOwnedByCustomer(paymentMethodId, customerId, 'use');
+      } catch (err) {
+        if (err instanceof AppError && err.statusCode === 403) {
+          await denyPaymentMethodAccess(userId, paymentMethodId, 'payment_method_detach_denied', req);
+        }
+        throw err;
+      }
 
       await StripeService.detachPaymentMethod(paymentMethodId);
       res.json({ success: true, message: 'Payment method removed.' });
@@ -74,6 +107,16 @@ export class PaymentMethodController {
       const userId = req.user!.userId;
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
       const customerId = await StripeService.getOrCreateCustomer(userId, user!.email, user!.name);
+
+      try {
+        await StripeService.assertPaymentMethodOwnedByCustomer(paymentMethodId, customerId, 'use');
+      } catch (err) {
+        if (err instanceof AppError && err.statusCode === 403) {
+          await denyPaymentMethodAccess(userId, paymentMethodId, 'payment_method_set_default_denied', req);
+        }
+        throw err;
+      }
+
       await StripeService.setDefaultPaymentMethod(customerId, paymentMethodId);
       res.json({ success: true, message: 'Default payment method updated.' });
     } catch (err) {

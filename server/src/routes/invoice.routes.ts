@@ -6,7 +6,7 @@ import { paymentLimiter } from '../middleware/rateLimiter';
 import { InvoicePDFService } from '../services/InvoicePDFService';
 import { AppError } from '../middleware/errorHandler';
 import { prisma } from '../config/database';
-import { isAdminRole, isFamilyRole } from '../utils/careAccess';
+import { isAdminRole, isBillingStaffRole, isFamilyRole } from '../utils/careAccess';
 
 const router = Router();
 router.use(authenticate);
@@ -31,26 +31,20 @@ router.get('/:id/pdf', async (req: Request, res: Response, next: NextFunction) =
     if (isAdminRole(role)) {
       // ok
     } else if (isFamilyRole(role)) {
-      if (invoice.clientId !== userId) throw new AppError('Forbidden.', 403);
-    } else if (role === 'care_coordinator' || role === 'org_admin') {
+      if (invoice.clientId !== userId) throw new AppError('Invoice not found.', 404);
+    } else if (isBillingStaffRole(role)) {
       const [client, caller] = await Promise.all([
         prisma.user.findUnique({ where: { id: invoice.clientId }, select: { organizationId: true } }),
         prisma.user.findUnique({ where: { id: userId }, select: { organizationId: true } }),
       ]);
       if (!client?.organizationId || client.organizationId !== caller?.organizationId) {
-        throw new AppError('Forbidden.', 403);
+        throw new AppError('Invoice not found.', 404);
       }
     } else {
-      throw new AppError('Forbidden.', 403);
+      throw new AppError('Invoice not found.', 404);
     }
 
     const pdfBuffer = await InvoicePDFService.generatePdfBuffer(req.params.id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${invoice.invoiceNumber || 'document'}.pdf"`,
-    );
-    res.status(200).send(pdfBuffer);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',

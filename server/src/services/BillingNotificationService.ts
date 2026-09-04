@@ -3,6 +3,7 @@ import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { EmailService } from './EmailService';
 import { NotificationService } from './NotificationService';
+import { assertProcessingAllowed } from '../middleware/processingRestriction';
 
 export type BillingNotifyType =
   | 'invoice_generated'
@@ -42,6 +43,16 @@ export async function notifyBillingEvent(opts: {
   amount?: string;
   currency?: string;
 }): Promise<void> {
+  try {
+    await assertProcessingAllowed(opts.userId);
+  } catch (err) {
+    logger.info('Billing notification skipped — processing restricted', {
+      type: opts.type,
+      userId: opts.userId,
+    });
+    return;
+  }
+
   try {
     await NotificationService.create({
       userId: opts.userId,

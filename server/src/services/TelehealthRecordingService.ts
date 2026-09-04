@@ -1,9 +1,10 @@
 import { EgressClient, EncodedFileOutput, EncodedFileType, S3Upload } from 'livekit-server-sdk';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
+import { createPhiS3Client, isPhiKmsConfigured, isPhiS3Configured } from '../utils/phiS3';
 import {
   canAdmitMeeting,
   canCreateSessionRoom,
@@ -32,16 +33,15 @@ export function isPlaceholderLiveKitUrl(url: string): boolean {
 }
 
 export function isS3Configured(): boolean {
-  return Boolean(
-    env.AWS_BUCKET?.trim() && env.AWS_ACCESS_KEY_ID?.trim() && env.AWS_SECRET_ACCESS_KEY?.trim(),
-  );
+  return isPhiS3Configured();
 }
 
 export function isRecordingPipelineReady(): boolean {
   return (
     Boolean(env.LIVEKIT_API_KEY?.trim() && env.LIVEKIT_API_SECRET?.trim()) &&
     !isPlaceholderLiveKitUrl(env.LIVEKIT_URL || '') &&
-    isS3Configured()
+    isS3Configured() &&
+    (!env.isProd || isPhiKmsConfigured())
   );
 }
 
@@ -121,6 +121,8 @@ function assertPipelineReady(): void {
 }
 
 function s3Output(filepath: string): EncodedFileOutput {
+  // LiveKit S3Upload does not expose SSE headers; bucket default encryption must use
+  // TELEHEALTH_RECORDING_KMS_KEY (validated at startup in production).
   return new EncodedFileOutput({
     fileType: EncodedFileType.MP4,
     filepath,
@@ -131,6 +133,7 @@ function s3Output(filepath: string): EncodedFileOutput {
         secret: env.AWS_SECRET_ACCESS_KEY,
         region: env.AWS_DEFAULT_REGION,
         bucket: env.AWS_BUCKET,
+        metadata: { 'phi-classification': 'telehealth-recording' },
       }),
     },
   });
@@ -147,13 +150,7 @@ async function startEgress(roomName: string, filepath: string): Promise<string |
 async function signedPlaybackUrl(stored: string): Promise<string> {
   const key = s3KeyFromRecordingUrl(stored);
   if (!key || !isS3Configured()) return stored;
-  const s3 = new S3Client({
-    region: env.AWS_DEFAULT_REGION,
-    credentials: {
-      accessKeyId: env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-    },
-  });
+  const s3 = createPhiS3Client();
   return getSignedUrl(s3, new GetObjectCommand({ Bucket: env.AWS_BUCKET, Key: key }), { expiresIn: 300 });
 }
 
@@ -161,7 +158,7 @@ export class TelehealthRecordingService {
   static async startForSession(sessionId: string, actor: TelehealthActor) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canStartRecording('session', session, actor)) throw new AppError('Forbidden.', 403);
@@ -182,7 +179,7 @@ export class TelehealthRecordingService {
     assertPipelineReady();
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canStartRecording('session', session, actor)) throw new AppError('Forbidden.', 403);
@@ -248,7 +245,7 @@ export class TelehealthRecordingService {
   static async playbackForSession(sessionId: string, actor: TelehealthActor) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canViewRecording('session', session, actor)) throw new AppError('Forbidden.', 403);

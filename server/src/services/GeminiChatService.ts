@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, ChatSession } from '@google/generative-ai';
 import { env } from '../config/env';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
+import { sanitizePlainText } from '../utils/sanitize';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
@@ -35,12 +36,12 @@ export class GeminiChatService {
 
     try {
       const result = await session.sendMessage(message);
-      const responseText = result.response.text();
+      const responseText = sanitizePlainText(result.response.text());
 
       // Persist messages
       await prisma.message.createMany({
         data: [
-          { conversationId, senderId: userId, content: message, type: 'text' },
+          { conversationId, senderId: userId, content: sanitizePlainText(message), type: 'text' },
           { conversationId, senderId: 'ai', content: responseText, type: 'ai_response' },
         ],
       });
@@ -76,12 +77,13 @@ export class GeminiChatService {
     for await (const chunk of result.stream) {
       const text = chunk.text();
       fullText += text;
-      onChunk(text);
+      onChunk(sanitizePlainText(text));
     }
+    fullText = sanitizePlainText(fullText);
 
     await prisma.message.createMany({
       data: [
-        { conversationId, senderId: userId, content: message, type: 'text' },
+        { conversationId, senderId: userId, content: sanitizePlainText(message), type: 'text' },
         { conversationId, senderId: 'ai', content: fullText, type: 'ai_response' },
       ],
     });

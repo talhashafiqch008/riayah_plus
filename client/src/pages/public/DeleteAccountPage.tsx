@@ -6,9 +6,9 @@ import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
 import { Mail, Smartphone, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { deleteAccount } from '@/lib/api/user';
+import { clearLegacyTokenStorage } from '@/lib/api/client';
 import { isApiError } from '@/lib/errors';
 import toast from 'react-hot-toast';
-import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 
 
@@ -37,9 +37,7 @@ export default function DeleteAccountPage() {
  await deleteAccount();
  setSubmitted(true);
  toast.success('Account deleted successfully.');
- localStorage.removeItem(STORAGE_KEYS.token);
- localStorage.removeItem(STORAGE_KEYS.apiToken);
- localStorage.removeItem(STORAGE_KEYS.user);
+ clearLegacyTokenStorage();
  setTimeout(() => navigate('/'), 2000);
  } catch (error) {
  if (isApiError(error)) {

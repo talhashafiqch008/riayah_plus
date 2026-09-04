@@ -19,6 +19,8 @@ import { requestLogger, forceJson } from './middleware/requestLogger';
 import { notFound, errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import { startScheduler } from './cron/scheduler';
+import { verifySmtpTlsAtStartup } from './services/EmailService';
+import { beforeSendScrub, scrubSentryEvent } from './utils/sentryScrub';
 import apiRouter from './routes/index';
 
 // ─── Process-level safety net ────────────────────────────────────────────────
@@ -40,11 +42,19 @@ if (env.SENTRY_DSN) {
     environment: env.SENTRY_ENVIRONMENT,
     tracesSampleRate: env.isProd ? 0.2 : 1.0,
     integrations: [Sentry.expressIntegration()],
+    beforeSend: beforeSendScrub,
+    beforeSendTransaction: scrubSentryEvent,
   });
 }
 
 // ─── Express app ─────────────────────────────────────────────────────────────
 const app = express();
+
+// Behind Nginx/ALB in deployed environments — required for per-client IP rate limits.
+if (env.isProd || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS || '1', 10));
+}
+
 const server = http.createServer(app);
 
 // ─── Socket.io ───────────────────────────────────────────────────────────────
@@ -130,6 +140,7 @@ async function bootstrap(): Promise<void> {
     await connectRedis();
 
     if (env.NODE_ENV !== 'test') {
+      await verifySmtpTlsAtStartup();
       startScheduler();
     }
 

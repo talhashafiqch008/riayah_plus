@@ -22,7 +22,7 @@ export class TelehealthNoteService {
 
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canJoinSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);

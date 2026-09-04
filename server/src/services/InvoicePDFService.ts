@@ -1,12 +1,14 @@
 import PDFDocument from 'pdfkit';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { Readable } from 'stream';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import { env } from '../config/env';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
-
-const s3 = new S3Client({ region: env.AWS_DEFAULT_REGION });
+import {
+  assertPhiS3UploadConfigured,
+  createPhiS3Client,
+  phiPutObjectInput,
+} from '../utils/phiS3';
 
 interface LineItem {
   description: string;
@@ -27,9 +29,7 @@ export class InvoicePDFService {
   }
 
   static async generateAndUpload(invoiceId: string): Promise<string> {
-    if (!env.AWS_BUCKET?.trim() || !env.AWS_ACCESS_KEY_ID?.trim() || !env.AWS_SECRET_ACCESS_KEY?.trim()) {
-      throw new AppError('PDF storage is not configured (AWS credentials / bucket).', 503);
-    }
+    assertPhiS3UploadConfigured('PDF storage');
 
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
@@ -40,12 +40,16 @@ export class InvoicePDFService {
     const pdfBuffer = await InvoicePDFService.buildPDF(invoice);
 
     const key = `invoices/${invoiceId}-${uuidv4()}.pdf`;
-    await s3.send(new PutObjectCommand({
-      Bucket: env.AWS_BUCKET,
-      Key: key,
-      Body: pdfBuffer,
-      ContentType: 'application/pdf',
-    }));
+    const s3 = createPhiS3Client();
+    await s3.send(
+      new PutObjectCommand(
+        phiPutObjectInput('invoice_pdf', {
+          key,
+          body: pdfBuffer,
+          contentType: 'application/pdf',
+        }),
+      ),
+    );
 
     const url = `https://${env.AWS_BUCKET}.s3.${env.AWS_DEFAULT_REGION}.amazonaws.com/${key}`;
     await prisma.invoice.update({ where: { id: invoiceId }, data: { pdfUrl: url } });

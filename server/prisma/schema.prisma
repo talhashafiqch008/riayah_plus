@@ -451,8 +451,10 @@ model UserSession {
   lastActiveAt DateTime  @default(now())
   revokedAt    DateTime?
   createdAt    DateTime  @default(now())
+  retentionExpiresAt DateTime?
 
   @@index([userId])
+  @@index([retentionExpiresAt])
   @@map("user_sessions")
 }
 
@@ -913,10 +915,12 @@ model Session {
 
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  retentionExpiresAt DateTime?
 
   @@index([providerId])
   @@index([clientId])
   @@index([episodeId])
+  @@index([retentionExpiresAt])
   @@map("sessions")
 }
 
@@ -1199,10 +1203,12 @@ model Document {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   deletedAt      DateTime?
+  retentionExpiresAt DateTime?
 
   @@index([userId])
   @@index([intakeRecordId])
   @@index([careUnitId])
+  @@index([retentionExpiresAt])
   @@map("documents")
 }
 
@@ -1276,9 +1282,11 @@ model Message {
   editedAt       DateTime?
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
+  retentionExpiresAt DateTime?
 
   @@index([senderId])
   @@index([conversationId])
+  @@index([retentionExpiresAt])
   @@map("messages")
 }
 
@@ -1298,9 +1306,11 @@ model Notification {
   isRead    Boolean             @default(false)
   readAt    DateTime?
   createdAt DateTime            @default(now())
+  retentionExpiresAt DateTime?
 
   @@index([userId])
   @@index([isRead])
+  @@index([retentionExpiresAt])
   @@map("notifications")
 }
 
@@ -1969,9 +1979,11 @@ model Meeting {
   telehealthControl Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  retentionExpiresAt DateTime?
   host             User      @relation("MeetingHost", fields: [hostId], references: [id])
   participant      User      @relation("MeetingParticipant", fields: [participantId], references: [id])
 
+  @@index([retentionExpiresAt])
   @@map("meetings")
 }
 

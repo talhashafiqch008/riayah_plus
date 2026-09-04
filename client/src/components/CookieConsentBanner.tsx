@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { initializeSentryIfConsented } from '@/lib/sentry';
 
 const STORAGE_KEY = 'riayah_cookie_consent_v1';
 
@@ -39,6 +40,9 @@ export function CookieConsentBanner() {
     setVisible(false);
     (window as unknown as { __RAIYAH_ANALYTICS__?: boolean }).__RAIYAH_ANALYTICS__ =
       value === 'accepted';
+    if (value === 'accepted') {
+      initializeSentryIfConsented();
+    }
   };
 
   if (!visible || choice) return null;

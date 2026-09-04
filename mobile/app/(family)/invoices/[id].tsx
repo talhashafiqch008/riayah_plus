@@ -31,8 +31,9 @@ export default function FamilyInvoiceDetailScreen() {
       let next = await getInvoice(String(id));
       if (canPayInvoice(next)) {
         try {
-          const confirmed = await confirmInvoicePayment(String(id));
+          const confirmed = await confirmInvoicePayment(String(id), { maxAttempts: 10, intervalMs: 1500 });
           if (confirmed.data) next = confirmed.data;
+          else if (confirmed.paid || confirmed.alreadyPaid) next = await getInvoice(String(id));
           if (confirmed.paid && !confirmed.alreadyPaid) {
             toast.show('Payment received', { type: 'success' });
           }

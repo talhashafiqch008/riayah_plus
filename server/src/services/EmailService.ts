@@ -1,16 +1,42 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
+import { redactEmailForLog } from '../utils/auditRedact';
 
-const transporter = nodemailer.createTransport({
-  host: env.MAIL_HOST,
-  port: env.MAIL_PORT,
-  secure: env.MAIL_PORT === 465,
-  auth: {
-    user: env.MAIL_USERNAME,
-    pass: env.MAIL_PASSWORD,
-  },
-});
+function smtpTransportOptions(): SMTPTransport.Options {
+  const secure = env.MAIL_PORT === 465;
+  return {
+    host: env.MAIL_HOST,
+    port: env.MAIL_PORT,
+    secure,
+    requireTLS: !secure,
+    auth: {
+      user: env.MAIL_USERNAME,
+      pass: env.MAIL_PASSWORD,
+    },
+    tls: {
+      rejectUnauthorized: true,
+    },
+  };
+}
+
+const transporter = nodemailer.createTransport(smtpTransportOptions());
+
+/** Verify SMTP TLS in production when mail credentials are configured. */
+export async function verifySmtpTlsAtStartup(): Promise<void> {
+  if (!env.isProd) return;
+  if (!env.MAIL_USERNAME?.trim() || !env.MAIL_PASSWORD?.trim()) return;
+
+  try {
+    await transporter.verify();
+  } catch (err) {
+    throw new Error(
+      `FATAL: SMTP TLS verification failed for ${env.MAIL_HOST}:${env.MAIL_PORT}. ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 interface MailOptions {
   to: string | string[];
@@ -27,7 +53,7 @@ export class EmailService {
         ...options,
       });
     } catch (err) {
-      logger.error('Email send failed', { error: err, to: options.to });
+      logger.error('Email send failed', { error: err, to: redactEmailForLog(options.to) });
     }
   }
 

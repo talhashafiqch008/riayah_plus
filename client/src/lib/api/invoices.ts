@@ -143,19 +143,44 @@ export async function payInvoice(id: string) {
   }
 }
 
-export async function confirmInvoicePayment(id: string) {
-  try {
-    const { data } = await client.post<{
-      success?: boolean;
-      paid?: boolean;
-      alreadyPaid?: boolean;
-      pending?: boolean;
-      data?: Invoice;
-    }>(`/invoices/${id}/pay/confirm`);
-    return data;
-  } catch (error) {
-    throw extractApiError(error);
+export type ConfirmInvoicePaymentResult = {
+  success?: boolean;
+  paid?: boolean;
+  alreadyPaid?: boolean;
+  pending?: boolean;
+  data?: Invoice;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Poll PayTabs confirm after hosted checkout — gateway may lag a few seconds behind redirect. */
+export async function confirmInvoicePayment(
+  id: string,
+  options?: { maxAttempts?: number; intervalMs?: number },
+): Promise<ConfirmInvoicePaymentResult> {
+  const maxAttempts = options?.maxAttempts ?? 8;
+  const intervalMs = options?.intervalMs ?? 1200;
+
+  let last: ConfirmInvoicePaymentResult = {};
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const { data } = await client.post<ConfirmInvoicePaymentResult>(
+        `/invoices/${id}/pay/confirm`,
+      );
+      last = data;
+      if (data.paid || data.alreadyPaid) {
+        if (!data.data) {
+          last = { ...data, data: await getInvoice(id) };
+        }
+        return last;
+      }
+      if (!data.pending) return last;
+    } catch (error) {
+      if (attempt === maxAttempts - 1) throw extractApiError(error);
+    }
+    if (attempt < maxAttempts - 1) await sleep(intervalMs);
   }
+  return last;
 }
 
 export async function downloadInvoicePdf(id: string, fileName: string) {

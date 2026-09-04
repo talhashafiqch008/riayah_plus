@@ -23,10 +23,21 @@ export class WalletService {
     type: string,
     description?: string,
     relatedId?: string,
-    relatedType?: string
+    relatedType?: string,
   ) {
     if (!(amount > 0)) {
       throw new AppError('Credit amount must be positive.', 400);
+    }
+
+    if (relatedId && relatedType) {
+      const existing = await tx.creditTransaction.findFirst({
+        where: { userId, relatedId, relatedType, type },
+      });
+      if (existing) {
+        const wallet = await tx.walletBalance.findUnique({ where: { userId } });
+        if (!wallet) throw new AppError('Wallet not found.', 404);
+        return wallet;
+      }
     }
 
     const wallet = await tx.walletBalance.upsert({
@@ -59,10 +70,10 @@ export class WalletService {
     type: string,
     description?: string,
     relatedId?: string,
-    relatedType?: string
+    relatedType?: string,
   ) {
     return prisma.$transaction(async (tx) =>
-      this.creditWithTx(tx, userId, amount, type, description, relatedId, relatedType)
+      this.creditWithTx(tx, userId, amount, type, description, relatedId, relatedType),
     );
   }
 
@@ -72,19 +83,21 @@ export class WalletService {
     type: string,
     description?: string,
     relatedId?: string,
-    relatedType?: string
+    relatedType?: string,
   ) {
     return prisma.$transaction(async (tx) => {
-      const wallet = await tx.walletBalance.findUnique({ where: { userId } });
-      if (!wallet || Number(wallet.balance) < amount) {
+      const claimed = await tx.walletBalance.updateMany({
+        where: { userId, balance: { gte: amount } },
+        data: { balance: { decrement: amount } },
+      });
+      if (claimed.count === 0) {
         throw new AppError('Insufficient wallet balance.', 422);
       }
 
-      const updated = await tx.walletBalance.update({
-        where: { userId },
-        data: { balance: { decrement: amount } },
-      });
+      const updated = await tx.walletBalance.findUnique({ where: { userId } });
+      if (!updated) throw new AppError('Wallet not found.', 404);
 
+      const balanceAfter = Number(updated.balance);
       await tx.creditTransaction.create({
         data: {
           userId,
@@ -93,8 +106,8 @@ export class WalletService {
           description,
           relatedId,
           relatedType,
-          balanceBefore: Number(wallet.balance),
-          balanceAfter: Number(updated.balance),
+          balanceBefore: balanceAfter + amount,
+          balanceAfter,
         },
       });
 
@@ -104,26 +117,32 @@ export class WalletService {
 
   static async holdEscrow(userId: string, amount: number) {
     return prisma.$transaction(async (tx) => {
-      const wallet = await tx.walletBalance.findUnique({ where: { userId } });
-      if (!wallet || Number(wallet.balance) < amount) {
-        throw new AppError('Insufficient balance to hold in escrow.', 422);
-      }
-      return tx.walletBalance.update({
-        where: { userId },
+      const claimed = await tx.walletBalance.updateMany({
+        where: { userId, balance: { gte: amount } },
         data: {
           balance: { decrement: amount },
           escrow: { increment: amount },
         },
       });
+      if (claimed.count === 0) {
+        throw new AppError('Insufficient balance to hold in escrow.', 422);
+      }
+      const updated = await tx.walletBalance.findUnique({ where: { userId } });
+      if (!updated) throw new AppError('Wallet not found.', 404);
+      return updated;
     });
   }
 
   static async releaseEscrow(userId: string, amount: number, toProviderId: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.walletBalance.update({
-        where: { userId },
+      const released = await tx.walletBalance.updateMany({
+        where: { userId, escrow: { gte: amount } },
         data: { escrow: { decrement: amount } },
       });
+      if (released.count === 0) {
+        throw new AppError('Insufficient escrow balance to release.', 422);
+      }
+
       await tx.walletBalance.upsert({
         where: { userId: toProviderId },
         create: { userId: toProviderId, balance: amount, escrow: 0 },
@@ -133,12 +152,20 @@ export class WalletService {
   }
 
   static async refundEscrow(userId: string, amount: number) {
-    return prisma.walletBalance.update({
-      where: { userId },
-      data: {
-        balance: { increment: amount },
-        escrow: { decrement: amount },
-      },
+    return prisma.$transaction(async (tx) => {
+      const refunded = await tx.walletBalance.updateMany({
+        where: { userId, escrow: { gte: amount } },
+        data: {
+          balance: { increment: amount },
+          escrow: { decrement: amount },
+        },
+      });
+      if (refunded.count === 0) {
+        throw new AppError('Insufficient escrow balance to refund.', 422);
+      }
+      const updated = await tx.walletBalance.findUnique({ where: { userId } });
+      if (!updated) throw new AppError('Wallet not found.', 404);
+      return updated;
     });
   }
 

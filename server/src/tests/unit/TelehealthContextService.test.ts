@@ -30,8 +30,8 @@ describe('noteVisibleToViewer', () => {
   const note = { authorId: 'clin-1', isPrivate: false };
   const privateNote = { authorId: 'clin-1', isPrivate: true };
 
-  it('shows public notes to family and staff', () => {
-    expect(noteVisibleToViewer(note, { userId: 'fam', role: 'family' })).toBe(true);
+  it('hides all clinical notes from family viewers', () => {
+    expect(noteVisibleToViewer(note, { userId: 'fam', role: 'family' })).toBe(false);
     expect(noteVisibleToViewer(note, { userId: 'clin-1', role: 'clinical_staff' })).toBe(true);
   });
 
@@ -39,15 +39,15 @@ describe('noteVisibleToViewer', () => {
     expect(noteVisibleToViewer(privateNote, { userId: 'fam', role: 'family' })).toBe(false);
   });
 
-  it('shows private notes to the author and clinical staff', () => {
+  it('shows private notes to the author and clinical staff only', () => {
     expect(noteVisibleToViewer(privateNote, { userId: 'clin-1', role: 'clinical_staff' })).toBe(true);
     expect(noteVisibleToViewer(privateNote, { userId: 'other-clin', role: 'doctor' })).toBe(true);
-    expect(noteVisibleToViewer(privateNote, { userId: 'admin', role: 'admin' })).toBe(true);
+    expect(noteVisibleToViewer(privateNote, { userId: 'admin', role: 'admin' })).toBe(false);
   });
 });
 
 describe('shapeTelehealthContext', () => {
-  it('omits unitCost from plan items and private notes for family', () => {
+  it('omits unitCost from plan items and all clinical notes for family', () => {
     const ctx = shapeTelehealthContext({
       viewer: { userId: 'fam', role: 'family' },
       episode: { id: 'ep-1', title: 'Care', status: 'active' },
@@ -67,6 +67,6 @@ describe('shapeTelehealthContext', () => {
     expect(ctx.episode.id).toBe('ep-1');
     expect(ctx.carePlan?.goals).toHaveLength(1);
     expect(ctx.carePlan?.items[0]).not.toHaveProperty('unitCost');
-    expect(ctx.notes.map((n) => n.id)).toEqual(['n1']);
+    expect(ctx.notes.map((n) => n.id)).toEqual([]);
   });
 });

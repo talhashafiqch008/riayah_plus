@@ -7,6 +7,7 @@ import {
   canPayInvoice,
   confirmInvoicePayment,
   formatMoney,
+  getInvoice,
   invoiceStatusBadgeClass,
   invoiceStatusLabel,
   listInvoices,
@@ -67,8 +68,10 @@ export default function FamilyBillingPage() {
         const updates = await Promise.all(
           payable.map(async (row) => {
             try {
-              const confirmed = await confirmInvoicePayment(row.id);
-              return confirmed.data ?? row;
+              const confirmed = await confirmInvoicePayment(row.id, { maxAttempts: 10, intervalMs: 1500 });
+              if (confirmed.data) return confirmed.data;
+              if (confirmed.paid || confirmed.alreadyPaid) return getInvoice(row.id);
+              return row;
             } catch {
               return row;
             }

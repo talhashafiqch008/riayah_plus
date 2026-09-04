@@ -28,11 +28,12 @@ export function setAuthTokens(_access: string | null, _refresh?: string | null) 
   // Cookies are set by the server on login/register/refresh
 }
 
-/** Remove legacy localStorage tokens from pre-cookie migration */
+/** Remove legacy localStorage tokens and cached user profile from pre-cookie migration */
 export function clearLegacyTokenStorage(): void {
   localStorage.removeItem('raiyah:api_token');
   localStorage.removeItem('raiyah:refresh_token');
   localStorage.removeItem('raiyah:token');
+  localStorage.removeItem('raiyah:user');
   localStorage.removeItem('api_token');
   localStorage.removeItem('token');
   localStorage.removeItem('refresh_token');

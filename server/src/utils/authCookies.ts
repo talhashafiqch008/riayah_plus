@@ -20,7 +20,7 @@ function accessCookieOptions() {
   return {
     httpOnly: true,
     secure: env.isProd,
-    sameSite: 'lax' as const,
+    sameSite: 'strict' as const,
     path: '/',
   };
 }

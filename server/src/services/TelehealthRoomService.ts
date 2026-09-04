@@ -79,7 +79,7 @@ export class TelehealthRoomService {
     try {
       const session = await prisma.session.findUnique({
         where: { id: sessionId },
-        include: { episode: { select: { coordinatorId: true, title: true } } },
+        include: { episode: { select: { coordinatorId: true, organizationId: true, title: true } } },
       });
       if (!session) return { provisioned: false, reason: 'not_found' };
 
@@ -176,7 +176,7 @@ export class TelehealthRoomService {
   static async listLobby(sessionId: string, actor: TelehealthActor) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canCreateSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);
@@ -200,7 +200,7 @@ export class TelehealthRoomService {
   static async admit(sessionId: string, participantUserId: string, actor: TelehealthActor) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canCreateSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);

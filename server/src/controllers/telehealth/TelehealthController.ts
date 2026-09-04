@@ -12,20 +12,59 @@ import { TelehealthNoteService } from '../../services/TelehealthNoteService';
 import { TelehealthConsentService } from '../../services/TelehealthConsentService';
 import { TelehealthPaymentService } from '../../services/TelehealthPaymentService';
 import { TelehealthRecordingService } from '../../services/TelehealthRecordingService';
+import { RecordingTranscriptService } from '../../services/RecordingTranscriptService';
 import { sanitizedString } from '../../utils/sanitize';
 import {
   assertLiveKitConfigured,
   canCreateSessionRoom,
   canJoinMeeting,
   canJoinSessionRoom,
+  isAssignedEpisodeCoordinator,
+  isDirectMeetingParticipant,
+  isDirectSessionParticipant,
   isJoinableMeeting,
   isJoinableSession,
   issueLiveKitJoinToken,
+  meetingAccessRow,
   parseSessionIdFromRoom,
   sessionRoomName,
+  type SessionAccessRow,
+  type TelehealthActor,
 } from '../../services/LiveKitAccess';
+import { logTelehealthPurposeOfUse } from '../../utils/telehealthPurposeLog';
 
-type Actor = { userId: string; role: string };
+function actorFromReq(req: Request): TelehealthActor {
+  return {
+    userId: req.user!.userId,
+    role: req.user!.role,
+    organizationId: req.tenant?.organizationId,
+  };
+}
+
+async function episodeOrganizationId(episodeId: string | null | undefined): Promise<string | null> {
+  if (!episodeId) return null;
+  const episode = await prisma.careEpisode.findUnique({
+    where: { id: episodeId },
+    select: { organizationId: true },
+  });
+  return episode?.organizationId ?? null;
+}
+
+async function logElevatedSessionAccess(
+  req: Request,
+  session: SessionAccessRow & { id: string },
+  actor: TelehealthActor,
+): Promise<void> {
+  if (isDirectSessionParticipant(session, actor)) return;
+  await logTelehealthPurposeOfUse({
+    userId: actor.userId,
+    role: actor.role,
+    purpose: isAssignedEpisodeCoordinator(session, actor) ? 'session_host' : 'session_join',
+    entity: 'Session',
+    entityId: session.id,
+    req,
+  });
+}
 
 async function loadSessionForRoom(roomName: string) {
   const sessionId = parseSessionIdFromRoom(roomName);
@@ -33,11 +72,14 @@ async function loadSessionForRoom(roomName: string) {
     where: sessionId
       ? { OR: [{ id: sessionId }, { livekitRoomId: roomName }] }
       : { livekitRoomId: roomName },
-    include: { episode: { select: { coordinatorId: true } } },
+    include: { episode: { select: { coordinatorId: true, organizationId: true } } },
   });
 }
 
-function assertCanJoinSession(session: NonNullable<Awaited<ReturnType<typeof loadSessionForRoom>>>, actor: Actor) {
+function assertCanJoinSession(
+  session: NonNullable<Awaited<ReturnType<typeof loadSessionForRoom>>>,
+  actor: TelehealthActor,
+) {
   if (!canJoinSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);
   if (!isJoinableSession(session)) throw new AppError('This session cannot be joined.', 400);
 }
@@ -45,13 +87,14 @@ function assertCanJoinSession(session: NonNullable<Awaited<ReturnType<typeof loa
 export class TelehealthController {
   static async generateToken(req: Request, res: Response): Promise<void> {
     const { roomName } = z.object({ roomName: z.string().min(1) }).parse(req.body);
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const user = await prisma.user.findUnique({ where: { id: actor.userId } });
     if (!user) throw new AppError('User not found.', 404);
 
     const session = await loadSessionForRoom(roomName);
     if (session) {
       assertCanJoinSession(session, actor);
+      await logElevatedSessionAccess(req, session, actor);
       await TelehealthPaymentService.assertSessionPaid(session, actor);
       await TelehealthConsentService.assertJoinConsent(actor);
       const join = await TelehealthRoomService.prepareSessionJoin(session, actor);
@@ -80,9 +123,20 @@ export class TelehealthController {
       },
     });
     if (!meeting) throw new AppError('Room not found.', 404);
-    if (!canJoinMeeting(meeting, actor)) throw new AppError('Forbidden.', 403);
+    const orgId = await episodeOrganizationId(meeting.episodeId);
+    if (!canJoinMeeting(meetingAccessRow(meeting, orgId), actor)) throw new AppError('Forbidden.', 403);
     if (!isJoinableMeeting(meeting)) throw new AppError('This meeting cannot be joined.', 400);
     await TelehealthConsentService.assertJoinConsent(actor);
+    if (!isDirectMeetingParticipant(meeting, actor)) {
+      await logTelehealthPurposeOfUse({
+        userId: actor.userId,
+        role: actor.role,
+        purpose: 'meeting_join',
+        entity: 'Meeting',
+        entityId: meeting.id,
+        req,
+      });
+    }
 
     const join = await TelehealthRoomService.prepareMeetingJoin(meeting, actor);
     const token = await issueLiveKitJoinToken({
@@ -103,11 +157,11 @@ export class TelehealthController {
 
   static async createRoom(req: Request, res: Response): Promise<void> {
     const { sessionId } = z.object({ sessionId: z.string() }).parse(req.body);
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
 
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { episode: { select: { coordinatorId: true } } },
+      include: { episode: { select: { coordinatorId: true, organizationId: true } } },
     });
     if (!session) throw new AppError('Session not found.', 404);
     if (!canCreateSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);
@@ -119,7 +173,7 @@ export class TelehealthController {
 
   static async getRoomInfo(req: Request, res: Response): Promise<void> {
     const { roomName } = req.params;
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
 
     const session = await loadSessionForRoom(roomName);
     if (session) {
@@ -127,7 +181,8 @@ export class TelehealthController {
     } else {
       const meeting = await prisma.meeting.findUnique({ where: { roomName } });
       if (!meeting) throw new AppError('Room not found.', 404);
-      if (!canJoinMeeting(meeting, actor)) throw new AppError('Forbidden.', 403);
+      const orgId = await episodeOrganizationId(meeting.episodeId);
+      if (!canJoinMeeting(meetingAccessRow(meeting, orgId), actor)) throw new AppError('Forbidden.', 403);
     }
 
     assertLiveKitConfigured();
@@ -139,26 +194,26 @@ export class TelehealthController {
   }
 
   static async lobby(req: Request, res: Response): Promise<void> {
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const data = await TelehealthRoomService.listLobby(req.params.sessionId, actor);
     res.json({ success: true, ...data });
   }
 
   static async admit(req: Request, res: Response): Promise<void> {
     const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body);
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const data = await TelehealthRoomService.admit(req.params.sessionId, userId, actor);
     res.json({ success: true, ...data });
   }
 
   static async context(req: Request, res: Response): Promise<void> {
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const data = await TelehealthContextService.forSession(req.params.sessionId, actor);
     res.json({ success: true, ...data });
   }
 
   static async addNote(req: Request, res: Response): Promise<void> {
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const body = z
       .object({
         content: sanitizedString(z.string().min(1).max(20000)),
@@ -171,21 +226,40 @@ export class TelehealthController {
   }
 
   static async startRecording(req: Request, res: Response): Promise<void> {
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const data = await TelehealthRecordingService.startForSession(req.params.sessionId, actor);
     res.json({ success: true, message: 'Recording started.', ...data });
   }
 
   static async stopRecording(req: Request, res: Response): Promise<void> {
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const data = await TelehealthRecordingService.stopForSession(req.params.sessionId, actor);
     res.json({ success: true, message: 'Recording stopping.', ...data });
   }
 
   static async getRecording(req: Request, res: Response): Promise<void> {
-    const actor: Actor = { userId: req.user!.userId, role: req.user!.role };
+    const actor = actorFromReq(req);
     const data = await TelehealthRecordingService.playbackForSession(req.params.sessionId, actor);
     res.json({ success: true, ...data });
+  }
+
+  static async getTranscript(req: Request, res: Response): Promise<void> {
+    const actor = actorFromReq(req);
+    const transcript = await RecordingTranscriptService.readForSession(
+      req.params.sessionId,
+      actor,
+      req,
+    );
+    res.json({ success: true, transcript });
+  }
+
+  static async saveTranscript(req: Request, res: Response): Promise<void> {
+    const actor = actorFromReq(req);
+    const { transcript } = z
+      .object({ transcript: sanitizedString(z.string().min(1).max(500_000)) })
+      .parse(req.body);
+    await RecordingTranscriptService.saveForSession(req.params.sessionId, transcript, actor, req);
+    res.json({ success: true, message: 'Transcript saved.' });
   }
 
   static async sessionCheckin(req: Request, res: Response): Promise<void> {

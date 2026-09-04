@@ -3,6 +3,7 @@ import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { EmailService } from './EmailService';
 import { NotificationService } from './NotificationService';
+import { canSendEmailToUser } from '../utils/communicationConsent';
 import {
   reminderRecipientIds,
   reminderWindow,
@@ -59,9 +60,18 @@ async function remindUser(opts: {
   try {
     const user = await prisma.user.findUnique({
       where: { id: opts.userId },
-      select: { email: true, name: true },
+      select: { email: true, name: true, processingRestricted: true },
     });
+    if (user?.processingRestricted) return false;
+
     if (user?.email) {
+      const allowed = await canSendEmailToUser(opts.userId, 'telehealth_reminder');
+      if (!allowed) {
+        logger.info('Telehealth reminder email skipped — consent not granted', {
+          userId: opts.userId,
+        });
+        return true;
+      }
       const joinUrl = `${env.FRONTEND_URL}/family/telehealth`;
       await EmailService.send({
         to: user.email,
