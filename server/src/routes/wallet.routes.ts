@@ -54,12 +54,29 @@ router.post('/topup/:id/confirm', paymentLimiter, async (req: Request, res: Resp
   const topup = await prisma.creditTopup.findUnique({ where: { id: req.params.id } });
   if (!topup || topup.userId !== req.user!.userId) throw new AppError('Top-up not found.', 404);
 
+  if (topup.status === 'paid') {
+    res.json({ message: 'Credits already added.', amount: topup.amount });
+    return;
+  }
+
   if (topup.stripeIntentId) {
     const intent = await stripe.paymentIntents.retrieve(topup.stripeIntentId);
     if (intent.status !== 'succeeded') throw new AppError('Payment not yet completed.', 422);
   }
 
-  await prisma.creditTopup.update({ where: { id: topup.id }, data: { status: 'paid', confirmedAt: new Date() } });
+  const claimed = await prisma.creditTopup.updateMany({
+    where: { id: topup.id, userId: req.user!.userId, status: 'pending' },
+    data: { status: 'paid', confirmedAt: new Date() },
+  });
+  if (claimed.count === 0) {
+    const current = await prisma.creditTopup.findUnique({ where: { id: topup.id } });
+    if (current?.status === 'paid') {
+      res.json({ message: 'Credits already added.', amount: topup.amount });
+      return;
+    }
+    throw new AppError('Top-up could not be confirmed.', 409);
+  }
+
   await WalletService.credit(topup.userId, Number(topup.amount), 'topup', 'Credit top-up', topup.id, 'CreditTopup');
 
   res.json({ message: 'Credits added successfully.', amount: topup.amount });

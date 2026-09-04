@@ -105,7 +105,7 @@ interface CareOnboardingWizardProps {
 export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingWizardProps) {
   const isFamily = variant === 'family';
   const navigate = useNavigate();
-  const { logout, user: authUser, refreshUser } = useAuth();
+  const { logout, user: authUser, refreshUser, loading: authLoading } = useAuth();
   const [step, setStep] = useState<OnboardingStep>(
     isFamily ? OnboardingStep.LOCATION : OnboardingStep.WELCOME,
   );
@@ -121,10 +121,11 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
   const successPath = isFamily ? '/family' : '/careseeker';
 
   useEffect(() => {
+    if (authLoading) return;
+
     const checkAuth = () => {
-      const userStr = localStorage.getItem(STORAGE_KEYS.user);
       const status = localStorage.getItem(STORAGE_KEYS.onboardingStatus);
-      const user = userStr ? JSON.parse(userStr) : authUser;
+      const user = authUser;
 
       if (!user) {
         toast.error('Please log in to continue onboarding.');
@@ -161,7 +162,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
     };
 
     checkAuth();
-  }, [authUser, navigate, isFamily]);
+  }, [authUser, authLoading, navigate, isFamily]);
 
   useEffect(() => {
     try {
@@ -314,8 +315,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const userData = localStorage.getItem(STORAGE_KEYS.user);
-      if (!userData) {
+      if (!authUser) {
         toast.error('Please complete account registration first.');
         setStep(OnboardingStep.REGISTRATION);
         setIsSubmitting(false);

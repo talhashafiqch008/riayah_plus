@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/errorHandler';
 import { resolveCatalogService } from './ServiceCatalog';
 
 interface PricingInput {
@@ -44,9 +45,14 @@ export class PricingEngine {
 
     // Fetch service base rate from catalogue
     const service = await resolveCatalogService(input.serviceType);
+    if (!service?.baseRate) {
+      throw new AppError(
+        `Unknown or unpriced service type: ${input.serviceType}. Add it to the pricing catalog.`,
+        422,
+      );
+    }
 
-    // Catalogue hourly rate (M4 pricing master). Provider rate may add later; never below catalog.
-    let hourlyRate = service?.baseRate ? Number(service.baseRate) : 50;
+    let hourlyRate = Number(service.baseRate);
 
     if (input.providerId) {
       const providerProfile = await prisma.providerProfile.findUnique({

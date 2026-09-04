@@ -11,6 +11,11 @@ import {
   readAndDecryptExport,
   deleteExportFile,
 } from '../../utils/dataExportCrypto';
+import {
+  redactBookingRows,
+  redactMessageRows,
+  redactForeignUserId,
+} from '../../utils/exportRedact';
 
 const EXPORT_TTL_MS = () => Math.max(1, env.DATA_EXPORT_TTL_HOURS) * 60 * 60 * 1000;
 
@@ -211,19 +216,31 @@ export class PrivacyController {
         format,
         expiresAt: expiresAt.toISOString(),
         user,
-        bookings,
+        bookings: redactBookingRows(bookings, userId, exportRequest.id),
         payments,
-        messages,
+        messages: redactMessageRows(messages, userId, exportRequest.id),
         notifications,
         documents,
-        reviews,
+        reviews: (reviews as Array<{ providerId?: string }>).map((r) => ({
+          ...r,
+          providerId: redactForeignUserId(r.providerId, userId, exportRequest.id),
+        })),
         wallet,
         care: {
           careUnits,
           careRecipients,
           intakes,
-          episodes,
-          assessments,
+          episodes: (episodes as Array<{ coordinatorId?: string | null; patientId?: string }>).map(
+            (e) => ({
+              ...e,
+              coordinatorId: redactForeignUserId(e.coordinatorId ?? undefined, userId, exportRequest.id),
+              patientId: redactForeignUserId(e.patientId, userId, exportRequest.id),
+            }),
+          ),
+          assessments: (assessments as Array<{ assessorId?: string | null }>).map((a) => ({
+            ...a,
+            assessorId: redactForeignUserId(a.assessorId ?? undefined, userId, exportRequest.id),
+          })),
         },
         invoices,
         emergencies,

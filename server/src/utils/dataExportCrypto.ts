@@ -7,7 +7,16 @@ const EXPORT_DIR = path.join(process.cwd(), 'uploads', 'exports');
 const ALGO = 'aes-256-gcm' as const;
 
 function exportMasterKey(): Buffer {
-  const raw = env.DATA_EXPORT_ENCRYPTION_KEY || env.JWT_ACCESS_SECRET;
+  const raw = env.DATA_EXPORT_ENCRYPTION_KEY?.trim();
+  if (!raw) {
+    if (env.isProd) {
+      throw new Error(
+        'DATA_EXPORT_ENCRYPTION_KEY is not configured. Set a dedicated secret for GDPR exports.',
+      );
+    }
+    // Local dev only — never use JWT_ACCESS_SECRET as export key material (H7).
+    return crypto.createHash('sha256').update('riayah-data-export:local-dev-only').digest();
+  }
   return crypto.createHash('sha256').update(`riayah-data-export:${raw}`).digest();
 }
 

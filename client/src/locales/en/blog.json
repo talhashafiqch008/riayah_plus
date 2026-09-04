@@ -1,0 +1,63 @@
+{
+  "hub": {
+    "brandLine": "Global Expertise. Local Vision.",
+    "eyebrow": "Riayah Plus Blogs",
+    "title": "Evidence-Based Care & Regional Insights",
+    "subtitle": "Rigorous analyses, policy breakdowns, and practical guidance on disability care, aged care, and family care coordination across Qatar, the GCC, and Egypt.",
+    "searchPlaceholder": "Search analyses, policies, or clinical topics...",
+    "allTopics": "All Topics",
+    "allRegions": "All Regions",
+    "featuredBadge": "Featured Regional Analysis",
+    "readTime": "{{min}} min read",
+    "readArticle": "Read Full Analysis",
+    "verifiedSourcesCount": "{{count}} Verified Citations",
+    "noResultsTitle": "No analyses found",
+    "noResultsDesc": "Try adjusting your search query or removing active category/region filters."
+  },
+  "categories": {
+    "all": "All Topics",
+    "disability-care": "Disability Care",
+    "aged-care": "Aged Care",
+    "care-coordination": "Care Coordination",
+    "policy-research": "Policy & Research",
+    "family-support": "Family Support"
+  },
+  "countries": {
+    "all": "All Regions",
+    "qatar": "Qatar",
+    "saudi-arabia": "Saudi Arabia",
+    "uae": "United Arab Emirates",
+    "egypt": "Egypt",
+    "regional": "Regional & International",
+    "unicef": "UNICEF & Regional"
+  },
+  "article": {
+    "backToHub": "Back to Blogs",
+    "keyTakeawaysTitle": "Key Takeaways for Families",
+    "verifiedSourcesTitle": "Verified Sources & Citations",
+    "verifiedSourcesSubtitle": "Every statistic on this page links directly to its official government or international publication.",
+    "riayahPerspectiveBadge": "Riayah Plus Clinical Perspective",
+    "riayahPerspectiveNotice": "Visual Distinction: This section reflects Riayah Plus clinical philosophy and system design, grounded in the verified data above.",
+    "officialSource": "Official Source",
+    "publishedOn": "Published",
+    "writtenBy": "Written by",
+    "shareArticle": "Share Analysis",
+    "linkCopied": "Link copied to clipboard!",
+    "relatedTitle": "Related Analyses & Research",
+    "viewAll": "View All Articles"
+  },
+  "verifiedDirectory": {
+    "eyebrow": "Institutional Rigor",
+    "title": "Verified Data & Policy Directory",
+    "subtitle": "Riayah Plus builds its care models upon validated national strategies, demographic datasets, and WHO/UNICEF standards.",
+    "officialPortal": "Official Portal",
+    "visitSource": "Visit Source",
+    "disclaimer": "Note: Riayah Plus regularly audits and updates primary statistical citations to ensure fidelity with official government publications."
+  },
+  "cta": {
+    "eyebrow": "From Insight to Action",
+    "title": "Turn clinical evidence into a structured care plan for your loved one",
+    "subtitle": "Speak directly with a dedicated Care Coordinator who understands your family's daily routines, goals, and regional healthcare resources.",
+    "button": "Book a Free Consultation"
+  }
+}

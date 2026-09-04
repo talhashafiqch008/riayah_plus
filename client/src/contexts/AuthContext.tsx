@@ -186,12 +186,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userData?.id) {
         const refreshedUser = mapUserData(userData, data);
         setUser(refreshedUser);
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(refreshedUser));
       }
     } catch {
       if (isAuthenticating.current) return;
       setUser(null);
-      localStorage.removeItem(STORAGE_KEYS.user);
     }
   };
 
@@ -226,11 +224,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userData && userData.id) {
         const refreshedUser = mapUserData(userData, data);
         setUser(refreshedUser);
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(refreshedUser));
       } else {
         if (isAuthenticating.current) return;
         setUser(null);
-        localStorage.removeItem(STORAGE_KEYS.user);
       }
     } catch (error: unknown) {
       const err = error as { response?: { status?: number }; message?: string };
@@ -243,7 +239,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (isAuthenticating.current) return;
       setUser(null);
-      localStorage.removeItem(STORAGE_KEYS.user);
     } finally {
       if (isAuthenticating.current) return;
       setLoading(false);
@@ -271,7 +266,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const loggedInUser = mapUserData(data.user as Record<string, unknown>, data);
       setUser(loggedInUser);
-      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loggedInUser));
       storeAuthResponse(data);
 
       return loggedInUser;
@@ -298,7 +292,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const loggedInUser = mapUserData(data.user as Record<string, unknown>, data);
       setUser(loggedInUser);
-      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loggedInUser));
       storeAuthResponse(data);
 
       return loggedInUser;
@@ -333,7 +326,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setUser(registeredUser);
-      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(registeredUser));
       storeAuthResponse(responseData);
 
       return { user: registeredUser };
@@ -358,10 +350,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       channel.close();
     }
 
-    localStorage.removeItem(STORAGE_KEYS.onboardingData);
-    localStorage.removeItem(STORAGE_KEYS.providerOnboardingDraft);
-    localStorage.removeItem(STORAGE_KEYS.country);
-    localStorage.removeItem(STORAGE_KEYS.user);
+    localStorage.removeItem('raiyah:onboarding_data');
+    localStorage.removeItem('raiyah:provider_onboarding_draft');
+    localStorage.removeItem('raiyah:country');
     clearLegacyTokenStorage();
     setUser(null);
     navigate('/');

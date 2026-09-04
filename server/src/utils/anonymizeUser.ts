@@ -8,7 +8,7 @@ import { prisma } from '../config/database';
  * operational shells where legal retention may still apply.
  */
 export async function anonymizeUser(userId: string): Promise<void> {
-  const placeholder = `deleted_${userId.slice(0, 8)}@anonymized.local`;
+  const placeholder = `deleted_${crypto.randomUUID()}@anonymized.local`;
   const redacted = '[redacted]';
 
   await prisma.$transaction(async (tx) => {
@@ -64,14 +64,10 @@ export async function anonymizeUser(userId: string): Promise<void> {
       },
     });
 
-    await tx.message.updateMany({
+    await tx.message.deleteMany({
       where: { OR: [{ senderId: userId }, { receiverId: userId }] },
-      data: { content: redacted, fileUrl: null },
     });
-    await tx.notification.updateMany({
-      where: { userId },
-      data: { title: redacted, body: redacted, data: {} },
-    });
+    await tx.notification.deleteMany({ where: { userId } });
     await tx.pushNotificationToken.deleteMany({ where: { userId } });
 
     await tx.document.updateMany({
@@ -256,12 +252,25 @@ export async function anonymizeUser(userId: string): Promise<void> {
       data: {
         notes: null,
         recordingUrl: null,
+        recordingTranscript: null,
+        recordingStatus: null,
+        recordingEgressId: null,
         latitude: null,
         longitude: null,
         checkInLat: null,
         checkInLng: null,
         checkOutLat: null,
         checkOutLng: null,
+      },
+    });
+
+    await tx.meeting.updateMany({
+      where: { OR: [{ hostId: userId }, { participantId: userId }] },
+      data: {
+        title: 'Anonymized Meeting',
+        notes: null,
+        recordingUrl: null,
+        recordingStatus: null,
       },
     });
 

@@ -29,17 +29,21 @@ router.post('/stripe/webhook', async (req: Request, res: Response) => {
     const intent = event.data.object as Stripe.PaymentIntent;
     const topup = await prisma.creditTopup.findFirst({ where: { stripeIntentId: intent.id } });
     if (topup) {
-      await prisma.creditTopup.update({
-        where: { id: topup.id },
+      const claimed = await prisma.creditTopup.updateMany({
+        where: { id: topup.id, status: 'pending' },
         data: { status: 'paid', confirmedAt: new Date() },
       });
+      if (claimed.count === 0) {
+        res.json({ received: true });
+        return;
+      }
       await WalletService.credit(
         topup.userId,
         Number(topup.amount),
         'topup',
         'Stripe credit top-up',
         topup.id,
-        'CreditTopup'
+        'CreditTopup',
       );
     }
   }

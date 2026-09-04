@@ -20,7 +20,8 @@ jest.mock('@sentry/node', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
   withScope: jest.fn(),
-  Handlers: { requestHandler: () => (_req: unknown, _res: unknown, next: () => void) => next(), errorHandler: () => (_err: unknown, _req: unknown, _res: unknown, next: () => void) => next() },
+  expressIntegration: jest.fn(() => ({})),
+  setupExpressErrorHandler: jest.fn(),
 }));
 
 // Silence Firebase

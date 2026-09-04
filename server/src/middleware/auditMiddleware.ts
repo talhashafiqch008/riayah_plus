@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuditService } from '../services/AuditService';
+import { logger } from '../config/logger';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -60,8 +61,12 @@ export function auditMiddleware(req: Request, res: Response, next: NextFunction)
       durationMs: Date.now() - startedAt,
       entity: resolveEntity(req),
       entityId: resolveEntityId(req),
-    }).catch(() => {
-      // Audit failures must not affect the API response path.
+    }).catch((err) => {
+      logger.error('audit_log_failure', {
+        method: req.method,
+        path: req.path,
+        err: err instanceof Error ? err.message : String(err),
+      });
     });
   });
 

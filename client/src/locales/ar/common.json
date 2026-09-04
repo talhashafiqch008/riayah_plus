@@ -1,0 +1,23 @@
+{
+  "actions": {
+    "continue": "متابعة",
+    "back": "رجوع",
+    "next": "التالي",
+    "submit": "إرسال",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "close": "إغلاق",
+    "scrollToTop": "العودة للأعلى",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "success": "تم بنجاح"
+  },
+  "language": {
+    "en": "English",
+    "ar": "العربية",
+    "switchToEn": "English",
+    "switchToAr": "العربية"
+  }
+}

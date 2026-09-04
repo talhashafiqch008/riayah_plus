@@ -130,7 +130,7 @@ export function requireCareCoordinator(req: Request, res: Response, next: NextFu
     res.status(401).json({ message: 'Unauthenticated.' });
     return;
   }
-  const allowed: UserRole[] = ['care_coordinator', ...ADMIN_ROLES];
+  const allowed: UserRole[] = ['care_coordinator', 'org_admin', ...ADMIN_ROLES];
   if (!allowed.includes(req.user.role)) {
     res.status(403).json({ message: 'Care coordinator access required.' });
     return;

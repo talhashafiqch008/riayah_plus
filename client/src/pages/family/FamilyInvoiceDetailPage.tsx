@@ -28,8 +28,9 @@ export default function FamilyInvoiceDetailPage() {
       let next = await getInvoice(id);
       if (canPayInvoice(next)) {
         try {
-          const confirmed = await confirmInvoicePayment(id);
+          const confirmed = await confirmInvoicePayment(id, { maxAttempts: 10, intervalMs: 1500 });
           if (confirmed.data) next = confirmed.data;
+          else if (confirmed.paid || confirmed.alreadyPaid) next = await getInvoice(id);
           if (confirmed.paid && !confirmed.alreadyPaid) {
             toast.success('Payment received');
           }

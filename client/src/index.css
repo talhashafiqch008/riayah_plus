@@ -49,6 +49,7 @@
   /* Calm Clinical Organic: Display headings, Body UI, Data mono */
   --font-display: "Playfair Display", "Inter", "Cairo", serif;
   --font-body: "Plus Jakarta Sans", "Inter", "Cairo", system-ui, sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Cairo", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
   --font-data: "JetBrains Mono", "IBM Plex Mono", monospace;
 
@@ -485,4 +486,35 @@ input[type="radio"] {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[dir="rtl"],
+html[lang="ar"],
+.rtl {
+  font-family: var(--font-arabic), "IBM Plex Sans Arabic", "Noto Sans Arabic", "Cairo", system-ui, sans-serif;
+}
+
+[dir="rtl"] *,
+[lang="ar"] *,
+.rtl * {
+  letter-spacing: normal !important;
+}
+
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[lang="ar"] h1,
+[lang="ar"] h2,
+[lang="ar"] h3,
+[lang="ar"] h4 {
+  line-height: 1.4 !important;
+}
+
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl-rotate-180 {
+  transform: rotate(180deg);
 }

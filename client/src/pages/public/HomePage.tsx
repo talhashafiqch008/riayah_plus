@@ -1,25 +1,63 @@
-import { Link } from 'react-router-dom';
-import HeroAnimation from '@/components/landing/HeroAnimation';
-import ScrollEffects from '@/components/landing/ScrollEffects';
-import NoiseOverlay from '@/components/landing/NoiseOverlay';
+import { useTranslation } from 'react-i18next';
+import { useI18n } from '@/components/I18nProvider';
+import { Navbar } from '@/components/landing/Navbar';
+import { Hero } from '@/components/landing/Hero';
+import { PartnersStrip } from '@/components/landing/PartnersStrip';
+import { WhoWeCareFor } from '@/components/landing/RoleCTA';
+import { HowItWorks } from '@/components/landing/HowItWorks';
+import { CarePlan } from '@/components/landing/CarePlan';
+import { Features } from '@/components/landing/Features';
+import { CareCoordinator } from '@/components/landing/CareCoordinator';
+import { FamilyExperience } from '@/components/landing/WhyChooseUs';
+import { Testimonials } from '@/components/landing/Testimonials';
+import { FAQ } from '@/components/landing/FAQ';
+import { FinalCTA } from '@/components/landing/FinalCTA';
+import { LandingFooter } from '@/components/landing/LandingFooter';
+import { fontBody, fontArabic } from '@/components/landing/tokens';
 
+export default function HomePage() {
+  const { t } = useTranslation('common');
+  const { isRTL } = useI18n();
 
-export default function CinematicLandingPage() {
- return (
- <main id="main-content" className="min-h-screen bg-[#F2F0E9] font-sans selection:bg-[#8CC63F] selection:text-[#F2F0E9]" tabIndex={-1}>
- <NoiseOverlay />
- <HeroAnimation />
- <ScrollEffects />
-
- <footer className="py-12 bg-[#1A1A1A] text-[#F2F0E9] border-t border-[#F2F0E9]/10 px-6 md:px-12 font-mono text-xs uppercase tracking-widest">
- <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
- <div>&copy; 2026 Raiyah Plus</div>
- <div className="flex gap-8">
- <Link to="/privacy" className="hover:text-[#00A9C1] transition-colors">Privacy Policy</Link>
- <Link to="/terms" className="hover:text-[#00A9C1] transition-colors">Terms of Service</Link>
- </div>
- </div>
- </footer>
- </main>
- );
+  return (
+    <main
+      id="main-content"
+      className="min-h-screen overflow-x-clip"
+      style={{ fontFamily: isRTL ? fontArabic : fontBody, background: '#FFFFFF' }}
+      tabIndex={-1}
+    >
+      <a
+        href="#how-it-works"
+        className="absolute start-3 top-3 z-[60] -translate-y-[200%] rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0F172A] outline outline-2 outline-[#14B8A6] focus:translate-y-0"
+      >
+        {isRTL ? 'الانتقال إلى المحتوى' : 'Skip to content'}
+      </a>
+      {/* 1. Navigation */}
+      <Navbar />
+      {/* 2. Hero & 3. Trust Strip */}
+      <Hero />
+      {/* 4. Who We Care For */}
+      <WhoWeCareFor />
+      {/* 5. How Riayah Works (4 steps) */}
+      <HowItWorks />
+      {/* 6. The Riayah Care Plan */}
+      <CarePlan />
+      {/* 7. Our Services (7 Specialized Services) */}
+      <Features />
+      {/* 8. The Care Coordinator */}
+      <CareCoordinator />
+      {/* 9. Family Experience */}
+      <FamilyExperience />
+      {/* 10. Real Family Stories */}
+      <Testimonials />
+      {/* 11. FAQ */}
+      <FAQ />
+      {/* 11.5 Australian Experience & Partners */}
+      <PartnersStrip className="py-16 sm:py-20" />
+      {/* 12. Final CTA */}
+      <FinalCTA />
+      {/* 13. Footer */}
+      <LandingFooter />
+    </main>
+  );
 }

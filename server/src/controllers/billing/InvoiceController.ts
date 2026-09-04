@@ -4,7 +4,8 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { AuditService } from '../../services/AuditService';
 import { notifyBillingEvent } from '../../services/BillingNotificationService';
-import { isAdminRole, isCoordinatorRole, isFamilyRole } from '../../utils/careAccess';
+import { isAdminRole, isBillingStaffRole, isFamilyRole } from '../../utils/careAccess';
+import { normalizeLineItems } from '../../utils/invoiceLineItems';
 import { assertInvoiceTransition } from '../../utils/stateMachine';
 import { QatariPaymentService } from '../../services/QatariPaymentService';
 import { env } from '../../config/env';
@@ -53,11 +54,11 @@ async function assertCanAccessInvoice(
   if (isAdminRole(role)) return;
 
   if (isFamilyRole(role)) {
-    if (invoice.clientId !== userId) throw new AppError('Forbidden.', 403);
+    if (invoice.clientId !== userId) throw new AppError('Invoice not found.', 404);
     return;
   }
 
-  if (isCoordinatorRole(role) || role === 'org_admin') {
+  if (isBillingStaffRole(role)) {
     const client = await prisma.user.findUnique({
       where: { id: invoice.clientId },
       select: { organizationId: true },
@@ -67,19 +68,19 @@ async function assertCanAccessInvoice(
       select: { organizationId: true },
     });
     if (!client?.organizationId || client.organizationId !== caller?.organizationId) {
-      throw new AppError('Forbidden.', 403);
+      throw new AppError('Invoice not found.', 404);
     }
     return;
   }
 
-  throw new AppError('Forbidden.', 403);
+  throw new AppError('Invoice not found.', 404);
 }
 
 async function assertCanBillClient(req: Request, clientId: string): Promise<void> {
   const role = req.user!.role;
   if (isAdminRole(role)) return;
 
-  if (!isCoordinatorRole(role) && role !== 'org_admin') {
+  if (!isBillingStaffRole(role)) {
     throw new AppError('Forbidden. Insufficient permissions to create invoices.', 403);
   }
 
@@ -113,7 +114,7 @@ export class InvoiceController {
       where.clientId = userId;
     } else if (isAdminRole(role)) {
       if (clientId) where.clientId = clientId;
-    } else if (isCoordinatorRole(role) || role === 'org_admin') {
+    } else if (isBillingStaffRole(role)) {
       const caller = await prisma.user.findUnique({
         where: { id: userId },
         select: { organizationId: true },
@@ -142,12 +143,13 @@ export class InvoiceController {
   static async store(req: Request, res: Response): Promise<void> {
     const data = createInvoiceSchema.parse(req.body);
     await assertCanBillClient(req, data.clientId);
+    const lineItems = normalizeLineItems(data.lineItems);
 
     if (data.currency !== 'QAR' && data.currency !== 'USD') {
       throw new AppError('Unsupported currency. Use QAR or USD.', 400);
     }
 
-    const { subtotal, taxAmount, total } = calculateTotals(data.lineItems, data.taxRate);
+    const { subtotal, taxAmount, total } = calculateTotals(lineItems, data.taxRate);
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -163,7 +165,7 @@ export class InvoiceController {
         total,
         notes: data.notes,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        lineItems: data.lineItems as object,
+        lineItems: lineItems as object,
         status: 'draft',
       },
     });
@@ -330,6 +332,24 @@ export class InvoiceController {
       throw new AppError('Invoice must be sent before it can be paid.', 422);
     }
 
+    const existingPending = await prisma.payment.findFirst({
+      where: { invoiceId: invoice.id, gateway: 'paytabs', status: 'pending' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existingPending?.gatewayRef) {
+      const stored = existingPending.gatewayResponse as { redirectUrl?: string } | null;
+      if (stored?.redirectUrl) {
+        res.json({
+          success: true,
+          gateway: 'paytabs',
+          paymentUrl: stored.redirectUrl,
+          reference: existingPending.gatewayRef,
+          reusedPending: true,
+        });
+        return;
+      }
+    }
+
     const requestedReturn =
       typeof req.body?.returnUrl === 'string' ? req.body.returnUrl : '';
     const returnUrl = isAllowedFrontendOrigin(requestedReturn)
@@ -357,6 +377,7 @@ export class InvoiceController {
         status: 'pending',
         gateway: 'paytabs',
         gatewayRef: result.transactionRef,
+        gatewayResponse: { redirectUrl: result.redirectUrl },
         description: `PayTabs checkout ${invoice.invoiceNumber}`,
       },
     });

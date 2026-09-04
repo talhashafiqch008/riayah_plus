@@ -6,6 +6,8 @@ import { assertTenantOrgAccess } from '../middleware/tenantAccess';
 export const FAMILY_ROLES = ['family', 'client', 'consumer', 'patient'] as const;
 export const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'] as const;
 export const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES] as const;
+/** org_admin + coordinators + platform admins — invoice/billing write surface (L1). */
+export const BILLING_STAFF_ROLES = ['care_coordinator', 'org_admin', ...ADMIN_ROLES] as const;
 
 export function isFamilyRole(role: string): boolean {
   return (FAMILY_ROLES as readonly string[]).includes(role);
@@ -15,8 +17,22 @@ export function isCoordinatorRole(role: string): boolean {
   return (COORDINATOR_ROLES as readonly string[]).includes(role);
 }
 
+export function isBillingStaffRole(role: string): boolean {
+  return (BILLING_STAFF_ROLES as readonly string[]).includes(role);
+}
+
 export function isAdminRole(role: string): boolean {
   return (ADMIN_ROLES as readonly string[]).includes(role);
+}
+
+/** org_admin may view telehealth for episodes in their organization only (not platform-wide). */
+export function canOrgAdminAccessEpisode(
+  actor: { role: string; organizationId?: string | null },
+  episodeOrganizationId?: string | null,
+): boolean {
+  if (actor.role !== 'org_admin') return false;
+  if (!actor.organizationId || !episodeOrganizationId) return false;
+  return actor.organizationId === episodeOrganizationId;
 }
 
 /** Prisma where filter: family sees episodes on their care units (or legacy patientId self). */

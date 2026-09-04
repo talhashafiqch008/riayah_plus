@@ -11,15 +11,16 @@ import { PhoneInput } from '@/components/PhoneInput';
 import { PhoneAuthService } from '@/lib/phone-auth';
 import { verifyPhoneOtp } from '@/lib/api/auth';
 import { CountryCode } from '@/config/countries';
+import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
-import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 
 
 
 export default function PhoneLoginPage() {
  const navigate = useNavigate();
+ const { refreshUser } = useAuth();
  const [step, setStep] = useState<'phone' | 'otp'>('phone');
  const [fullPhoneNumber, setFullPhoneNumber] = useState('');
  const [countryCode, setCountryCode] = useState<CountryCode>(CountryCode.QA); // Qatar default
@@ -86,12 +87,10 @@ export default function PhoneLoginPage() {
  return;
  }
 
- // Sessions are cookie-only — never persist access tokens in localStorage (M1)
+ // Sessions are cookie-only — never persist user profile in localStorage (B5/M9)
  if (result.accessToken || result.user) {
  toast.success('Phone verified successfully!');
- if (result.user) {
- localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(result.user));
- }
+ await refreshUser();
  navigate('/careseeker');
  } else {
  toast.error('Invalid verification code. Please try again.');

@@ -17,6 +17,7 @@ import {
   issueLiveKitJoinToken,
   receiveLiveKitWebhookEvent,
 } from '../../services/LiveKitAccess';
+import { assertCanScheduleMeeting } from '../../utils/meetingScheduleAccess';
 
 const scheduleSchema = z.object({
   participantId: z.string(),
@@ -36,6 +37,9 @@ export class MeetingSchedulerController {
     try {
       const body = scheduleSchema.parse(req.body);
       const hostId = req.user!.userId;
+
+      await assertCanScheduleMeeting(req, body);
+
       const roomName = `riayah-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
       const meeting = await prisma.meeting.create({
@@ -212,11 +216,10 @@ export class MeetingSchedulerController {
   // POST /api/livekit/webhook — LiveKit event webhook (signature required)
   static async livekitWebhook(req: Request, res: Response, next: NextFunction) {
     try {
-      const raw = Buffer.isBuffer(req.body)
-        ? req.body.toString('utf8')
-        : typeof req.body === 'string'
-          ? req.body
-          : JSON.stringify(req.body ?? {});
+      if (!Buffer.isBuffer(req.body)) {
+        throw new AppError('LiveKit webhook requires a raw request body.', 400);
+      }
+      const raw = req.body.toString('utf8');
       const authHeader = typeof req.headers.authorization === 'string'
         ? req.headers.authorization
         : undefined;

@@ -28,6 +28,12 @@ router.post('/sessions/:sessionId/recording/stop', (req, res, next) => {
 router.get('/sessions/:sessionId/recording', (req, res, next) => {
   TelehealthController.getRecording(req, res).catch(next);
 });
+router.get('/sessions/:sessionId/transcript', (req, res, next) => {
+  TelehealthController.getTranscript(req, res).catch(next);
+});
+router.put('/sessions/:sessionId/transcript', (req, res, next) => {
+  TelehealthController.saveTranscript(req, res).catch(next);
+});
 router.get('/rooms/:roomName', TelehealthController.getRoomInfo);
 router.post('/checkin', TelehealthController.sessionCheckin);
 router.post('/checkout', TelehealthController.sessionCheckout);

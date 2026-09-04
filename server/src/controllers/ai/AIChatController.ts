@@ -2,23 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { GeminiChatService } from '../../services/GeminiChatService';
-import { AppError } from '../../middleware/errorHandler';
+import { assertAiChatConsent } from '../../utils/aiChatConsent';
 import { assertContentPolicy } from '../../utils/contentPolicy';
-
-const AI_CHAT_CONSENT_TYPE = 'ai_chat';
-
-async function assertAiChatConsent(userId: string): Promise<void> {
-  const consent = await prisma.consent.findUnique({
-    where: { userId_consentType: { userId, consentType: AI_CHAT_CONSENT_TYPE } },
-    select: { granted: true, revokedAt: true },
-  });
-  if (!consent || !consent.granted || consent.revokedAt !== null) {
-    throw new AppError(
-      'AI chat consent is required. Please accept the AI usage terms before using this feature.',
-      403,
-    );
-  }
-}
 
 const messageSchema = z.object({ message: z.string().min(1).max(2000) });
 

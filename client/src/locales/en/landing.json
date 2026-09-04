@@ -1,0 +1,311 @@
+{
+  "nav": {
+    "howItWorks": "How It Works",
+    "disabilityCare": "Disability Care",
+    "agedCare": "Aged Care",
+    "services": "Services",
+    "carePlan": "Care Plan",
+    "coordinator": "Care Coordinator",
+    "about": "About",
+    "knowledgeHub": "Blogs",
+    "signIn": "Sign In",
+    "bookConsultation": "Book a Consultation"
+  },
+  "hero": {
+    "badge": "Specialized Disability & Aged Care",
+    "titleLine1": "Specialized Care.",
+    "titleLine2": "Built Around Your Family.",
+    "subtitle": "Disability and aged care designed around your loved one's needs, goals, and everyday life.",
+    "bookConsultation": "Book a Consultation",
+    "howItWorks": "How Riayah Works"
+  },
+  "trustStrip": {
+    "disabilityCare": {
+      "title": "Disability Care",
+      "desc": "Individualized support & therapy"
+    },
+    "agedCare": {
+      "title": "Aged Care",
+      "desc": "Compassionate home & clinical support"
+    },
+    "careCoordination": {
+      "title": "Care Coordination",
+      "desc": "One dedicated person managing care"
+    },
+    "homeCommunity": {
+      "title": "Home & Community Support",
+      "desc": "Daily living & community engagement"
+    },
+    "telehealth": {
+      "title": "Telehealth",
+      "desc": "Direct consultations with your team"
+    }
+  },
+  "partners": {
+    "eyebrow": "Our Australian Experience & Partners",
+    "title": "Built on proven Australian care models, adapted for our region",
+    "subtitle": "Clinical rigor and person-centered coordination frameworks developed with our Australian partners and adapted to GCC family values",
+    "carestride": {
+      "name": "CareStride Australia",
+      "desc": "Disability & Aged Care"
+    },
+    "uniqueSupport": {
+      "name": "Unique Individual Support",
+      "desc": "Specialized In-Home Care"
+    },
+    "myndic": {
+      "name": "MyNDIC Australia",
+      "desc": "NDIS & Person-Centered Systems"
+    }
+  },
+  "whoWeCareFor": {
+    "eyebrow": "Who We Care For",
+    "title": "Tailored care for every stage and ability",
+    "subtitle": "We partner closely with families to deliver dependable, high-touch support that promotes dignity, comfort, and independence.",
+    "olderAdults": {
+      "title": "Older Adults",
+      "desc": "Empowering seniors to remain safe, active, and well-supported at home with clinical visits, rehabilitation, and companion care.",
+      "badge": "Aged Care"
+    },
+    "disability": {
+      "title": "People Living With Disability",
+      "desc": "Goal-oriented allied health, nursing, and daily support designed to unlock independence and nurture personal growth.",
+      "badge": "Disability Support"
+    },
+    "families": {
+      "title": "Families & Caregivers",
+      "desc": "Relief and total clarity for family members with a single coordinator, unified schedule, and transparent care updates.",
+      "badge": "Family First"
+    }
+  },
+  "howItWorks": {
+    "eyebrow": "How Riayah Works",
+    "title": "Your family's care journey in 4 clear steps",
+    "subtitle": "No juggling providers or repeating your medical history. We build and coordinate everything around you.",
+    "steps": {
+      "01": {
+        "step": "01",
+        "title": "Tell us about your needs",
+        "body": "Share your family's care requirements, daily routines, goals, and preferences through a guided consultation."
+      },
+      "02": {
+        "step": "02",
+        "title": "Meet your Care Coordinator",
+        "body": "You are paired with a dedicated Care Coordinator who acts as your single point of contact and builds your clinical team."
+      },
+      "03": {
+        "step": "03",
+        "title": "Build your care plan",
+        "body": "Together, we craft an individualized care plan encompassing clinical goals, therapy schedules, and daily support."
+      },
+      "04": {
+        "step": "04",
+        "title": "Start care and track progress",
+        "body": "Visits begin smoothly. Review notes, communicate with your team, and track health milestones in real time."
+      }
+    }
+  },
+  "carePlan": {
+    "eyebrow": "The Riayah Care Plan",
+    "title": "More than appointments. A living, individualized care plan.",
+    "subtitle": "Riayah organizes your loved one's entire care ecosystem into a centralized, transparent plan that adapts as their needs evolve.",
+    "badge": "Individualized Blueprint",
+    "pillars": {
+      "goals": {
+        "title": "Goals",
+        "desc": "Clear, measurable wellness and independence targets defined with the family."
+      },
+      "services": {
+        "title": "Services",
+        "desc": "Multi-disciplinary care matched to clinical, physical, and daily living needs."
+      },
+      "appointments": {
+        "title": "Appointments",
+        "desc": "Synchronized calendar for home visits, clinical sessions, and telehealth."
+      },
+      "progress": {
+        "title": "Progress",
+        "desc": "Real-time session notes, outcome indicators, and milestone tracking."
+      },
+      "reviews": {
+        "title": "Reviews",
+        "desc": "Scheduled quarterly assessments ensuring care continually evolves with your needs."
+      }
+    },
+    "previewCard": {
+      "patientName": "Fatima",
+      "planType": "Comprehensive Disability & Wellness Plan",
+      "status": "Active Plan",
+      "primaryGoal": "Maintain mobility & speech therapy progress",
+      "coordinatorLabel": "Dedicated Coordinator:",
+      "coordinatorName": "Sara Al-Harbi, RN",
+      "nextVisit": "Tomorrow at 10:00 AM • Home Physiotherapy",
+      "recentProgress": "Mobility score +18% over last 6 weeks"
+    }
+  },
+  "services": {
+    "eyebrow": "Our Services",
+    "titleLine1": "Comprehensive Disability &",
+    "titleLine2": "Aged Care Services",
+    "subtitle": "Specialized clinical care, therapy, and compassionate support delivered in the comfort of your home and community.",
+    "exploreAll": "Explore All Services",
+    "items": {
+      "disability": {
+        "title": "Disability Care",
+        "description": "Specialized support programs empowering individuals of all abilities to achieve greater independence."
+      },
+      "aged": {
+        "title": "Aged Care",
+        "description": "Comprehensive elder care ensuring comfort, mobility, and dignified living in familiar home environments."
+      },
+      "nursing": {
+        "title": "Nursing",
+        "description": "Clinical home nursing including medication management, wound care, vital monitoring, and post-op support."
+      },
+      "alliedHealth": {
+        "title": "Allied Health",
+        "description": "Physical therapy, occupational therapy, and speech pathology tailored to individualized recovery goals."
+      },
+      "dailyLiving": {
+        "title": "Daily Living & Community Support",
+        "description": "Assistance with daily activities, personal care, mobility support, and social community engagement."
+      },
+      "careCoordination": {
+        "title": "Care Coordination",
+        "description": "Your single clinical contact who organizes visits, synchronizes clinicians, and supports your family."
+      },
+      "telehealth": {
+        "title": "Telehealth",
+        "description": "Secure virtual consultations, quick doctor reviews, and video follow-ups with your care team."
+      }
+    }
+  },
+  "coordinator": {
+    "eyebrow": "The Riayah Difference",
+    "title": "One person connecting your care journey",
+    "subtitle": "Families shouldn't have to navigate fragmented healthcare systems alone. Your dedicated Care Coordinator is with you every step of the way.",
+    "roleTitle": "Your Dedicated Care Coordinator",
+    "roleSubtitle": "A licensed clinical professional who knows your family by name.",
+    "responsibilities": [
+      {
+        "title": "Single Point of Contact",
+        "desc": "One phone number and message thread for questions, schedule changes, and updates."
+      },
+      {
+        "title": "Team & Provider Assembly",
+        "desc": "Matches and schedules vetted nurses, therapists, and support workers tailored to your loved one."
+      },
+      {
+        "title": "Care Plan Ownership",
+        "desc": "Monitors clinical progress notes, adjusts schedules, and organizes regular family reviews."
+      },
+      {
+        "title": "Family Advocacy & Peace of Mind",
+        "desc": "Acts as your trusted partner, ensuring zero administrative friction or missed follow-ups."
+      }
+    ],
+    "quote": "“My job is to remove all the stress from healthcare logistics so families can simply focus on loving and supporting each other.”",
+    "author": "Maryam Al-Kuwari, Lead Care Coordinator"
+  },
+  "familyExperience": {
+    "eyebrow": "Family Experience",
+    "title": "Total clarity in the palm of your hand",
+    "subtitle": "Designed specifically for families to stay informed, engaged, and in control of their loved one's care.",
+    "features": [
+      {
+        "step": "01",
+        "title": "Book",
+        "desc": "Request new home visits or telehealth consultations in seconds with your preferred times."
+      },
+      {
+        "step": "02",
+        "title": "Communicate",
+        "desc": "Message your Care Coordinator and clinical team directly in one encrypted thread."
+      },
+      {
+        "step": "03",
+        "title": "View Appointments",
+        "desc": "Access a clear, shared calendar of upcoming nursing, physio, and support visits."
+      },
+      {
+        "step": "04",
+        "title": "Review Care Plan",
+        "desc": "View live therapeutic goals, clinician notes, and current treatment milestones."
+      },
+      {
+        "step": "05",
+        "title": "Track Progress",
+        "desc": "Celebrate functional improvements and health milestones documented after each session."
+      }
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "Real Families, Real Stories",
+    "title": "How Riayah transforms everyday family life",
+    "subtitle": "Hear from families in Qatar who found peace of mind with our coordinated disability and aged care."
+  },
+  "faq": {
+    "eyebrow": "Frequently Asked Questions",
+    "title": "Common questions from families",
+    "subtitle": "Everything you need to know about starting care, our coordinator role, and how we support your loved ones.",
+    "support": {
+      "needHuman": "Want to speak with a Care Coordinator?",
+      "description": "Book a free consultation and our team will answer all your questions about our disability and aged care services."
+    },
+    "items": [
+      {
+        "q": "What makes Riayah Plus different from regular home care agencies?",
+        "a": "Unlike fragmented agencies where you must manage separate nurses and therapists, Riayah assigns a dedicated Care Coordinator who crafts a holistic Care Plan, synchronizes your entire clinical team, and keeps your family informed in one unified app."
+      },
+      {
+        "q": "How do you match clinicians and caregivers to my family member?",
+        "a": "During the initial consultation, we assess your loved one's clinical requirements, personality preferences, schedule, and cultural context. Your coordinator handpicks vetted nurses, physiotherapists, and support specialists best suited for them."
+      },
+      {
+        "q": "Can care plans be adjusted as our family's needs change?",
+        "a": "Yes, absolutely. The Riayah Care Plan is a living blueprint. Your coordinator conducts ongoing reviews and adjusts hours, therapy goals, and clinical visits as your loved one progresses or needs evolve."
+      },
+      {
+        "q": "What disability and aged care services are available at home?",
+        "a": "We provide comprehensive home nursing, rehabilitation (physiotherapy, occupational therapy, speech therapy), assistance with daily living activities, companion care, respite support, and telehealth follow-ups."
+      },
+      {
+        "q": "How quickly can we start care after booking a consultation?",
+        "a": "Once you complete the initial consultation, your coordinator can assess needs, finalize the individualized care plan, and begin scheduled visits within 24 to 48 hours."
+      }
+    ]
+  },
+  "finalCta": {
+    "title": "Start your care journey with Riayah Plus",
+    "subtitle": "Book a free consultation today. Our Care Coordinators are ready to build the personalized care your family deserves.",
+    "button": "Book a Consultation"
+  },
+  "footer": {
+    "description": "Specialized disability and aged care built around your family: individualized care plans, dedicated coordination, and compassionate support.",
+    "tagline": "Specialized Care. Built Around Your Family.",
+    "rights": "All rights reserved.",
+    "groups": {
+      "care": "Care Services",
+      "company": "About Riayah",
+      "patientInfo": "Patient & Family",
+      "legal": "Legal & Support"
+    },
+    "links": {
+      "disabilityCare": "Disability Care",
+      "agedCare": "Aged Care",
+      "careCoordination": "Care Coordination",
+      "alliedHealth": "Allied Health",
+      "howItWorks": "How It Works",
+      "carePlan": "The Care Plan",
+      "aboutUs": "About Us",
+      "knowledgeHub": "Blogs",
+      "careers": "Careers",
+      "patientInfo": "Patient Information",
+      "contact": "Contact Us",
+      "faq": "FAQ",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "complaints": "Complaints & Feedback"
+    }
+  }
+}
