@@ -36,6 +36,7 @@ import lmsRoutes from './lms.routes';
 import meetingsRoutes from './meetings.routes';
 import livekitWebhookRoutes from './livekit-webhook.routes';
 import careOrdersRoutes from './care-orders.routes';
+import voiceRecordingRoutes from './voice-recording.routes';
 // New routes (Phase 2+ parity)
 import pricingRoutes from './pricing.routes';
 import payoutRoutes from './payout.routes';
@@ -98,6 +99,7 @@ router.get('/coordinator/intake-queue', authenticate, requireCareCoordinator, In
 // Telehealth & GPS (M4–M5)
 router.use('/telehealth', telehealthRoutes);
 router.use('/gps', gpsRoutes);
+router.use('/voice-recordings', voiceRecordingRoutes);
 
 // Billing (M4)
 router.use('/invoices', invoiceRoutes);

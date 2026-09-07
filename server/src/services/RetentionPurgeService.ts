@@ -76,16 +76,32 @@ export async function purgeExpiredSessionRecordings(): Promise<number> {
   return result.count;
 }
 
-export async function runRetentionPurgeBatch(): Promise<void> {
-  const [messages, meetings, userSessions, documents, recordings] = await Promise.all([
-    purgeExpiredMessages(),
-    purgeExpiredMeetings(),
-    purgeExpiredUserSessions(),
-    purgeExpiredDocuments(),
-    purgeExpiredSessionRecordings(),
-  ]);
+export async function purgeExpiredVoiceRecordings(): Promise<number> {
+  const cutoff = retentionCutoff(RETENTION_DAYS.voiceRecording);
+  const result = await prisma.voiceRecording.deleteMany({
+    where: {
+      OR: [
+        { retentionExpiresAt: { lt: new Date() } },
+        { deletedAt: { not: null, lt: cutoff } },
+        { retentionExpiresAt: null, createdAt: { lt: cutoff } },
+      ],
+    },
+  });
+  return result.count;
+}
 
-  const total = messages + meetings + userSessions + documents + recordings;
+export async function runRetentionPurgeBatch(): Promise<void> {
+  const [messages, meetings, userSessions, documents, recordings, voiceRecordings] =
+    await Promise.all([
+      purgeExpiredMessages(),
+      purgeExpiredMeetings(),
+      purgeExpiredUserSessions(),
+      purgeExpiredDocuments(),
+      purgeExpiredSessionRecordings(),
+      purgeExpiredVoiceRecordings(),
+    ]);
+
+  const total = messages + meetings + userSessions + documents + recordings + voiceRecordings;
   if (total > 0) {
     logger.info('Retention purge batch completed', {
       messages,
@@ -93,6 +109,7 @@ export async function runRetentionPurgeBatch(): Promise<void> {
       userSessions,
       documents,
       recordings,
+      voiceRecordings,
     });
   }
 }

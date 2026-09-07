@@ -14,7 +14,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Riayah Plus uses your location only when you check in or out of a visit, to confirm you are at the patient's address.",
         "NSCameraUsageDescription": "Riayah Plus needs camera access for telehealth video visits.",
-        "NSMicrophoneUsageDescription": "Riayah Plus needs microphone access for telehealth video visits."
+        "NSMicrophoneUsageDescription": "Riayah Plus needs microphone access for telehealth visits and voice notes."
       }
     },
     "android": {
@@ -62,7 +62,7 @@
         "expo-camera",
         {
           "cameraPermission": "Riayah Plus needs camera access for telehealth video visits.",
-          "microphonePermission": "Riayah Plus needs microphone access for telehealth video visits.",
+          "microphonePermission": "Riayah Plus needs microphone access for telehealth visits and voice notes.",
           "recordAudioAndroid": true
         }
       ],

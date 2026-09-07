@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { RoleHome } from '../../../components/shell/RoleHome';
+import { VoiceRecordWidget } from '../../../components/voice/VoiceRecordWidget';
 import { listCarePlans, listEpisodes, listIntakeQueue } from '../../../lib/api/care';
 
 type ShellStat = { label: string; value: string; accent: 'teal' | 'stone' | 'amber' };
@@ -116,6 +117,7 @@ export default function CoordinatorHomeScreen() {
       nextSteps={NEXT_STEPS}
       cta={{ label: 'Open intake queue', onPress: () => router.push('/(coordinator)/intake') }}
       quickLinks={QUICK_LINKS}
+      topWidget={<VoiceRecordWidget historyHref="/(coordinator)/voice-recordings" />}
     />
   );
 }

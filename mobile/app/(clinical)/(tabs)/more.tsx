@@ -21,6 +21,12 @@ export default function ClinicalMoreScreen() {
               description: 'Admit patients and join video visits',
               href: '/(clinical)/telehealth',
             },
+            {
+              icon: 'mic-outline',
+              label: 'Voice recordings',
+              description: 'Record and replay clinical voice notes',
+              href: '/(clinical)/voice-recordings',
+            },
           ],
         },
         {

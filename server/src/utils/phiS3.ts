@@ -2,7 +2,7 @@ import { PutObjectCommand, type PutObjectCommandInput, S3Client } from '@aws-sdk
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
 
-export type PhiS3Purpose = 'telehealth_recording' | 'chat_attachment' | 'invoice_pdf';
+export type PhiS3Purpose = 'telehealth_recording' | 'chat_attachment' | 'invoice_pdf' | 'voice_recording';
 
 /** KMS key id/arn for PHI uploads; purpose-specific env with AWS_KMS_KEY_ID fallback. */
 export function kmsKeyForPurpose(purpose: PhiS3Purpose): string {
@@ -13,6 +13,8 @@ export function kmsKeyForPurpose(purpose: PhiS3Purpose): string {
       return env.CHAT_ATTACHMENT_KMS_KEY || env.AWS_KMS_KEY_ID;
     case 'invoice_pdf':
       return env.INVOICE_PDF_KMS_KEY || env.AWS_KMS_KEY_ID;
+    case 'voice_recording':
+      return env.TELEHEALTH_RECORDING_KMS_KEY || env.AWS_KMS_KEY_ID;
   }
 }
 

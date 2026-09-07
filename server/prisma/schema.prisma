@@ -413,6 +413,7 @@ model User {
   dataExportRequests      DataExportRequest[]       @relation("DataExportRequests")
   accountDeletionRequests AccountDeletionRequest[]  @relation("AccountDeletionRequests")
   pushTokens              PushNotificationToken[]   @relation("PushTokens")
+  voiceRecordings         VoiceRecording[]
 
   @@index([email])
   @@index([phone])
@@ -1985,6 +1986,33 @@ model Meeting {
 
   @@index([retentionExpiresAt])
   @@map("meetings")
+}
+
+/// Browser-captured voice notes (MediaRecorder) — separate from LiveKit egress video recordings.
+model VoiceRecording {
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId     String?
+  title              String?
+  notes              String?
+  s3Key              String
+  mimeType           String
+  sizeBytes          Int
+  durationSeconds    Int?
+  sessionId          String?
+  meetingId          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+  retentionExpiresAt DateTime?
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([meetingId])
+  @@index([retentionExpiresAt])
+  @@map("voice_recordings")
 }
 
 model LessonProgress {

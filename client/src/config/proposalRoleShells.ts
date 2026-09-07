@@ -18,6 +18,7 @@ import {
   UserCog,
   Wallet,
   Video,
+  Mic,
 } from 'lucide-react';
 
 export interface RoleShellNavItem {
@@ -55,6 +56,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Care Journey', href: '/family/episodes', icon: Activity },
       { name: 'Appointments', href: '/family/bookings', icon: Calendar },
       { name: 'Video sessions', href: '/family/telehealth', icon: Video },
+      { name: 'Voice recordings', href: '/family/voice-recordings', icon: Mic },
       { name: 'Documents', href: '/family/documents', icon: FileText },
       { name: 'Care Plans', href: '/family/care-plans', icon: BookOpen },
       { name: 'Billing', href: '/family/billing', icon: Wallet },
@@ -118,6 +120,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Episodes', href: '/coordinator/episodes', icon: Activity },
       { name: 'Care Plans', href: '/coordinator/plans', icon: ClipboardList },
       { name: 'Schedule', href: '/coordinator/schedule', icon: Calendar },
+      { name: 'Voice recordings', href: '/coordinator/voice-recordings', icon: Mic },
       { name: 'Messages', href: '/coordinator/messages', icon: MessageCircle },
     ],
     dashboard: {
@@ -159,6 +162,7 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Dashboard', href: '/clinical', icon: LayoutDashboard },
       { name: 'Schedule', href: '/clinical/schedule', icon: Calendar },
       { name: 'Video sessions', href: '/clinical/telehealth', icon: Video },
+      { name: 'Voice recordings', href: '/clinical/voice-recordings', icon: Mic },
       { name: 'Patients', href: '/clinical/patients', icon: Users },
       { name: 'Session Notes', href: '/clinical/notes', icon: Stethoscope },
       { name: 'Care Plans', href: '/clinical/plans', icon: BookOpen },

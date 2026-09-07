@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { RoleHome } from '../../../components/shell/RoleHome';
+import { VoiceRecordWidget } from '../../../components/voice/VoiceRecordWidget';
 import { listAssessments } from '../../../lib/api/assessments';
 
 type ShellStat = { label: string; value: string; accent: 'teal' | 'stone' | 'amber' };
@@ -91,6 +92,7 @@ export default function ClinicalHomeScreen() {
       onRetry={() => void statsQuery.refetch()}
       nextSteps={NEXT_STEPS}
       quickLinks={QUICK_LINKS}
+      topWidget={<VoiceRecordWidget historyHref="/(clinical)/voice-recordings" />}
     />
   );
 }

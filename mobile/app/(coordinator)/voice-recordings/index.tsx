@@ -1,0 +1,5 @@
+import { VoiceRecordingsScreen } from '../../../components/voice/VoiceRecordingsScreen';
+
+export default function CoordinatorVoiceRecordingsRoute() {
+  return <VoiceRecordingsScreen />;
+}

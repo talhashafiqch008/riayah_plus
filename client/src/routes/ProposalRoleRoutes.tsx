@@ -41,6 +41,7 @@ import EpisodeListPage from '@/pages/care/EpisodeListPage';
 import EpisodeDetailPage from '@/pages/care/EpisodeDetailPage';
 import AssessmentSchedulePage from '@/pages/care/AssessmentSchedulePage';
 import StaffProfileSettingsPage from '@/pages/staff/ProfilePage';
+import VoiceRecordingsPage from '@/pages/roles/VoiceRecordingsPage';
 
 const PageSpinner = () => (
   <div className="min-h-[200px] flex items-center justify-center">
@@ -204,6 +205,17 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/coordinator/voice-recordings"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <VoiceRecordingsPage
+                        title="Voice recordings"
+                        description="Capture voice notes during intake or care coordination, then replay or delete them from your history."
+                      />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {shellKey === 'family' && (
@@ -341,6 +353,17 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/family/voice-recordings"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <VoiceRecordingsPage
+                        title="Voice recordings"
+                        description="Record voice notes during or after a video session, then replay or delete them from your history."
+                      />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {shellKey === 'clinical' && (
@@ -442,6 +465,17 @@ export const proposalRoleRouteElements = (
                   element={
                     <Suspense fallback={<PageSpinner />}>
                       <RoleMessagesPage basePath="/clinical/messages" canStartStaffThreads />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/clinical/voice-recordings"
+                  element={
+                    <Suspense fallback={<PageSpinner />}>
+                      <VoiceRecordingsPage
+                        title="Voice recordings"
+                        description="Record clinical voice notes during or after a session, then replay or delete them from your history."
+                      />
                     </Suspense>
                   }
                 />

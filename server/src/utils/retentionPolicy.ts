@@ -4,6 +4,7 @@ export const RETENTION_DAYS = {
   notification: 365,
   meeting: 365,
   sessionRecording: 90,
+  voiceRecording: 90,
   userSession: 90,
   document: 2555,
 } as const;

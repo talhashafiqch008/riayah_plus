@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import {
   Dimensions,
   Pressable,
@@ -62,6 +62,8 @@ export type RoleHomeProps = {
   nextSteps: string[];
   cta?: { label: string; onPress: () => void };
   quickLinks: readonly RoleHomeLink[];
+  /** Optional dashboard widget rendered above next steps (e.g. voice record). */
+  topWidget?: ReactNode;
 };
 
 function accentColor(accent: RoleHomeStat['accent']) {
@@ -216,6 +218,7 @@ export function RoleHome({
   nextSteps,
   cta,
   quickLinks,
+  topWidget,
 }: RoleHomeProps) {
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(' ')[0] ?? 'there';
@@ -329,6 +332,8 @@ export function RoleHome({
             </Text>
           </Pressable>
         ) : null}
+
+        {topWidget ? <View className="mt-5 px-4">{topWidget}</View> : null}
 
         <View className="mt-5 px-4">
           <View style={[{ padding: 16 }, roleCardStyle]}>

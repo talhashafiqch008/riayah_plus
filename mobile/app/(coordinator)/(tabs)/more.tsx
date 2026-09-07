@@ -26,6 +26,12 @@ export default function CoordinatorMoreScreen() {
               description: 'Map, check-ins, and check-outs for booked visits',
               href: '/(coordinator)/map',
             },
+            {
+              icon: 'mic-outline',
+              label: 'Voice recordings',
+              description: 'Record and replay voice notes',
+              href: '/(coordinator)/voice-recordings',
+            },
           ],
         },
         {
