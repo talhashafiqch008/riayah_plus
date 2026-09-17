@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '@/components/I18nProvider';
-import { L, fontBody, fontHeading, fontArabic } from './tokens';
+import { L, fontBody, fontHeading, fontArabic, landingContainerClass } from './tokens';
 import { SectionReveal } from './motion';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
@@ -22,8 +22,8 @@ export function LandingFooter() {
     {
       title: t('footer.groups.care', 'Care Services'),
       items: [
-        { label: t('footer.links.disabilityCare', 'Disability Care'), href: formatHref('#who-we-care-for') },
-        { label: t('footer.links.agedCare', 'Aged Care'), href: formatHref('#who-we-care-for') },
+        { label: t('footer.links.disabilityCare', 'Disability Care'), href: formatHref('#services') },
+        { label: t('footer.links.agedCare', 'Aged Care'), href: formatHref('#services') },
         { label: t('footer.links.careCoordination', 'Care Coordination'), href: formatHref('#coordinator') },
         { label: t('footer.links.alliedHealth', 'Allied Health'), href: formatHref('#services') },
       ],
@@ -52,7 +52,7 @@ export function LandingFooter() {
 
   return (
     <footer style={{ background: L.deep, color: '#F0F7F6' }}>
-      <SectionReveal className="mx-auto max-w-6xl px-5 py-14 sm:px-6 sm:py-16">
+      <SectionReveal className={`${landingContainerClass} py-14 sm:py-16`}>
         <div className="mb-12 grid grid-cols-2 gap-10 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
             <Link to="/" className="mb-4 inline-flex items-center gap-2.5">

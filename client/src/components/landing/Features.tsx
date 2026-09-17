@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '@/components/I18nProvider';
-import { L, fontHeading, fontBody, fontArabic } from './tokens';
+import { L, fontHeading, fontBody, fontArabic, landingContainerClass } from './tokens';
 import { LandingCard } from './LandingCard';
 import { LandingButton } from './LandingButton';
 import { SectionReveal, Stagger, StaggerItem } from './motion';
@@ -100,8 +100,15 @@ export function Features() {
   ];
 
   return (
-    <section id="services" className="bg-white py-20 sm:py-28">
-      <div className="mx-auto max-w-6xl px-5 sm:px-6">
+    <section id="services" className="relative overflow-hidden py-20 sm:py-28" style={{ background: L.paper }}>
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        aria-hidden
+        style={{
+          background: `radial-gradient(ellipse 50% 40% at 10% 20%, ${L.aqua} 0%, transparent 60%), radial-gradient(ellipse 40% 35% at 90% 10%, ${L.mint} 0%, transparent 55%)`,
+        }}
+      />
+      <div className={landingContainerClass}>
         <div className="mb-14 flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <SectionReveal className="max-w-2xl">
             <p

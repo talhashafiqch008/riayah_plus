@@ -1,50 +1,50 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Star, Quote } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '@/components/I18nProvider';
-import { L, fontHeading, fontBody, fontArabic, easeOut } from './tokens';
+import { L, fontHeading, fontBody, fontArabic, easeOut, landingContainerClass } from './tokens';
 import { SectionReveal } from './motion';
 
 const TESTIMONIALS_EN = [
   {
     quote:
-      'Finding specialized physical therapy and daily living support for my son with cerebral palsy was overwhelming. Our Riayah Care Coordinator built a personalized plan and stays in touch every week. It has brought peace back to our household.',
+      'Our Care Coordinator built a clear plan for our son and checks in every week. Care finally feels manageable.',
     name: 'Nasser Al-Kuwari',
-    role: 'Parent of child with disability · Doha',
+    role: 'Parent · Doha',
     initials: 'NK',
   },
   {
     quote:
-      'My 84-year-old mother wanted to remain in her home. Riayah coordinated her home nurse, medication checks, and geriatric physio into one synchronized weekly schedule. We never worry about missed visits.',
+      'Riayah synced nursing, meds, and physio for my mother into one weekly schedule. We stopped worrying about missed visits.',
     name: 'Mona Al-Attiyah',
-    role: 'Family caregiver (Aged Care) · Al Rayyan',
+    role: 'Family caregiver · Al Rayyan',
     initials: 'MA',
   },
   {
     quote:
-      'The Riayah Care Plan makes all the difference. We see real mobility progress targets and therapy notes immediately after every session. No paperwork chase, just compassionate care.',
+      'We see goals and therapy notes right after each session. No paperwork chase, just clear progress.',
     name: 'Rashid Al-Thani',
     role: 'Family member · Lusail',
     initials: 'RT',
   },
   {
     quote:
-      'Having one dedicated coordinator meant we didn’t have to repeat our daughter’s medical background to five different therapists. Everyone arrives prepared and works as a true team.',
+      'One coordinator meant we never had to repeat our daughter’s history to every therapist. The team arrives prepared.',
     name: 'Huda Al-Marri',
     role: 'Parent · Al Wakrah',
     initials: 'HM',
   },
   {
     quote:
-      'After my father’s stroke, coordinating rehabilitation felt like a full-time job. Riayah took over the logistics completely, organizing home physiotherapy, nursing, and doctor check-ins seamlessly.',
+      'After my father’s stroke, Riayah handled rehab logistics completely. Nursing and physio just showed up on time.',
     name: 'Fahad Al-Nuaimi',
     role: 'Family caregiver · Doha',
     initials: 'FN',
   },
   {
     quote:
-      'The warmth and professionalism of the care team gave my grandmother confidence and dignity. She looks forward to her companion and rehabilitation sessions every week.',
+      'The team gave my grandmother confidence and dignity. She looks forward to her sessions every week.',
     name: 'Noor Al-Sulaiti',
     role: 'Granddaughter · Al Khor',
     initials: 'NS',
@@ -54,44 +54,44 @@ const TESTIMONIALS_EN = [
 const TESTIMONIALS_AR = [
   {
     quote:
-      'كان العثور على أخصائي علاج طبيعي ومساندة يومية لابني من أصحاب الهمم أمراً شاقاً ومشتتاً. صاغت منسقة رعاية بلس خطة مخصصة وتتابع معنا أسبوعياً، مما أعاد الهدوء والاطمئنان لبيتنا.',
+      'منسقة الرعاية وضعت خطة واضحة لابني وتتابع معنا أسبوعياً. أصبحت الرعاية أسهل بكثير.',
     name: 'ناصر الكواري',
-    role: 'ولي أمر (دعم ذوي الإعاقة) · الدوحة',
+    role: 'ولي أمر · الدوحة',
     initials: 'ن ك',
   },
   {
     quote:
-      'كانت رغبة والدتي البالغة 84 عاماً هي البقاء في منزلها المألوف. نظمت رعاية بلس زيارات التمريض المنزلي والعلاج الطبيعي في جدول موحد ودقيق دون أي انقطاع أو تأخير.',
+      'نظّمت رعاية بلس التمريض والأدوية والعلاج الطبيعي لوالدتي في جدول أسبوعي واحد دون انقطاع.',
     name: 'منى العطية',
-    role: 'مقدمة رعاية أسرية (رعاية كبار السن) · الريان',
+    role: 'مقدمة رعاية · الريان',
     initials: 'م ع',
   },
   {
     quote:
-      'خطة الرعاية الفردية من رعاية بلس أحدثت فارقاً حقيقياً؛ نرى أهداف التحسن وملاحظات المعالجين فور انتهاء كل جلسة دون الحاجة لطلب تقارير يدوية.',
+      'نرى الأهداف وملاحظات العلاج فور انتهاء كل جلسة. وضوح كامل دون مطاردة التقارير.',
     name: 'راشد آل ثاني',
     role: 'فرد من العائلة · لوسيل',
     initials: 'ر ث',
   },
   {
     quote:
-      'وجود منسق رعاية مخصص وفّر علينا عناء تكرار شرح التاريخ الطبي لابنتنا لكل معالج جديد؛ فالفريق الطبي يأتي مطلعاً تماماً ويعمل بتناغم مذهل.',
+      'منسق واحد أغنانا عن تكرار تاريخ ابنتنا الطبي لكل معالج. الفريق يصل مستعداً ويعمل بتناغم.',
     name: 'هدى المري',
-    role: 'والدة مريضة · الوكرة',
+    role: 'والدة · الوكرة',
     initials: 'هـ م',
   },
   {
     quote:
-      'بعد إصابة والدي بالجلطة، كان تنسيق جلسات التأهيل مرهقاً جداً لنا كعائلة. تولت رعاية بلس كافة الترتيبات التمريضية والتأهيلية باحترافية وتفانٍ كبير.',
+      'بعد جلطة والدي تولّت رعاية بلس ترتيب التأهيل بالكامل. التمريض والعلاج الطبيعي في مواعيدهم.',
     name: 'فهد النعيمي',
-    role: 'مقدم رعاية أسرية · الدوحة',
+    role: 'مقدم رعاية · الدوحة',
     initials: 'ف ن',
   },
   {
     quote:
-      'اللطف والاهتمام الذي لمسناه من الكادر الطبي منح جدتي شعوراً بالأمان والراحة، وأصبحت تنتظر مواعيد جلسات التأهيل والمرافقة الأسبوعية بكل سعادة.',
+      'اللطف والاحترافية منحتا جدتي ثقة وكرامة. تنتظر جلساتها كل أسبوع بسعادة.',
     name: 'نور السليطي',
-    role: 'فرد من العائلة · الخور',
+    role: 'حفيدة · الخور',
     initials: 'ن س',
   },
 ];
@@ -113,24 +113,21 @@ function TestimonialCard({
 
   return (
     <article
-      className="flex h-full flex-col rounded-2xl bg-white p-6"
+      className="flex h-full flex-col rounded-2xl bg-white p-5 sm:p-6"
       style={{
         border: `1px solid ${L.lineSoft}`,
-        boxShadow: '0 14px 36px -20px rgba(15,23,42,0.18)',
+        boxShadow: L.shadowSoft,
       }}
     >
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex gap-0.5" style={{ color: L.sea }} aria-label="5 star rating">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star key={i} className="h-4 w-4 fill-current" />
-          ))}
-        </div>
-        <Quote className="h-6 w-6 rtl-flip" style={{ color: `${L.lagoon}66` }} aria-hidden />
+      <div className="mb-3 flex gap-0.5" style={{ color: L.sea }} aria-label="5 star rating">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star key={i} className="h-3.5 w-3.5 fill-current" aria-hidden />
+        ))}
       </div>
       <p
-        className="mb-6 flex-1 text-sm italic"
+        className="mb-5 flex-1 text-sm"
         style={{
-          color: L.fog,
+          color: L.ink,
           fontFamily: isRTL ? fontArabic : fontBody,
           lineHeight: isRTL ? 1.75 : 1.6,
         }}
@@ -139,7 +136,7 @@ function TestimonialCard({
       </p>
       <div className="flex items-center gap-3">
         <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
           style={{ background: L.sea, fontFamily: isRTL ? fontArabic : fontHeading }}
         >
           {initials}
@@ -150,19 +147,11 @@ function TestimonialCard({
             style={{
               color: L.ink,
               fontFamily: isRTL ? fontArabic : fontHeading,
-              lineHeight: isRTL ? 1.4 : 1.25,
             }}
           >
             {name}
           </p>
-          <p
-            className="text-xs"
-            style={{
-              color: L.fog,
-              fontFamily: isRTL ? fontArabic : fontBody,
-              lineHeight: isRTL ? 1.5 : 1.3,
-            }}
-          >
+          <p className="text-xs" style={{ color: L.fog, fontFamily: isRTL ? fontArabic : fontBody }}>
             {role}
           </p>
         </div>
@@ -184,7 +173,7 @@ export function Testimonials() {
     (index: number) => {
       setPage((index + pageCount) % pageCount);
     },
-    [pageCount]
+    [pageCount],
   );
 
   useEffect(() => {
@@ -201,31 +190,38 @@ export function Testimonials() {
   }, [page, list]);
 
   return (
-    <section id="testimonials" className="py-20 sm:py-28" style={{ background: L.paper }} aria-label="Testimonials">
-      <div className="mx-auto max-w-6xl px-5 sm:px-6">
-        <SectionReveal className="mb-12 text-center">
-          <p
-            className={`mb-3 text-xs font-bold uppercase ${
-              isRTL ? 'tracking-normal' : 'tracking-[0.2em]'
-            }`}
-            style={{ color: L.lagoon, fontFamily: isRTL ? fontArabic : fontBody }}
-          >
-            {t('testimonials.eyebrow', 'Real Families, Real Stories')}
-          </p>
+    <section
+      id="testimonials"
+      className="relative overflow-hidden py-20 sm:py-28"
+      style={{
+        background: `linear-gradient(180deg, ${L.paper} 0%, ${L.paper} 35%, ${L.ice} 100%)`,
+      }}
+      aria-label="Testimonials"
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
+        aria-hidden
+        style={{
+          background: `radial-gradient(ellipse 70% 75% at 50% 100%, ${L.aqua}45 0%, transparent 70%)`,
+        }}
+      />
+
+      <div className={`${landingContainerClass} z-10`}>
+        <SectionReveal className="mb-10 max-w-2xl text-start sm:mb-12">
           <h2
             style={{
               fontFamily: isRTL ? fontArabic : fontHeading,
               fontWeight: 800,
-              fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)',
+              fontSize: 'clamp(1.75rem, 3.5vw, 2.45rem)',
               letterSpacing: isRTL ? 'normal' : '-0.03em',
-              lineHeight: isRTL ? 1.45 : 1.2,
+              lineHeight: isRTL ? 1.4 : 1.15,
               color: L.ink,
             }}
           >
-            {t('testimonials.title', 'How Riayah transforms everyday family life')}
+            {t('testimonials.titleShort', 'Stories from families who trust Riayah.')}
           </h2>
           <p
-            className="mx-auto max-w-2xl mt-3 text-[1.02rem]"
+            className="mt-3 text-[1.02rem]"
             style={{
               color: L.fog,
               fontFamily: isRTL ? fontArabic : fontBody,
@@ -233,13 +229,13 @@ export function Testimonials() {
             }}
           >
             {t(
-              'testimonials.subtitle',
-              'Hear from families in Qatar who found peace of mind with our coordinated disability and aged care.'
+              'testimonials.subtitleShort',
+              'Real families in Qatar on coordinated disability and aged care.',
             )}
           </p>
         </SectionReveal>
 
-        <SectionReveal className="relative min-h-[280px]" delay={0.06}>
+        <SectionReveal className="relative min-h-[240px]" delay={0.06}>
           <div aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -248,17 +244,17 @@ export function Testimonials() {
                 animate={{ opacity: 1, transform: 'translateY(0px)' }}
                 exit={reduceMotion ? undefined : { opacity: 0, transform: 'translateY(-8px)' }}
                 transition={{ duration: 0.35, ease: easeOut }}
-                className="grid gap-5 md:grid-cols-3"
+                className="grid gap-4 md:grid-cols-3"
               >
-                {visible.map((t) => (
-                  <TestimonialCard key={`${page}-${t.name}`} {...t} />
+                {visible.map((item) => (
+                  <TestimonialCard key={`${page}-${item.name}`} {...item} />
                 ))}
               </motion.div>
             </AnimatePresence>
           </div>
         </SectionReveal>
 
-        <div className="mt-8 flex justify-center gap-2" role="tablist" aria-label="Testimonial pages">
+        <div className="mt-8 flex justify-center gap-1" role="tablist" aria-label="Testimonial pages">
           {Array.from({ length: pageCount }).map((_, i) => (
             <button
               key={i}
@@ -267,12 +263,18 @@ export function Testimonials() {
               aria-selected={i === page}
               aria-label={`Show stories page ${i + 1}`}
               onClick={() => go(i)}
-              className="h-2.5 rounded-full transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D9488]"
-              style={{
-                width: i === page ? 22 : 10,
-                background: i === page ? L.sea : `${L.lagoon}44`,
-              }}
-            />
+              className="flex items-center justify-center p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D9488]"
+              style={{ minHeight: 0, minWidth: 0 }}
+            >
+              <span
+                className="block rounded-full transition-all duration-200"
+                style={{
+                  height: 5,
+                  width: i === page ? 16 : 5,
+                  background: i === page ? L.sea : `${L.lagoon}55`,
+                }}
+              />
+            </button>
           ))}
         </div>
       </div>

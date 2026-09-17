@@ -353,17 +353,6 @@ export const proposalRoleRouteElements = (
                     </Suspense>
                   }
                 />
-                <Route
-                  path="/family/voice-recordings"
-                  element={
-                    <Suspense fallback={<PageSpinner />}>
-                      <VoiceRecordingsPage
-                        title="Voice recordings"
-                        description="Record voice notes during or after a video session, then replay or delete them from your history."
-                      />
-                    </Suspense>
-                  }
-                />
               </>
             )}
             {shellKey === 'clinical' && (

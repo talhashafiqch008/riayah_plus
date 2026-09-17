@@ -24,7 +24,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Avatar } from '../../../components/ui';
-import { VoiceRecordWidget } from '../../../components/voice/VoiceRecordWidget';
 import { apiClient } from '../../../lib/api/client';
 import { listEpisodes } from '../../../lib/api/care';
 import { listSessions, type CareSession } from '../../../lib/api/scheduling';
@@ -390,10 +389,6 @@ export default function FamilyHomeScreen() {
             </Text>
           </Pressable>
         ) : null}
-
-        <View className="mt-5 px-4">
-          <VoiceRecordWidget historyHref="/(family)/voice-recordings" />
-        </View>
 
         {next ? (
           <View className="mt-5 px-4">

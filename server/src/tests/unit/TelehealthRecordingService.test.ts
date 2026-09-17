@@ -56,11 +56,12 @@ describe('recording access', () => {
     expect(canStartRecording('meeting', meeting, { userId: 'fam', role: 'family' })).toBe(false);
   });
 
-  it('lets participants view and blocks strangers', () => {
-    expect(canViewRecording('session', session, { userId: 'fam', role: 'family' })).toBe(true);
+  it('blocks family from viewing recordings; staff participants can view', () => {
+    expect(canViewRecording('session', session, { userId: 'fam', role: 'family' })).toBe(false);
+    expect(canViewRecording('session', session, { userId: 'clin', role: 'clinical_staff' })).toBe(true);
+    expect(canViewRecording('meeting', meeting, { userId: 'fam', role: 'family' })).toBe(false);
+    expect(canViewRecording('meeting', meeting, { userId: 'host', role: 'clinical_staff' })).toBe(true);
     expect(canViewRecording('session', session, { userId: 'other', role: 'family' })).toBe(false);
-    expect(canViewRecording('meeting', meeting, { userId: 'fam', role: 'family' })).toBe(true);
-    expect(canViewRecording('meeting', meeting, { userId: 'other', role: 'family' })).toBe(false);
   });
 });
 

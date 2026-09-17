@@ -87,7 +87,7 @@ export function CardCarousel({
 
   return (
     <div className={className}>
-      <div className="mb-5 flex items-center justify-end gap-2 px-5 sm:px-6 max-w-6xl mx-auto">
+      <div className="mb-5 mx-auto flex w-full max-w-[90rem] items-center justify-end gap-2 px-5 sm:px-8 lg:px-12">
         <button
           type="button"
           onClick={() => scrollByDir(-1)}

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from 'react-native-toast-notifications';
 import { router } from 'expo-router';
 import { apiErrorMessage } from '../../lib/format';
-import { uploadVoiceRecording } from '../../lib/api/voiceRecordings';
+import {
+  listVoiceRecordingPatients,
+  uploadVoiceRecording,
+  type VoiceRecordingPatient,
+} from '../../lib/api/voiceRecordings';
 
 const TEAL = '#0D9488';
 const STONE_200 = '#E7E5E4';
@@ -14,6 +18,7 @@ const STONE_500 = '#78716C';
 const STONE_900 = '#1C1917';
 const ROSE = '#E11D48';
 const WHITE = '#FFFFFF';
+const AMBER = '#B45309';
 
 function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
@@ -41,10 +46,17 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
+  const selectedRef = useRef<VoiceRecordingPatient | null>(null);
 
+  const [patients, setPatients] = useState<VoiceRecordingPatient[]>([]);
+  const [selectedPatientKey, setSelectedPatientKey] = useState('');
+  const [loadingPatients, setLoadingPatients] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientKey) ?? null;
+  selectedRef.current = selectedPatient;
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -54,7 +66,23 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listVoiceRecordingPatients();
+        if (cancelled) return;
+        setPatients(rows);
+        setSelectedPatientKey(rows[0]?.id ?? '');
+      } catch (e: unknown) {
+        if (!cancelled) {
+          toast.show(apiErrorMessage(e, 'Failed to load patients'), { type: 'danger' });
+        }
+      } finally {
+        if (!cancelled) setLoadingPatients(false);
+      }
+    })();
     return () => {
+      cancelled = true;
       clearTimer();
       const rec = recordingRef.current;
       recordingRef.current = null;
@@ -62,10 +90,14 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         void rec.stopAndUnloadAsync().catch(() => undefined);
       }
     };
-  }, [clearTimer]);
+  }, [clearTimer, toast]);
 
   const startRecording = async () => {
     if (isRecording || uploading) return;
+    if (!selectedRef.current) {
+      toast.show('Choose an assigned patient before recording.', { type: 'danger' });
+      return;
+    }
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
@@ -99,6 +131,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
 
   const stopAndSave = async () => {
     const recording = recordingRef.current;
+    const patient = selectedRef.current;
     if (!recording) return;
     recordingRef.current = null;
     clearTimer();
@@ -106,6 +139,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
     setUploading(true);
 
     try {
+      if (!patient) throw new Error('Choose an assigned patient before recording.');
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recording.getURI();
@@ -123,6 +157,9 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         fileName: `voice-${Date.now()}.${ext}`,
         mimeType,
         durationSeconds,
+        patientId: patient.patientId,
+        careRecipientId: patient.careRecipientId,
+        episodeId: patient.episodeId,
       });
       toast.show('Voice recording saved', { type: 'success' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -150,6 +187,8 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
     }
   };
 
+  const canRecord = Boolean(selectedPatient) && !loadingPatients;
+
   return (
     <View
       style={{
@@ -173,7 +212,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
               ? 'Saving…'
               : isRecording
                 ? `Recording ${formatDuration(elapsed)}`
-                : 'Tap to record — title and notes are optional later'}
+                : 'Choose a patient, then record'}
           </Text>
         </View>
         <Pressable
@@ -192,12 +231,49 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         </Pressable>
       </View>
 
+      <View style={{ marginTop: 12, maxHeight: 140, opacity: isRecording || uploading ? 0.6 : 1 }}>
+        {loadingPatients ? (
+          <ActivityIndicator color={TEAL} style={{ paddingVertical: 12 }} />
+        ) : patients.length === 0 ? (
+          <Text style={{ fontSize: 12, color: AMBER }}>
+            Only patients on your active or validated care episodes appear here.
+          </Text>
+        ) : (
+          <ScrollView nestedScrollEnabled>
+            {patients.map((p) => {
+              const selected = p.id === selectedPatientKey;
+              return (
+                <Pressable
+                  key={p.id}
+                  disabled={isRecording || uploading}
+                  onPress={() => setSelectedPatientKey(p.id)}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 10,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: selected ? TEAL : STONE_200,
+                    backgroundColor: selected ? '#F0FDFA' : WHITE,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: STONE_900 }}>{p.name}</Text>
+                  <Text style={{ marginTop: 2, fontSize: 11, color: STONE_500 }} numberOfLines={1}>
+                    {p.episodeTitle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+      </View>
+
       <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         {!isRecording ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Start voice recording"
-            disabled={uploading}
+            disabled={uploading || !canRecord}
             onPress={() => void startRecording()}
             style={{
               flex: 1,
@@ -208,7 +284,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
               backgroundColor: TEAL,
               borderRadius: 12,
               paddingVertical: 12,
-              opacity: uploading ? 0.6 : 1,
+              opacity: uploading || !canRecord ? 0.6 : 1,
             }}
           >
             {uploading ? (

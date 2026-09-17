@@ -56,7 +56,6 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Care Journey', href: '/family/episodes', icon: Activity },
       { name: 'Appointments', href: '/family/bookings', icon: Calendar },
       { name: 'Video sessions', href: '/family/telehealth', icon: Video },
-      { name: 'Voice recordings', href: '/family/voice-recordings', icon: Mic },
       { name: 'Documents', href: '/family/documents', icon: FileText },
       { name: 'Care Plans', href: '/family/care-plans', icon: BookOpen },
       { name: 'Billing', href: '/family/billing', icon: Wallet },

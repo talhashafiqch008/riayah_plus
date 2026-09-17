@@ -114,12 +114,6 @@ export default function FamilyTelehealthPage() {
                     {' · '}
                     {session.status.replace(/_/g, ' ')}
                   </div>
-                  <Link
-                    to={`/family/telehealth/${session.id}`}
-                    className="text-sm font-semibold text-teal-700 hover:text-teal-800"
-                  >
-                    {session.recordingUrl ? 'View recording' : 'Open'}
-                  </Link>
                 </article>
               ))}
             </section>

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '@/components/I18nProvider';
-import { fontHeading, fontBody, fontArabic } from './tokens';
+import { L, fontHeading, fontBody, fontArabic, landingContainerClass } from './tokens';
 import { SectionReveal, Stagger, StaggerItem } from './motion';
 
 interface PartnersStripProps {
@@ -8,7 +8,7 @@ interface PartnersStripProps {
   variant?: 'card' | 'flat';
 }
 
-export function PartnersStrip({ className = '', variant = 'card' }: PartnersStripProps) {
+export function PartnersStrip({ className = '' }: PartnersStripProps) {
   const { t } = useTranslation('landing');
   const { isRTL } = useI18n();
 
@@ -19,7 +19,7 @@ export function PartnersStrip({ className = '', variant = 'card' }: PartnersStri
       desc: t('partners.carestride.desc', 'Disability & Aged Care'),
       logo: '/landing/partners/carestride.png',
       alt: 'CareStride Australia',
-      logoHeight: 'h-10 sm:h-12',
+      logoHeight: 'h-9 sm:h-11',
     },
     {
       id: 'uniqueSupport',
@@ -27,7 +27,7 @@ export function PartnersStrip({ className = '', variant = 'card' }: PartnersStri
       desc: t('partners.uniqueSupport.desc', 'Specialized In-Home Care'),
       logo: '/landing/partners/unique-support.png',
       alt: 'Unique Individual Support',
-      logoHeight: 'h-11 sm:h-14',
+      logoHeight: 'h-10 sm:h-12',
     },
     {
       id: 'myndic',
@@ -35,81 +35,84 @@ export function PartnersStrip({ className = '', variant = 'card' }: PartnersStri
       desc: t('partners.myndic.desc', 'NDIS & Person-Centered Systems'),
       logo: '/landing/partners/myndic.png',
       alt: 'MyNDIC Australia',
-      logoHeight: 'h-10 sm:h-12',
+      logoHeight: 'h-9 sm:h-11',
     },
   ];
 
   return (
-    <section className={`py-14 sm:py-18 ${className}`} dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <SectionReveal>
-          <div
-            className={`overflow-hidden rounded-3xl ${
-              variant === 'card'
-                ? 'border border-slate-200/90 bg-gradient-to-b from-white via-white to-slate-50/70 p-7 sm:p-10 shadow-sm'
-                : 'border-y border-slate-200/70 bg-transparent py-8'
-            }`}
+    <section
+      className={`relative overflow-hidden py-16 sm:py-20 ${className}`}
+      style={{
+        background: `linear-gradient(180deg, ${L.paper} 0%, ${L.paper} 40%, ${L.ice} 100%)`,
+      }}
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%]"
+        aria-hidden
+        style={{
+          background: `radial-gradient(ellipse 60% 70% at 50% 100%, ${L.aqua}40 0%, transparent 70%)`,
+        }}
+      />
+
+      <div className={`${landingContainerClass} z-10`}>
+        <SectionReveal className="mb-10 max-w-xl text-center mx-auto">
+          <h2
+            className="mb-2"
+            style={{
+              fontFamily: isRTL ? fontArabic : fontHeading,
+              fontWeight: 800,
+              fontSize: 'clamp(1.35rem, 2.5vw, 1.75rem)',
+              letterSpacing: isRTL ? 'normal' : '-0.02em',
+              lineHeight: isRTL ? 1.4 : 1.25,
+              color: L.ink,
+            }}
           >
-            {/* Header / Eyebrow */}
-            <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
-              <span
-                className="inline-block text-xs font-bold uppercase tracking-widest text-teal-700 mb-2"
-                style={{
-                  fontFamily: isRTL ? fontArabic : fontHeading,
-                  letterSpacing: isRTL ? 'normal' : '0.12em',
-                }}
-              >
-                {t('partners.eyebrow', 'Our Australian Experience & Partners')}
-              </span>
-              <h3
-                className="text-xl sm:text-2xl font-bold text-slate-900"
-                style={{
-                  fontFamily: isRTL ? fontArabic : fontHeading,
-                  lineHeight: isRTL ? 1.4 : 1.25,
-                }}
-              >
-                {t(
-                  'partners.title',
-                  'Built on proven Australian care models, adapted for our region'
-                )}
-              </h3>
-            </div>
-
-            {/* 3 Clean Partner Cards */}
-            <Stagger className="grid gap-6 sm:grid-cols-3">
-              {partners.map((partner) => (
-                <StaggerItem key={partner.id} className="h-full">
-                  <div className="group flex h-full flex-col items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-6 text-center shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-teal-300 hover:shadow-md">
-                    {/* Logo Container */}
-                    <div className="flex h-20 w-full items-center justify-center p-2">
-                      <img
-                        src={partner.logo}
-                        alt={partner.alt}
-                        className={`max-w-full ${partner.logoHeight} object-contain transition-transform duration-300 group-hover:scale-105`}
-                      />
-                    </div>
-
-                    {/* Text Details */}
-                    <div className="mt-4 w-full border-t border-slate-100 pt-3">
-                      <p
-                        className="text-sm font-bold text-slate-900"
-                        style={{ fontFamily: isRTL ? fontArabic : fontHeading }}
-                      >
-                        {partner.name}
-                      </p>
-                      <p
-                        className="mt-0.5 text-xs text-slate-500"
-                        style={{ fontFamily: isRTL ? fontArabic : fontBody }}
-                      >
-                        {partner.desc}
-                      </p>
-                    </div>
-                  </div>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          </div>
+            {t('partners.titleShort', 'Built with Australian care partners')}
+          </h2>
+          <p
+            className="text-sm sm:text-[0.95rem]"
+            style={{
+              color: L.fog,
+              fontFamily: isRTL ? fontArabic : fontBody,
+              lineHeight: isRTL ? 1.7 : 1.55,
+            }}
+          >
+            {t(
+              'partners.subtitleShort',
+              'Proven models adapted for families across our region.',
+            )}
+          </p>
         </SectionReveal>
+
+        <Stagger className="grid gap-4 sm:grid-cols-3">
+          {partners.map((partner) => (
+            <StaggerItem key={partner.id}>
+              <div
+                className="flex h-full flex-col items-center justify-center rounded-2xl bg-white px-5 py-6 text-center"
+                style={{ border: `1px solid ${L.lineSoft}`, boxShadow: L.shadowSoft }}
+              >
+                <img
+                  src={partner.logo}
+                  alt={partner.alt}
+                  className={`max-w-full ${partner.logoHeight} object-contain`}
+                />
+                <p
+                  className="mt-4 text-sm font-bold"
+                  style={{ color: L.ink, fontFamily: isRTL ? fontArabic : fontHeading }}
+                >
+                  {partner.name}
+                </p>
+                <p
+                  className="mt-0.5 text-xs"
+                  style={{ color: L.fog, fontFamily: isRTL ? fontArabic : fontBody }}
+                >
+                  {partner.desc}
+                </p>
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
       </div>
     </section>
   );

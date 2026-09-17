@@ -65,12 +65,6 @@ const SECTIONS: { title: string; links: MoreLink[] }[] = [
         href: '/(family)/telehealth',
       },
       {
-        icon: 'mic-outline',
-        label: 'Voice recordings',
-        description: 'Record and replay voice notes',
-        href: '/(family)/voice-recordings',
-      },
-      {
         icon: 'notifications-outline',
         label: 'Notifications',
         description: 'Updates about your care journey',

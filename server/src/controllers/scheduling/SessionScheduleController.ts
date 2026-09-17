@@ -17,6 +17,20 @@ import { TelehealthRoomService } from '../../services/TelehealthRoomService';
 const FAMILY_ROLES = ['client', 'consumer', 'family', 'patient'];
 const MAX_DURATION_MINUTES = 480;
 
+function redactRecordingFieldsForFamily<T extends Record<string, unknown>>(
+  session: T,
+  role: string,
+): T {
+  if (!FAMILY_ROLES.includes(role)) return session;
+  return {
+    ...session,
+    recordingUrl: null,
+    recordingStatus: null,
+    recordingEgressId: null,
+    recordingTranscript: null,
+  };
+}
+
 /** Family session lists only need clinician name — skip provider_profiles (schema drift on extra columns). */
 const familyProviderSelect = {
   id: true,
@@ -211,10 +225,15 @@ export class SessionScheduleController {
     });
 
     res.json({
-      sessions: sessions.map((s) => ({
-        ...s,
-        provider: s.provider ? toPublicStaffCard(s.provider) : s.provider,
-      })),
+      sessions: sessions.map((s) =>
+        redactRecordingFieldsForFamily(
+          {
+            ...s,
+            provider: s.provider ? toPublicStaffCard(s.provider) : s.provider,
+          } as Record<string, unknown>,
+          req.user!.role,
+        ),
+      ),
     });
   }
 
@@ -243,10 +262,13 @@ export class SessionScheduleController {
     }
 
     res.json({
-      session: {
-        ...session,
-        provider: session.provider ? toPublicStaffCard(session.provider) : session.provider,
-      },
+      session: redactRecordingFieldsForFamily(
+        {
+          ...session,
+          provider: session.provider ? toPublicStaffCard(session.provider) : session.provider,
+        } as Record<string, unknown>,
+        req.user!.role,
+      ),
     });
   }
 

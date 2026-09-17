@@ -1,11 +1,13 @@
-import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { FormEvent, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_SHELLS } from '@/config/proposalRoleShells';
 import { getRoleDashboard } from '@/routes/getRoleDashboard';
 import { isApiError, isTwoFactorRequiredError } from '@/lib/errors';
+import { PhoneInput } from '@/components/PhoneInput';
+import { CountryCode } from '@/config/countries';
 
 export type ProposalPortalKey = keyof typeof ROLE_SHELLS;
 
@@ -18,15 +20,27 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
   const shell = ROLE_SHELLS[portal];
   const { login, logout, complete2faLogin } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const allowPhone = portal === 'family';
 
+  const initialPhone = params.get('phone') ?? '';
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>(
+    allowPhone && initialPhone ? 'phone' : 'email',
+  );
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
   const [pendingUserId, setPendingUserId] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(initialPhone);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const identifierLabel = useMemo(
+    () => (loginMethod === 'phone' ? 'Phone' : 'Email'),
+    [loginMethod],
+  );
 
   const finishPortalLogin = async (user: { role?: string }) => {
     const role = (user.role ?? '').toLowerCase();
@@ -52,7 +66,13 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
     setLoading(true);
 
     try {
-      const user = await login(email, password);
+      const isPhone = allowPhone && loginMethod === 'phone';
+      const identifier = isPhone ? phone.replace(/\s+/g, '') : email;
+      if (!identifier.trim()) {
+        toast.error(`Please enter your ${identifierLabel.toLowerCase()}.`);
+        return;
+      }
+      const user = await login(identifier, password, isPhone);
       await finishPortalLogin(user);
     } catch (err: unknown) {
       if (isTwoFactorRequiredError(err)) {
@@ -73,7 +93,17 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
         return;
       }
 
-      const message = err instanceof Error ? err.message : 'Invalid email or password';
+      if (
+        isApiError(err) &&
+        err.statusCode === 403 &&
+        err.message?.toLowerCase().includes('phone not verified')
+      ) {
+        toast.error('Please verify your phone before logging in.');
+        navigate(`/verify-phone?phone=${encodeURIComponent(phone.replace(/\s+/g, ''))}`);
+        return;
+      }
+
+      const message = err instanceof Error ? err.message : 'Invalid credentials';
       setError(message);
       toast.error(message);
     } finally {
@@ -134,20 +164,51 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
 
           {step === 'credentials' ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="portal-email" className="block text-sm font-medium text-stone-700 mb-1">
-                  Email
-                </label>
-                <input
-                  id="portal-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className="w-full px-3 py-2.5 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
+              {allowPhone && (
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setLoginMethod('email')}
+                    className={`rounded-lg py-2 text-sm font-semibold ${loginMethod === 'email' ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500'}`}
+                  >
+                    Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginMethod('phone')}
+                    className={`rounded-lg py-2 text-sm font-semibold ${loginMethod === 'phone' ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500'}`}
+                  >
+                    Phone
+                  </button>
+                </div>
+              )}
+
+              {loginMethod === 'email' || !allowPhone ? (
+                <div>
+                  <label htmlFor="portal-email" className="block text-sm font-medium text-stone-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    id="portal-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    className="w-full px-3 py-2.5 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Phone</label>
+                  <PhoneInput
+                    value={phone}
+                    defaultCountry={CountryCode.PK}
+                    onChange={(next) => setPhone(next)}
+                    required
+                  />
+                </div>
+              )}
 
               <div>
                 <label
@@ -233,11 +294,21 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
           )}
 
           {step === 'credentials' && (
-            <p className="mt-6 text-center text-sm text-stone-500">
-              <Link to="/forgot-password" className="text-teal-600 hover:underline">
-                Forgot password?
-              </Link>
-            </p>
+            <div className="mt-6 space-y-2 text-center text-sm text-stone-500">
+              {allowPhone && (
+                <p>
+                  New here?{' '}
+                  <Link to="/register" className="text-teal-600 hover:underline">
+                    Create a family account
+                  </Link>
+                </p>
+              )}
+              <p>
+                <Link to="/forgot-password" className="text-teal-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </p>
+            </div>
           )}
         </div>
       </div>

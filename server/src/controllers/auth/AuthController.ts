@@ -29,6 +29,7 @@ import { sendEmailVerificationForUser } from '../../utils/emailVerification';
 import { persistRefreshToken, findRefreshTokenByPlain, revokeRefreshTokenByPlain } from '../../utils/refreshTokenStore';
 import { formatDeviceLabel } from '../../utils/deviceInfo';
 import { INVITE_TOKEN_TYPE } from '../../utils/inviteUser';
+import { normalizePhoneE164 } from '../../utils/phoneAuth';
 
 const resendVerificationPublicSchema = z.object({ email: z.string().email() });
 
@@ -90,15 +91,24 @@ export class AuthController {
     const password = body.password;
 
     const orgInclude = { organization: { select: { id: true, name: true } } } as const;
-    const user = 'email' in body
-      ? await prisma.user.findUnique({
-          where: { email: body.email, deletedAt: null },
-          include: orgInclude,
-        })
-      : await prisma.user.findFirst({
-          where: { phone: body.phone, deletedAt: null },
-          include: orgInclude,
-        });
+    let user;
+    if ('email' in body) {
+      user = await prisma.user.findUnique({
+        where: { email: body.email, deletedAt: null },
+        include: orgInclude,
+      });
+    } else {
+      let phone = body.phone;
+      try {
+        phone = normalizePhoneE164(body.phone);
+      } catch {
+        /* keep raw for lookup */
+      }
+      user = await prisma.user.findFirst({
+        where: { phone, deletedAt: null },
+        include: orgInclude,
+      });
+    }
 
     // A-9: always run bcrypt regardless of whether the user exists to prevent timing-based enumeration
     const passwordHash = user?.passwordHash ?? '$2a$12$cNV4pbbGpFVj8mcnExwV9eVk8GgZycv2RNFJWdNJAmR8IQCBsg0VO';
@@ -121,9 +131,13 @@ export class AuthController {
     // Family may log in and request care before organization assignment.
     // Platform admin assigns org later (Admin → Families); units/intakes backfill then.
 
-    // Enforce email verification before allowing login.
-    // (Seed accounts can be marked verified via prisma/seed.ts)
-    if (!user.isEmailVerified) {
+    // Email login requires email verification; phone login requires phone verification.
+    const isPhoneLogin = 'phone' in body;
+    if (isPhoneLogin) {
+      if (!user.isPhoneVerified) {
+        throw new AppError('Phone not verified. Please verify the SMS code before logging in.', 403);
+      }
+    } else if (!user.isEmailVerified) {
       throw new AppError('Email not verified. Please verify your email address before logging in.', 403);
     }
 

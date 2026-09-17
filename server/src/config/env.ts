@@ -85,6 +85,10 @@ export const env = {
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || '',
   WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET || '',
 
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
+  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
+
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:8001',
   AI_SERVICE_API_KEY: process.env.AI_SERVICE_API_KEY || '',

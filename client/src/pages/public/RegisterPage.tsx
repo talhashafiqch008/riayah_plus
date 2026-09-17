@@ -1,4 +1,3 @@
-
 import { useState, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -6,18 +5,16 @@ import toast from 'react-hot-toast';
 import { m, LazyMotion, domAnimation } from "framer-motion";
 import { isApiError } from '@/lib/errors';
 import { registerSchema } from '@/lib/validation';
+import { registerWithPhone } from '@/lib/api/auth';
+import { PhoneInput } from '@/components/PhoneInput';
+import { CountryCode } from '@/config/countries';
 import {
- Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone, Heart,
- CheckCircle2, ShieldCheck
+ Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone, ShieldCheck, CheckCircle2
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { FieldError } from '@/components/forms/FieldError';
 import { FormErrorSummary } from '@/components/forms/FormErrorSummary';
 
-
-
-
-// Animation variants
 const fadeIn = {
  initial: { opacity: 0, x: 20 },
  animate: { opacity: 1, x: 0 },
@@ -25,8 +22,11 @@ const fadeIn = {
  transition: { duration: 0.3 }
 };
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
 function RegisterContent() {
  const selectedRole = 'family';
+ const [method, setMethod] = useState<'email' | 'phone'>('email');
  const [formData, setFormData] = useState({
  email: '',
  password: '',
@@ -35,12 +35,12 @@ function RegisterContent() {
  lastName: '',
  phone: '',
  });
+ const [phoneE164, setPhoneE164] = useState('');
  const [loading, setLoading] = useState(false);
  const [agreedToTerms, setAgreedToTerms] = useState(false);
  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
  const { register } = useAuth();
  const navigate = useNavigate();
-
 
  const onValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
  setFormData({
@@ -49,12 +49,18 @@ function RegisterContent() {
  });
  };
 
-
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
  setFieldErrors({});
  setLoading(true);
 
+ try {
+ if (!agreedToTerms) {
+ toast.error('Please agree to the terms and conditions');
+ return;
+ }
+
+ if (method === 'email') {
  const validation = registerSchema.safeParse({
  ...formData,
  terms: agreedToTerms
@@ -63,19 +69,17 @@ function RegisterContent() {
  if (!validation.success) {
  const firstError = validation.error.issues[0];
  toast.error(firstError?.message || 'Please check your details');
- setLoading(false);
  return;
  }
 
- try {
  const result = await register({
  email: formData.email,
  password: formData.password,
  firstName: formData.firstName,
  lastName: formData.lastName,
  phone: formData.phone,
- role: (selectedRole || 'client') as string,
- consentAccepted: agreedToTerms === true,
+ role: selectedRole,
+ consentAccepted: true,
  });
 
  if (result.requiresEmailVerification) {
@@ -84,11 +88,46 @@ function RegisterContent() {
  return;
  }
 
- const registeredUser = result.user;
- toast.success('Account created successfully! Redirecting...');
-      const onboardingStatus = registeredUser.onboarding_status;
-      const onboardingPending = onboardingStatus && onboardingStatus !== 'complete' && onboardingStatus !== 'completed';
-      navigate(onboardingPending ? '/family/onboarding' : '/family');
+ toast.success('Account created successfully!');
+ navigate('/family');
+ return;
+ }
+
+ if (!formData.firstName.trim() || !formData.lastName.trim()) {
+ toast.error('Please enter your first and last name');
+ return;
+ }
+ if (!phoneE164 || phoneE164.replace(/\D/g, '').length < 8) {
+ toast.error('Please enter a valid phone number');
+ return;
+ }
+ if (!passwordRegex.test(formData.password)) {
+ toast.error('Password must be 8+ chars with upper, lower, and a number');
+ return;
+ }
+ if (formData.password !== formData.confirmPassword) {
+ toast.error("Passwords don't match");
+ return;
+ }
+
+ const result = await registerWithPhone({
+ firstName: formData.firstName,
+ lastName: formData.lastName,
+ phone: phoneE164.replace(/\s+/g, ''),
+ password: formData.password,
+ role: selectedRole,
+ consentAccepted: true,
+ });
+
+ if (result.requiresPhoneVerification) {
+ const phone = result.user?.phone || phoneE164.replace(/\s+/g, '');
+ toast.success('Account created! Enter the SMS code to verify.');
+ navigate(`/verify-phone?phone=${encodeURIComponent(phone)}`);
+ return;
+ }
+
+ toast.success('Account created!');
+ navigate('/login?portal=family');
  } catch (error: unknown) {
  if (isApiError(error) && error.fieldErrors) {
  setFieldErrors(error.fieldErrors);
@@ -105,7 +144,6 @@ function RegisterContent() {
 
  return (
  <div className="min-h-screen relative flex items-center justify-center bg-[#FDFBF7] overflow-hidden py-10 px-4">
- {/* 1. Animated Warm Background Elements (Same as Login) */}
  <div className="absolute inset-0 pointer-events-none">
  <m.div
  animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 0] }}
@@ -120,10 +158,7 @@ function RegisterContent() {
  <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#115e59 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
  </div>
 
- {/* Main Content */}
  <div className="relative z-10 size-full max-w-6xl flex flex-col md:flex-row items-center justify-center gap-12 md:gap-20">
-
- {/* Left Side: Dynamic Info base on Step */}
  <m.div
  initial={{ opacity: 0, x: -30 }}
  animate={{ opacity: 1, x: 0 }}
@@ -136,31 +171,46 @@ function RegisterContent() {
 
  <m.div {...fadeIn} className="bg-white/60 backdrop-blur-md p-8 rounded-3xl border border-white/50 shadow-sm">
  <h2 className="text-2xl font-semibold text-stone-900 mb-2">Family Account</h2>
- <p className="text-stone-500 mb-6">You are creating an account as a <span className="font-semibold text-teal-600">Family Member</span>.</p>
+ <p className="text-stone-500 mb-6">Register with email or phone — same family portal either way.</p>
  <div className="p-4 bg-teal-50 rounded-xl flex items-start gap-3 border border-teal-100">
  <div className="size-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0 text-teal-600">
  <ShieldCheck className="size-4" />
  </div>
  <div>
  <h3 className="font-semibold text-sm text-stone-900">Information Privacy</h3>
- <p className="text-xs text-stone-500 mt-1">Your data is encrypted and protected under HIPAA standards. We value your trust.</p>
+ <p className="text-xs text-stone-500 mt-1">Your data is encrypted and protected. We value your trust.</p>
  </div>
  </div>
  </m.div>
  </m.div>
 
- {/* Right Side: Glass Registration Card */}
  <m.div
  initial={{ opacity: 0, y: 30 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ duration: 0.8, delay: 0.1 }}
  className="w-full max-w-[480px] bg-white/80 backdrop-blur-xl p-8 md:p-10 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-white relative"
  >
- {/* Decorative Blob */}
  <div className="absolute -z-10 -bottom-10 -left-10 size-40 bg-amber-100/50 rounded-full blur-3xl"></div>
 
- <div className="text-center mb-8">
+ <div className="text-center mb-6">
  <h2 className="text-2xl font-semibold text-stone-900">Create Account</h2>
+ </div>
+
+ <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-stone-100 p-1">
+ <button
+ type="button"
+ onClick={() => setMethod('email')}
+ className={`rounded-xl py-2.5 text-sm font-semibold transition ${method === 'email' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+ >
+ Email
+ </button>
+ <button
+ type="button"
+ onClick={() => setMethod('phone')}
+ className={`rounded-xl py-2.5 text-sm font-semibold transition ${method === 'phone' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+ >
+ Phone
+ </button>
  </div>
 
  <m.form {...fadeIn} onSubmit={handleSubmit} className="space-y-4">
@@ -188,6 +238,9 @@ function RegisterContent() {
  <FieldError error={fieldErrors.lastName} />
  </div>
  </div>
+
+ {method === 'email' ? (
+ <>
  <div>
  <Input
  icon={Mail}
@@ -207,9 +260,23 @@ function RegisterContent() {
  name="phone"
  value={formData.phone}
  onChange={onValueChange}
+ required={false}
  />
  <FieldError error={fieldErrors.phone} />
  </div>
+ </>
+ ) : (
+ <div>
+ <PhoneInput
+ value={phoneE164}
+ defaultCountry={CountryCode.PK}
+ onChange={(phone) => setPhoneE164(phone)}
+ required
+ />
+ <FieldError error={fieldErrors.phone} />
+ </div>
+ )}
+
  <div>
  <PasswordInput
  placeholder="Password"
@@ -250,11 +317,18 @@ function RegisterContent() {
  >
  {loading ? 'Creating Account...' : (
  <>
- <span>Create Account</span>
+ <span>{method === 'phone' ? 'Create & send SMS code' : 'Create Account'}</span>
  <ArrowRight className="size-5" />
  </>
  )}
  </m.button>
+
+ <p className="text-center text-sm text-stone-500 pt-2">
+ Already have an account?{' '}
+ <Link to="/login?portal=family" className="font-semibold text-teal-700 hover:underline">
+ Sign in
+ </Link>
+ </p>
  </m.form>
  </m.div>
  </div>
@@ -262,65 +336,19 @@ function RegisterContent() {
  );
 }
 
-// Sub-components for cleaner code
-function FeatureItem({ icon: Icon, text }: { icon: React.ElementType, text: string }) {
- return (
- <div className="flex items-center gap-3 text-stone-600">
- <div className="size-8 rounded-full bg-white flex items-center justify-center shadow-sm text-teal-600">
- <Icon className="size-4" />
- </div>
- <span className="font-medium">{text}</span>
- </div>
- );
-}
-
-interface RoleCardProps {
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  active: boolean;
-  onClick?: () => void;
-  disabled?: boolean;
-  color: string;
-}
-
-function RoleCard({ icon: Icon, title, subtitle, active, onClick, disabled, color }: RoleCardProps) {
-  const isTeal = color === 'teal';
-  return (
-  <button
-  onClick={onClick}
-  disabled={disabled}
-  className={`w-full p-5 rounded-2xl border-2 text-left transition-all relative overflow-hidden group ${active ? 'border-teal-500 bg-teal-50/50' : disabled ? 'border-stone-100 bg-stone-50 cursor-not-allowed opacity-60' : 'border-stone-100 bg-white hover:border-teal-200 hover:shadow-md' }`}
-  >
-  <div className="flex items-center gap-5 relative z-10">
-  <div className={`size-14 rounded-2xl flex items-center justify-center transition-colors ${active || !active ? (isTeal ? 'bg-teal-100 text-teal-600' : 'bg-blue-100 text-blue-600') : '' }`}>
-  <Icon className="size-7" />
-  </div>
-  <div>
-  <h3 className="text-lg font-semibold text-stone-900">{title}</h3>
-  <p className="text-sm text-stone-500">{subtitle}</p>
-  </div>
-  <div className={`ml-auto size-6 rounded-full border-2 flex items-center justify-center ${active ? 'border-teal-500 bg-teal-500' : 'border-stone-200' }`}>
-  {active && <CheckCircle2 className="size-4 text-white" />}
-  </div>
-  </div>
-  </button>
-  );
-}
-
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
  icon?: React.ElementType;
  iconHidden?: boolean;
 }
 
-function Input({ icon: Icon, iconHidden, ...props }: InputProps) {
+function Input({ icon: Icon, iconHidden, required = true, ...props }: InputProps) {
  return (
  <div className="relative group">
  {!iconHidden && Icon && (
  <Icon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-stone-400 group-focus-within:text-teal-600 transition-colors" />
  )}
  <input
- required
+ required={required}
  className={`w-full py-4 bg-stone-50 border-2 border-stone-100 rounded-2xl focus:bg-white focus:border-teal-500 focus:ring-0 transition-all outline-none font-medium placeholder:text-stone-400 text-stone-900 ${!iconHidden ? 'pl-12 pr-4' : 'px-4' }`}
  {...props}
  />
@@ -358,7 +386,9 @@ export default function RegisterPage() {
  <div className="size-10 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin" />
  </div>
  }>
+ <LazyMotion features={domAnimation}>
  <RegisterContent />
+ </LazyMotion>
  </Suspense>
  );
 }

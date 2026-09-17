@@ -1,17 +1,7 @@
-import {
-  Target,
-  Stethoscope,
-  CalendarDays,
-  TrendingUp,
-  RefreshCw,
-  CheckCircle2,
-  Clock,
-  UserCheck,
-  Sparkles,
-} from 'lucide-react';
+import { Target, CalendarDays, TrendingUp, CheckCircle2, Clock, UserCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '@/components/I18nProvider';
-import { L, fontHeading, fontBody, fontArabic } from './tokens';
+import { L, fontHeading, fontBody, fontArabic, landingContainerClass } from './tokens';
 import { SectionReveal, Stagger, StaggerItem } from './motion';
 
 export function CarePlan() {
@@ -22,134 +12,85 @@ export function CarePlan() {
     {
       icon: Target,
       title: t('carePlan.pillars.goals.title', 'Goals'),
-      desc: t(
-        'carePlan.pillars.goals.desc',
-        'Clear, measurable wellness and independence targets defined with the family.'
-      ),
-      color: '#0D9488',
-      bg: '#F0FDFA',
-    },
-    {
-      icon: Stethoscope,
-      title: t('carePlan.pillars.services.title', 'Services'),
-      desc: t(
-        'carePlan.pillars.services.desc',
-        'Multi-disciplinary care matched to clinical, physical, and daily living needs.'
-      ),
-      color: '#2563EB',
-      bg: '#EFF6FF',
+      desc: t('carePlan.pillars.goals.descShort', 'Clear wellness targets set with the family.'),
     },
     {
       icon: CalendarDays,
       title: t('carePlan.pillars.appointments.title', 'Appointments'),
-      desc: t(
-        'carePlan.pillars.appointments.desc',
-        'Synchronized calendar for home visits, clinical sessions, and telehealth.'
-      ),
-      color: '#059669',
-      bg: '#ECFDF5',
+      desc: t('carePlan.pillars.appointments.descShort', 'Home visits, clinic sessions, and telehealth in one calendar.'),
     },
     {
       icon: TrendingUp,
       title: t('carePlan.pillars.progress.title', 'Progress'),
-      desc: t(
-        'carePlan.pillars.progress.desc',
-        'Real-time session notes, outcome indicators, and milestone tracking.'
-      ),
-      color: '#7C3AED',
-      bg: '#F5F3FF',
-    },
-    {
-      icon: RefreshCw,
-      title: t('carePlan.pillars.reviews.title', 'Reviews'),
-      desc: t(
-        'carePlan.pillars.reviews.desc',
-        'Scheduled quarterly assessments ensuring care continually evolves with your needs.'
-      ),
-      color: '#EA580C',
-      bg: '#FFF7ED',
+      desc: t('carePlan.pillars.progress.descShort', 'Notes, milestones, and outcomes you can actually follow.'),
     },
   ];
 
   return (
-    <section id="care-plan" className="py-20 sm:py-28" style={{ background: L.paper }}>
-      <div className="mx-auto max-w-6xl px-5 sm:px-6">
-        <SectionReveal className="mb-14 text-center">
-          <p
-            className={`mb-3 text-xs font-bold uppercase ${
-              isRTL ? 'tracking-normal' : 'tracking-[0.2em]'
-            }`}
-            style={{ color: L.lagoon, fontFamily: isRTL ? fontArabic : fontBody }}
-          >
-            {t('carePlan.eyebrow', 'The Riayah Care Plan')}
-          </p>
-          <h2
-            className="mb-3"
-            style={{
-              fontFamily: isRTL ? fontArabic : fontHeading,
-              fontWeight: 800,
-              fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)',
-              letterSpacing: isRTL ? 'normal' : '-0.03em',
-              lineHeight: isRTL ? 1.45 : 1.2,
-              color: L.ink,
-            }}
-          >
-            {t(
-              'carePlan.title',
-              'More than appointments. A living, individualized care plan.'
-            )}
-          </h2>
-          <p
-            className="mx-auto max-w-2xl text-[1.02rem]"
-            style={{
-              color: L.fog,
-              fontFamily: isRTL ? fontArabic : fontBody,
-              lineHeight: isRTL ? 1.75 : 1.6,
-            }}
-          >
-            {t(
-              'carePlan.subtitle',
-              "Riayah organizes your loved one's entire care ecosystem into a centralized, transparent plan that adapts as their needs evolve."
-            )}
-          </p>
-        </SectionReveal>
+    <section
+      id="care-plan"
+      className="py-20 sm:py-28"
+      style={{ background: L.paper }}
+    >
+      <div className={landingContainerClass}>
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <SectionReveal className="text-start">
+            <h2
+              className="mb-3"
+              style={{
+                fontFamily: isRTL ? fontArabic : fontHeading,
+                fontWeight: 800,
+                fontSize: 'clamp(1.85rem, 3.5vw, 2.6rem)',
+                letterSpacing: isRTL ? 'normal' : '-0.03em',
+                lineHeight: isRTL ? 1.4 : 1.15,
+                color: L.ink,
+              }}
+            >
+              {t('carePlan.titleShort', 'A living care plan, not just appointments.')}
+            </h2>
+            <p
+              className="mb-8 max-w-md text-[1.02rem]"
+              style={{
+                color: L.fog,
+                fontFamily: isRTL ? fontArabic : fontBody,
+                lineHeight: isRTL ? 1.75 : 1.65,
+              }}
+            >
+              {t(
+                'carePlan.subtitleShort',
+                'Goals, visits, and progress stay in one place so families and clinicians stay aligned.',
+              )}
+            </p>
 
-        <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
-          {/* Left / Leading: 5 Care Plan Pillars */}
-          <div className="lg:col-span-6">
-            <Stagger className="flex flex-col gap-4">
-              {pillars.map(({ icon: Icon, title, desc, color, bg }) => (
+            <Stagger className="flex flex-col gap-3">
+              {pillars.map(({ icon: Icon, title, desc }) => (
                 <StaggerItem key={title}>
                   <div
-                    className="flex items-start gap-4 rounded-2xl bg-white p-4 transition-all duration-200 hover:shadow-md"
-                    style={{
-                      border: `1px solid ${L.lineSoft}`,
-                      boxShadow: '0 4px 16px -8px rgba(15,23,42,0.06)',
-                    }}
+                    className="flex items-start gap-3.5 rounded-2xl bg-white/90 px-4 py-3.5"
+                    style={{ border: `1px solid ${L.lineSoft}`, boxShadow: L.shadowSoft }}
                   >
                     <div
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                      style={{ background: bg, color }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                      style={{ background: L.sky, color: L.sea }}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 pt-0.5">
                       <h3
-                        className="mb-1 text-base font-bold"
+                        className="text-[0.95rem] font-bold"
                         style={{
                           color: L.ink,
                           fontFamily: isRTL ? fontArabic : fontHeading,
-                          lineHeight: isRTL ? 1.4 : 1.25,
                         }}
                       >
                         {title}
                       </h3>
                       <p
-                        className="text-xs sm:text-[13px]"
+                        className="mt-0.5 text-sm"
                         style={{
                           color: L.fog,
                           fontFamily: isRTL ? fontArabic : fontBody,
-                          lineHeight: isRTL ? 1.65 : 1.5,
+                          lineHeight: isRTL ? 1.6 : 1.5,
                         }}
                       >
                         {desc}
@@ -159,107 +100,70 @@ export function CarePlan() {
                 </StaggerItem>
               ))}
             </Stagger>
-          </div>
+          </SectionReveal>
 
-          {/* Right / Trailing: Realistic Living Care Plan Preview Dashboard Card */}
-          <div className="lg:col-span-6">
+          <SectionReveal>
             <div
-              className="relative rounded-3xl bg-white p-6 sm:p-8"
-              style={{
-                boxShadow: '0 24px 60px -20px rgba(15,23,42,0.18)',
-                border: '1px solid rgba(13,148,136,0.15)',
-              }}
+              className="rounded-[1.75rem] bg-white p-6 sm:p-7"
+              style={{ boxShadow: L.shadow, border: `1px solid ${L.lineSoft}` }}
             >
-              {/* Header inside preview card */}
-              <div className="flex items-start justify-between border-b pb-5" style={{ borderColor: L.lineSoft }}>
+              <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                      style={{ background: '#ECFDF5', color: '#059669' }}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {t('carePlan.previewCard.status', 'Active Plan')}
-                    </span>
-                    <span
-                      className="text-xs font-medium"
-                      style={{ color: L.lagoon, fontFamily: isRTL ? fontArabic : fontBody }}
-                    >
-                      {t('carePlan.badge', 'Individualized Blueprint')}
-                    </span>
-                  </div>
-                  <h4
-                    className="mt-2 text-xl font-bold"
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                    style={{ background: L.sky, color: L.sea }}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                    {t('carePlan.previewCard.status', 'Active plan')}
+                  </span>
+                  <h3
+                    className="mt-2.5 text-xl font-bold"
                     style={{ color: L.ink, fontFamily: isRTL ? fontArabic : fontHeading }}
                   >
                     {t('carePlan.previewCard.patientName', 'Fatima')}
-                  </h4>
-                  <p
-                    className="mt-0.5 text-xs font-medium"
-                    style={{ color: L.fog, fontFamily: isRTL ? fontArabic : fontBody }}
-                  >
-                    {t('carePlan.previewCard.planType', 'Comprehensive Disability & Wellness Plan')}
+                  </h3>
+                  <p className="mt-0.5 text-sm" style={{ color: L.fog }}>
+                    {t('carePlan.previewCard.planTypeShort', 'Disability & wellness plan')}
                   </p>
                 </div>
-                <div
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
-                  style={{ background: L.sky, color: L.sea }}
-                >
-                  <Sparkles className="h-6 w-6" />
-                </div>
               </div>
 
-              {/* Goals Spotlight */}
-              <div className="mt-5 rounded-2xl p-4" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                <p
-                  className={`text-[11px] font-bold uppercase ${
-                    isRTL ? 'tracking-normal' : 'tracking-wider'
-                  }`}
-                  style={{ color: L.lagoon, fontFamily: isRTL ? fontArabic : fontBody }}
-                >
-                  {isRTL ? 'الهدف التأهيلي الأساسي' : 'Primary Functional Goal'}
-                </p>
-                <p
-                  className="mt-1 text-sm font-semibold"
-                  style={{ color: L.ink, fontFamily: isRTL ? fontArabic : fontBody }}
-                >
-                  {t(
-                    'carePlan.previewCard.primaryGoal',
-                    'Maintain independent mobility & continuous speech therapy progress'
-                  )}
-                </p>
-              </div>
-
-              {/* Live Status Indicators */}
-              <div className="mt-5 space-y-3">
-                <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: '#F0FDFA' }}>
-                  <UserCheck className="h-5 w-5 shrink-0 text-[#0D9488]" />
-                  <div className="min-w-0 flex-1 text-xs sm:text-sm">
-                    <span className="font-semibold text-[#0B3B3E]">
-                      {t('carePlan.previewCard.coordinatorLabel', 'Dedicated Coordinator:')}{' '}
-                    </span>
-                    <span className="text-[#0D9488] font-bold">
-                      {t('carePlan.previewCard.coordinatorName', 'Sara Al-Harbi, RN')}
-                    </span>
-                  </div>
+              <div className="space-y-2.5">
+                <div className="rounded-xl px-3.5 py-3" style={{ background: L.mist }}>
+                  <p className="text-[11px] font-semibold" style={{ color: L.sea }}>
+                    {t('carePlan.previewCard.goalLabel', 'Primary goal')}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold" style={{ color: L.ink }}>
+                    {t('carePlan.previewCard.primaryGoalShort', 'Maintain mobility & speech progress')}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: '#F8FAFC' }}>
-                  <Clock className="h-5 w-5 shrink-0 text-blue-600" />
-                  <div className="min-w-0 flex-1 text-xs sm:text-sm font-medium" style={{ color: L.ink }}>
-                    {t('carePlan.previewCard.nextVisit', 'Tomorrow at 10:00 AM • Home Physiotherapy')}
-                  </div>
+                <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: L.sky }}>
+                  <UserCheck className="h-4 w-4 shrink-0" style={{ color: L.sea }} aria-hidden />
+                  <p className="text-sm" style={{ color: L.ink }}>
+                    <span className="font-semibold">
+                      {t('carePlan.previewCard.coordinatorLabel', 'Coordinator:')}{' '}
+                    </span>
+                    {t('carePlan.previewCard.coordinatorName', 'Sara Al-Harbi, RN')}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: '#FAF5FF' }}>
-                  <TrendingUp className="h-5 w-5 shrink-0 text-purple-600" />
-                  <div className="min-w-0 flex-1 text-xs sm:text-sm font-semibold text-purple-900">
-                    {t('carePlan.previewCard.recentProgress', 'Mobility score +18% over last 6 weeks')}
-                  </div>
+                <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: L.mist }}>
+                  <Clock className="h-4 w-4 shrink-0" style={{ color: L.sea }} aria-hidden />
+                  <p className="text-sm font-medium" style={{ color: L.ink }}>
+                    {t('carePlan.previewCard.nextVisitShort', 'Tomorrow · 10:00 AM · Home physio')}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: L.mist }}>
+                  <TrendingUp className="h-4 w-4 shrink-0" style={{ color: L.sea }} aria-hidden />
+                  <p className="text-sm font-semibold" style={{ color: L.ink }}>
+                    {t('carePlan.previewCard.recentProgressShort', 'Mobility +18% in 6 weeks')}
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
+          </SectionReveal>
         </div>
       </div>
     </section>

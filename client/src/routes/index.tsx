@@ -39,6 +39,7 @@ const ForgotPasswordPage  = lazy(() => import('@/pages/public/ForgotPasswordPage
 const ResetPasswordPage   = lazy(() => import('@/pages/public/ResetPasswordPage'));
 const SetPasswordPage     = lazy(() => import('@/pages/public/SetPasswordPage'));
 const VerifyEmailPendingPage = lazy(() => import('@/pages/public/VerifyEmailPendingPage'));
+const VerifyPhonePendingPage = lazy(() => import('@/pages/public/VerifyPhonePendingPage'));
 const PrivacyPage         = lazy(() => import('@/pages/public/PrivacyPage'));
 const TermsPage           = lazy(() => import('@/pages/public/TermsPage'));
 const DeleteAccountPage        = lazy(() => import('@/pages/public/DeleteAccountPage'));
@@ -149,6 +150,7 @@ export function AppRoutes() {
         <Route path="/reset-password"  element={<S><ResetPasswordPage /></S>} />
         <Route path="/set-password"    element={<S><SetPasswordPage /></S>} />
         <Route path="/verify-email"    element={<S><VerifyEmailPendingPage /></S>} />
+        <Route path="/verify-phone"    element={<S><VerifyPhonePendingPage /></S>} />
         <Route path="/privacy"         element={<S><PrivacyPage /></S>} />
         <Route path="/terms"           element={<S><TermsPage /></S>} />
         <Route path="/delete-account"        element={<S><DeleteAccountPage /></S>} />

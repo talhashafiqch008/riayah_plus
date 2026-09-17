@@ -414,6 +414,7 @@ model User {
   accountDeletionRequests AccountDeletionRequest[]  @relation("AccountDeletionRequests")
   pushTokens              PushNotificationToken[]   @relation("PushTokens")
   voiceRecordings         VoiceRecording[]
+  patientVoiceRecordings  VoiceRecording[]          @relation("VoiceRecordingPatient")
 
   @@index([email])
   @@index([phone])
@@ -585,6 +586,7 @@ model CareRecipient {
   careOrders   CareOrder[]
   intakeRecords IntakeRecord[]
   revisions    CareRecipientRevision[]
+  voiceRecordings VoiceRecording[]
 
   @@index([userId])
   @@index([careUnitId])
@@ -1993,6 +1995,12 @@ model VoiceRecording {
   id                 String    @id @default(cuid())
   userId             String
   user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Family/patient account this note is about (required for staff recordings).
+  patientId          String?
+  patient            User?     @relation("VoiceRecordingPatient", fields: [patientId], references: [id], onDelete: SetNull)
+  careRecipientId    String?
+  careRecipient      CareRecipient? @relation(fields: [careRecipientId], references: [id], onDelete: SetNull)
+  episodeId          String?
   organizationId     String?
   title              String?
   notes              String?
@@ -2008,6 +2016,9 @@ model VoiceRecording {
   retentionExpiresAt DateTime?
 
   @@index([userId])
+  @@index([patientId])
+  @@index([careRecipientId])
+  @@index([episodeId])
   @@index([organizationId])
   @@index([sessionId])
   @@index([meetingId])

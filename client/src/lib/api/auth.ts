@@ -48,7 +48,36 @@ export async function register(data: RegisterPayload) {
         const response = await client.post('/auth/register', data);
         return response.data;
     } catch (error: unknown) {
-        throw extractDomainError(error); // MIGRATED: domain error handling
+        throw extractDomainError(error);
+    }
+}
+
+export async function registerWithPhone(data: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    password: string;
+    role?: string;
+    consentAccepted: boolean;
+}) {
+    try {
+        const response = await client.post('/auth/register/phone', {
+            name: `${data.firstName} ${data.lastName}`.trim(),
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phone: data.phone,
+            password: data.password,
+            role: data.role ?? 'family',
+            consentAccepted: data.consentAccepted,
+        });
+        return response.data as {
+            success: boolean;
+            requiresPhoneVerification?: boolean;
+            message?: string;
+            user?: { id: string; phone?: string; onboardingStatus?: string };
+        };
+    } catch (error: unknown) {
+        throw extractDomainError(error);
     }
 }
 

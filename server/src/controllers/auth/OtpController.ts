@@ -4,12 +4,12 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { EmailService } from '../../services/EmailService';
-import { WhatsAppService } from '../../services/WhatsAppService';
-import { env } from '../../config/env';
 import { generateAccessToken, generateRefreshToken, AuthPayload } from '../../middleware/auth';
 import { setAuthCookies } from '../../utils/authCookies';
 import { persistRefreshToken } from '../../utils/refreshTokenStore';
 import { sanitizedString } from '../../utils/sanitize';
+import { normalizePhoneE164 } from '../../utils/phoneAuth';
+import { TwilioSmsService } from '../../services/TwilioSmsService';
 
 const sendSchema = z.object({
   identifier: sanitizedString(z.string().min(3)),
@@ -33,30 +33,30 @@ export class OtpController {
     const otp = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // A-1: invalidate any existing unused OTPs for this identifier before issuing a new one
+    let storeIdentifier = parsedIdentifier;
+    if (parsedType === 'phone') {
+      try {
+        storeIdentifier = normalizePhoneE164(parsedIdentifier);
+      } catch {
+        throw new AppError('Invalid phone number.', 422);
+      }
+    }
+
     await prisma.otpVerification.deleteMany({
-      where: { identifier: parsedIdentifier, type: parsedType, verifiedAt: null },
+      where: { identifier: storeIdentifier, type: parsedType, verifiedAt: null },
     });
 
     await prisma.otpVerification.create({
-      data: { identifier: parsedIdentifier, otp, type: parsedType, expiresAt },
+      data: { identifier: storeIdentifier, otp, type: parsedType, expiresAt },
     });
 
     if (parsedType === 'email') {
-      await EmailService.sendOtp(parsedIdentifier, otp);
+      await EmailService.sendOtp(storeIdentifier, otp);
     } else {
-      // AUTH-002: deliver phone OTP via WhatsApp Business API
-      if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID) {
-        throw new AppError('Phone OTP gateway is not configured.', 503);
-      }
-      const phone = parsedIdentifier.replace(/^\+/, '');
-      await WhatsAppService.sendText(
-        phone,
-        `Your Riayah Plus verification code is: ${otp}. It expires in 10 minutes.`,
-      );
+      await TwilioSmsService.sendOtp(storeIdentifier, otp);
     }
 
-    res.json({ message: 'OTP sent.' });
+    res.json({ message: 'OTP sent.', identifier: storeIdentifier });
   }
 
   static async verify(req: Request, res: Response): Promise<void> {
@@ -71,7 +71,17 @@ export class OtpController {
     if (!identifier || !otp) throw new AppError('identifier/phone and otp are required.', 422);
     const type = raw.type ?? (raw.phone ? 'phone' : 'email');
     const parsed = verifySchema.parse({ identifier, otp, type });
-    const { identifier: parsedIdentifier, otp: parsedOtp, type: parsedType } = parsed;
+    let parsedIdentifier = parsed.identifier;
+    const parsedOtp = parsed.otp;
+    const parsedType = parsed.type;
+
+    if (parsedType === 'phone') {
+      try {
+        parsedIdentifier = normalizePhoneE164(parsedIdentifier);
+      } catch {
+        throw new AppError('Invalid phone number.', 422);
+      }
+    }
 
     const record = await prisma.otpVerification.findFirst({
       where: {
@@ -85,7 +95,6 @@ export class OtpController {
 
     if (!record) throw new AppError('Invalid or expired OTP.', 422);
 
-    // M-44: purge used OTP immediately (single-use)
     await prisma.otpVerification.delete({ where: { id: record.id } });
     await prisma.otpVerification.deleteMany({
       where: {
@@ -97,18 +106,23 @@ export class OtpController {
 
     let user = null;
     if (parsedType === 'phone') {
-      user = await prisma.user.findFirst({ where: { phone: parsedIdentifier } });
+      user = await prisma.user.findFirst({ where: { phone: parsedIdentifier, deletedAt: null } });
       if (user) {
-        await prisma.user.update({ where: { id: user.id }, data: { isPhoneVerified: true } });
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { isPhoneVerified: true, phoneVerifiedAt: new Date() },
+        });
       }
     } else {
-      user = await prisma.user.findFirst({ where: { email: parsedIdentifier } });
+      user = await prisma.user.findFirst({ where: { email: parsedIdentifier, deletedAt: null } });
       if (user) {
-        await prisma.user.update({ where: { id: user.id }, data: { isEmailVerified: true } });
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { isEmailVerified: true, emailVerifiedAt: new Date() },
+        });
       }
     }
 
-    // M-43: OTP verifies identity only — do not issue a full session unless explicitly enabled.
     const allowOtpLogin = process.env.ALLOW_OTP_LOGIN === 'true';
     if (user && allowOtpLogin) {
       const payload: AuthPayload = { userId: user.id, role: user.role, email: user.email };

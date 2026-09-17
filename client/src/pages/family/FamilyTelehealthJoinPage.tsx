@@ -8,7 +8,6 @@ import { isApiError } from '@/lib/errors';
 import { getSession, type CareSession } from '@/lib/api/scheduling';
 import {
   grantTelehealthConsent,
-  getTelehealthRecording,
   isLiveKitUrlReady,
   isTelehealthConsentRequired,
   isTelehealthPaymentRequired,
@@ -16,7 +15,6 @@ import {
   sessionJoinRoomName,
   telehealthPaymentInvoiceId,
   type TelehealthJoin,
-  type TelehealthRecording,
 } from '@/lib/api/telehealth';
 
 export function FamilyAppointmentJoinRedirect() {
@@ -35,15 +33,6 @@ export default function FamilyTelehealthJoinPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recording, setRecording] = useState<TelehealthRecording | null>(null);
-
-  const refreshRecording = useCallback(async () => {
-    try {
-      setRecording(await getTelehealthRecording(sessionId));
-    } catch {
-      setRecording(null);
-    }
-  }, [sessionId]);
 
   const requestJoin = useCallback(
     async (roomName: string) => {
@@ -84,13 +73,13 @@ export default function FamilyTelehealthJoinPage() {
     try {
       const row = await getSession(sessionId);
       setSession(row);
-      await Promise.all([requestJoin(sessionJoinRoomName(row)), refreshRecording()]);
+      await requestJoin(sessionJoinRoomName(row));
     } catch (err: unknown) {
       toast.error(isApiError(err) ? err.message : 'Failed to open session');
     } finally {
       setLoading(false);
     }
-  }, [refreshRecording, requestJoin, sessionId]);
+  }, [requestJoin, sessionId]);
 
   useEffect(() => {
     void load();
@@ -104,14 +93,6 @@ export default function FamilyTelehealthJoinPage() {
     }, 5000);
     return () => window.clearInterval(timer);
   }, [join?.phase, needsConsent, needsPayment, requestJoin, session]);
-
-  useEffect(() => {
-    if (recording?.status !== 'stopping') return undefined;
-    const timer = window.setInterval(() => {
-      void refreshRecording();
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [recording?.status, refreshRecording]);
 
   async function onGrantConsent() {
     if (!agreed || !session) return;
@@ -270,21 +251,6 @@ export default function FamilyTelehealthJoinPage() {
           <p className="mt-6 text-sm text-rose-700">{error}</p>
         )}
       </div>
-
-      {(recording?.recordingUrl || recording?.status) && (
-        <div className="rounded-xl border border-stone-100 bg-white p-6 shadow-sm space-y-3">
-          <h3 className="text-sm font-semibold text-stone-900">Session recording</h3>
-          {recording.status && (
-            <p className="text-xs font-medium uppercase tracking-wide text-teal-800">
-              {recording.status.replace(/_/g, ' ')}
-            </p>
-          )}
-          {recording.recordingUrl && (
-            <video src={recording.recordingUrl} controls className="w-full rounded-lg bg-black" />
-          )}
-        </div>
-      )}
     </div>
   );
 }
-

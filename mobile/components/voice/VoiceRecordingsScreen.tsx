@@ -18,9 +18,11 @@ import { apiErrorMessage, formatDate } from '../../lib/format';
 import {
   deleteVoiceRecording,
   getVoiceRecordingPlayback,
+  listVoiceRecordingPatients,
   listVoiceRecordings,
   uploadVoiceRecording,
   type VoiceRecording,
+  type VoiceRecordingPatient,
 } from '../../lib/api/voiceRecordings';
 
 function formatDuration(seconds?: number | null): string {
@@ -44,10 +46,12 @@ type Props = {
 };
 
 export function VoiceRecordingsScreen({
-  subtitle = 'Record voice notes, then replay or delete them. Title and notes are optional.',
+  subtitle = 'Choose an assigned patient, then record. Title and notes are optional.',
 }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<VoiceRecording[]>([]);
+  const [patients, setPatients] = useState<VoiceRecordingPatient[]>([]);
+  const [selectedPatientKey, setSelectedPatientKey] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -62,6 +66,10 @@ export function VoiceRecordingsScreen({
   const soundRef = useRef<Audio.Sound | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
+  const selectedRef = useRef<VoiceRecordingPatient | null>(null);
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientKey) ?? null;
+  selectedRef.current = selectedPatient;
 
   const clearTimer = () => {
     if (timerRef.current) {
@@ -72,7 +80,15 @@ export function VoiceRecordingsScreen({
 
   const load = useCallback(async () => {
     try {
-      setRows(await listVoiceRecordings());
+      const [recordingRows, patientRows] = await Promise.all([
+        listVoiceRecordings(),
+        listVoiceRecordingPatients(),
+      ]);
+      setRows(recordingRows);
+      setPatients(patientRows);
+      setSelectedPatientKey((prev) =>
+        prev && patientRows.some((p) => p.id === prev) ? prev : patientRows[0]?.id ?? '',
+      );
     } catch (e: unknown) {
       toast.show(apiErrorMessage(e, 'Failed to load recordings'), { type: 'danger' });
     } finally {
@@ -92,6 +108,10 @@ export function VoiceRecordingsScreen({
 
   const startRecording = async () => {
     if (isRecording || uploading) return;
+    if (!selectedRef.current) {
+      toast.show('Choose an assigned patient before recording.', { type: 'danger' });
+      return;
+    }
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
@@ -118,12 +138,14 @@ export function VoiceRecordingsScreen({
 
   const stopAndSave = async () => {
     const recording = recordingRef.current;
+    const patient = selectedRef.current;
     if (!recording) return;
     recordingRef.current = null;
     clearTimer();
     setIsRecording(false);
     setUploading(true);
     try {
+      if (!patient) throw new Error('Choose an assigned patient before recording.');
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recording.getURI();
@@ -141,6 +163,9 @@ export function VoiceRecordingsScreen({
         title: titleDraft.trim() || undefined,
         notes: notesDraft.trim() || undefined,
         durationSeconds,
+        patientId: patient.patientId,
+        careRecipientId: patient.careRecipientId,
+        episodeId: patient.episodeId,
       });
       setTitleDraft('');
       setNotesDraft('');
@@ -243,7 +268,41 @@ export function VoiceRecordingsScreen({
               }}
             >
               <Text style={{ fontSize: 12, fontWeight: '600', color: FAMILY.stone500 }}>
-                Optional details (leave blank if you prefer)
+                Patient (required)
+              </Text>
+              {patients.length === 0 ? (
+                <Text style={{ fontSize: 12, color: '#B45309' }}>
+                  Only patients on your active or validated care episodes appear here.
+                </Text>
+              ) : (
+                patients.map((p) => {
+                  const selected = p.id === selectedPatientKey;
+                  return (
+                    <Pressable
+                      key={p.id}
+                      disabled={isRecording || uploading}
+                      onPress={() => setSelectedPatientKey(p.id)}
+                      style={{
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: selected ? FAMILY.teal : FAMILY.stone200,
+                        backgroundColor: selected ? '#F0FDFA' : FAMILY.white,
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: FAMILY.stone900 }}>
+                        {p.name}
+                      </Text>
+                      <Text style={{ marginTop: 2, fontSize: 11, color: FAMILY.stone500 }}>
+                        {p.episodeTitle}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+              <Text style={{ fontSize: 12, fontWeight: '600', color: FAMILY.stone500 }}>
+                Optional details
               </Text>
               <TextInput
                 value={titleDraft}
@@ -284,14 +343,14 @@ export function VoiceRecordingsScreen({
                 {!isRecording ? (
                   <Pressable
                     onPress={() => void startRecording()}
-                    disabled={uploading}
+                    disabled={uploading || !selectedPatient}
                     style={{
                       flex: 1,
                       backgroundColor: FAMILY.teal,
                       borderRadius: 12,
                       paddingVertical: 12,
                       alignItems: 'center',
-                      opacity: uploading ? 0.6 : 1,
+                      opacity: uploading || !selectedPatient ? 0.6 : 1,
                     }}
                   >
                     <Text style={{ color: FAMILY.white, fontWeight: '700' }}>
@@ -370,6 +429,7 @@ export function VoiceRecordingsScreen({
                   {item.title?.trim() || 'Untitled recording'}
                 </Text>
                 <Text style={{ marginTop: 4, fontSize: 12, color: FAMILY.stone500 }}>
+                  {item.patientName ? `${item.patientName} · ` : ''}
                   {formatDate(item.createdAt)} · {formatDuration(item.durationSeconds)}
                 </Text>
                 {item.notes ? (

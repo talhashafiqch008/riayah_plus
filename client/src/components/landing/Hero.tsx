@@ -1,276 +1,265 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import {
-  ArrowRight,
-  HeartHandshake,
-  ShieldCheck,
-  Users,
-  Home,
-  Video,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Calendar, Phone, Video } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '@/components/I18nProvider';
-import { L, fontHeading, fontBody, fontArabic, easeOut } from './tokens';
+import { L, fontHeading, fontBody, fontArabic, easeOut, landingContainerClass } from './tokens';
 import { LandingButton } from './LandingButton';
+import { SoftBackdrop } from './SoftBackdrop';
 
 export function Hero() {
   const { t } = useTranslation('landing');
   const { isRTL } = useI18n();
   const reduceMotion = useReducedMotion();
 
-  const trustStripItems = [
-    {
-      icon: HeartHandshake,
-      title: t('trustStrip.disabilityCare.title', 'Disability Care'),
-      desc: t('trustStrip.disabilityCare.desc', 'Individualized support & therapy'),
-      bg: L.iconTeal,
-      color: L.sea,
-    },
-    {
-      icon: ShieldCheck,
-      title: t('trustStrip.agedCare.title', 'Aged Care'),
-      desc: t('trustStrip.agedCare.desc', 'Compassionate home & clinical support'),
-      bg: L.iconGreen,
-      color: '#059669',
-    },
-    {
-      icon: Users,
-      title: t('trustStrip.careCoordination.title', 'Care Coordination'),
-      desc: t('trustStrip.careCoordination.desc', 'One dedicated person managing care'),
-      bg: L.iconBlue,
-      color: '#2563EB',
-    },
-    {
-      icon: Home,
-      title: t('trustStrip.homeCommunity.title', 'Home & Community Support'),
-      desc: t('trustStrip.homeCommunity.desc', 'Daily living & community engagement'),
-      bg: L.iconPurple,
-      color: '#7C3AED',
-    },
-    {
-      icon: Video,
-      title: t('trustStrip.telehealth.title', 'Telehealth'),
-      desc: t('trustStrip.telehealth.desc', 'Direct consultations with your team'),
-      bg: L.iconTeal,
-      color: L.sea,
-    },
-  ];
-
   return (
-    <section className="relative overflow-x-clip bg-white pt-20" aria-labelledby="hero-heading">
-      {/* Soft organic pale-teal shape inside clip */}
+    <section
+      className="relative overflow-x-clip pt-20"
+      style={{ background: L.paper }}
+      aria-labelledby="hero-heading"
+    >
+      <SoftBackdrop intensity="soft" />
+
+      {/* Soft line grid */}
       <div
-        className="pointer-events-none absolute inset-y-0 end-0 top-8 hidden w-[min(58%,42rem)] overflow-hidden lg:block"
-        aria-hidden
-      >
-        <div
-          className="absolute -end-[20%] top-0 h-[90%] w-[120%]"
-          style={{
-            background: `radial-gradient(ellipse 70% 75% at 55% 40%, ${L.sky} 0%, #E8F8F6 45%, transparent 72%)`,
-            borderRadius: '48% 52% 45% 55% / 50% 42% 58% 50%',
-          }}
-        />
-      </div>
-      <div
-        className="pointer-events-none absolute end-8 top-24 z-[1] hidden h-24 w-32 opacity-45 lg:block"
+        className="pointer-events-none absolute inset-0 z-[1] opacity-[0.32]"
         aria-hidden
         style={{
-          backgroundImage: 'radial-gradient(#38BDF8 1.6px, transparent 1.6px)',
-          backgroundSize: '12px 12px',
+          backgroundImage: `
+            linear-gradient(to right, ${L.sea}22 1px, transparent 1px),
+            linear-gradient(to bottom, ${L.sea}22 1px, transparent 1px)
+          `,
+          backgroundSize: '52px 52px',
+          maskImage:
+            'radial-gradient(ellipse 80% 75% at 72% 38%, black 8%, transparent 78%)',
+          WebkitMaskImage:
+            'radial-gradient(ellipse 80% 75% at 72% 38%, black 8%, transparent 78%)',
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-6">
-        <div className="relative lg:min-h-[580px] lg:pb-6">
-          {/* Leading copy */}
-          <div className="relative z-20 max-w-xl pt-2 text-start lg:w-[46%] lg:max-w-none lg:pt-6 lg:pe-6">
-            <motion.p
-              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(12px)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px)' }}
-              transition={{ duration: 0.45, ease: easeOut }}
-              className={`mb-5 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold uppercase ${
-                isRTL ? 'tracking-normal' : 'tracking-[0.14em]'
-              }`}
-              style={{
-                background: L.sky,
-                color: L.sea,
-                fontFamily: isRTL ? fontArabic : fontBody,
-              }}
-            >
-              <Sparkles className="h-3.5 w-3.5 text-[#0D9488]" aria-hidden />
-              {t('hero.badge', 'Specialized Disability & Aged Care')}
-            </motion.p>
-
+      <div className={`${landingContainerClass} z-10`}>
+        <div className="grid items-center gap-12 pb-16 pt-14 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20 xl:gap-20">
+          {/* Left */}
+          <div className="relative z-20 max-w-2xl text-start lg:max-w-none lg:pe-4">
             <motion.h1
               id="hero-heading"
-              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(18px)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px)' }}
-              transition={{ duration: 0.55, delay: reduceMotion ? 0 : 0.05, ease: easeOut }}
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: easeOut }}
               className="mb-5 text-start"
               style={{
                 fontFamily: isRTL ? fontArabic : fontHeading,
-                fontWeight: 700,
-                fontSize: 'clamp(2.2rem, 5.2vw, 3.6rem)',
-                lineHeight: isRTL ? 1.4 : 1.08,
-                letterSpacing: isRTL ? 'normal' : '-0.035em',
+                fontWeight: 800,
+                fontSize: 'clamp(2.55rem, 5vw, 3.85rem)',
+                lineHeight: isRTL ? 1.32 : 1.05,
+                letterSpacing: isRTL ? 'normal' : '-0.045em',
+                color: L.ink,
               }}
             >
-              <span className="block" style={{ color: L.ink }}>
-                {t('hero.titleLine1', 'Specialized Care.')}
-              </span>
-              <span className="block" style={{ color: L.sea }}>
-                {t('hero.titleLine2', 'Built Around Your Family.')}
-              </span>
+              {t('hero.title', 'Care that starts with simplicity and trust.')}
             </motion.h1>
 
             <motion.p
-              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(10px)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px)' }}
-              transition={{ duration: 0.5, delay: reduceMotion ? 0 : 0.12, ease: easeOut }}
-              className="mb-9 max-w-[28rem] text-start text-[1.05rem]"
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: reduceMotion ? 0 : 0.06, ease: easeOut }}
+              className="mb-9 max-w-[34rem] text-[1.05rem]"
               style={{
                 color: L.fog,
                 fontFamily: isRTL ? fontArabic : fontBody,
-                lineHeight: isRTL ? 1.75 : 1.6,
-                letterSpacing: isRTL ? 'normal' : undefined,
+                lineHeight: isRTL ? 1.75 : 1.65,
               }}
             >
               {t(
                 'hero.subtitle',
-                "Disability and aged care designed around your loved one's needs, goals, and everyday life."
+                'Riayah Plus connects families, clinicians, and care coordinators in one calm space for plans, visits, messages, and follow-up care.',
               )}
             </motion.p>
 
             <motion.div
-              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(10px)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px)' }}
-              transition={{ duration: 0.45, delay: reduceMotion ? 0 : 0.2, ease: easeOut }}
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: reduceMotion ? 0 : 0.1, ease: easeOut }}
               className="flex flex-col gap-3 sm:flex-row sm:items-center"
             >
               <LandingButton
                 to="/register"
                 variant="solid"
-                fill="left"
-                shape="boxy"
-                className="min-h-12 px-7 text-[15px]"
+                fill="none"
+                shape="pill"
+                className="min-h-12 px-8 text-[15px]"
+                style={{ background: L.ink, borderColor: L.ink, boxShadow: L.shadowSoft }}
               >
-                {t('hero.bookConsultation', 'Book a Consultation')}
+                {t('hero.bookConsultation', 'Get started')}
                 <ArrowRight className="h-4 w-4 rtl-flip" aria-hidden />
               </LandingButton>
               <LandingButton
                 href="#how-it-works"
                 variant="soft"
-                fill="left"
-                shape="boxy"
-                className="min-h-12 px-7 text-[15px]"
+                fill="none"
+                shape="pill"
+                className="min-h-12 px-8 text-[15px]"
               >
-                {t('hero.howItWorks', 'How Riayah Works')}
+                {t('hero.howItWorks', 'How it works')}
               </LandingButton>
             </motion.div>
           </div>
 
-          {/* Desktop photographic composition */}
+          {/* Right collage — clearer spacing, nothing clipped */}
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: reduceMotion ? 0 : 0.1, ease: easeOut }}
-            className={`absolute top-0 z-0 hidden overflow-hidden lg:block ${
-              isRTL ? 'end-[44%]' : 'start-[44%]'
-            }`}
-            style={{
-              [isRTL ? 'left' : 'right']: 'calc(-1 * max(0px, (100vw - 72rem) / 2))',
-              bottom: '-5.5rem',
-            }}
+            initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: reduceMotion ? 0 : 0.08, ease: easeOut }}
+            className="relative mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none"
+            aria-hidden
           >
-            <img
-              src="/landing/who-family.jpg"
-              alt="Family and person receiving specialized disability and aged care support"
-              className="h-full w-full object-cover object-[center_24%]"
-              fetchPriority="high"
-            />
-            {/* Soft blend into the left column */}
-            <div
-              className={`pointer-events-none absolute inset-y-0 w-[18%] ${
-                isRTL
-                  ? 'right-0 bg-gradient-to-l from-white via-white/60 to-transparent'
-                  : 'left-0 bg-gradient-to-r from-white via-white/60 to-transparent'
-              }`}
-              aria-hidden
-            />
-          </motion.div>
+            <div className="relative mx-auto aspect-[5/4] w-full min-h-[340px] sm:min-h-[390px] lg:min-h-[440px]">
+              <div
+                className="absolute inset-[6%] rounded-full blur-3xl"
+                style={{
+                  background: `radial-gradient(circle, ${L.aqua} 0%, ${L.mint} 45%, transparent 72%)`,
+                  opacity: 0.8,
+                }}
+              />
 
-          {/* Mobile / tablet photo */}
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(14px)' }}
-            animate={{ opacity: 1, transform: 'translateY(0px)' }}
-            transition={{ duration: 0.55, delay: reduceMotion ? 0 : 0.1, ease: easeOut }}
-            className="relative mt-10 overflow-hidden rounded-2xl lg:hidden"
-            style={{ aspectRatio: '4 / 3' }}
-          >
-            <img
-              src="/landing/who-family.jpg"
-              alt="Family receiving personalized care support"
-              className="h-full w-full object-cover object-[center_20%]"
-            />
+              {/* Check-in */}
+              <div
+                className="absolute start-[2%] top-[2%] z-[2] w-[54%] rounded-2xl bg-white p-4 sm:p-5"
+                style={{ boxShadow: L.shadow, border: `1px solid ${L.lineSoft}` }}
+              >
+                <p
+                  className="mb-3 text-xs font-semibold sm:text-sm"
+                  style={{ color: L.ink, fontFamily: isRTL ? fontArabic : fontBody }}
+                >
+                  {t('hero.ui.checkIn', 'How is care going today?')}
+                </p>
+                <div className="mb-2 flex justify-between text-[11px]" style={{ color: L.fog }}>
+                  <span>{t('hero.ui.low', 'Hard')}</span>
+                  <span>{t('hero.ui.high', 'Great')}</span>
+                </div>
+                <div className="flex gap-1.5">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="h-2.5 flex-1 rounded-full"
+                      style={{ background: i <= 3 ? L.sea : L.sky }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Visits */}
+              <div
+                className="absolute end-[4%] top-[6%] z-[3] w-[36%] rounded-2xl bg-white p-4"
+                style={{ boxShadow: L.shadow, border: `1px solid ${L.lineSoft}` }}
+              >
+                <p className="text-[11px]" style={{ color: L.fog }}>
+                  {t('hero.ui.visits', 'Visits')}
+                </p>
+                <p
+                  className="mt-1 text-2xl font-bold tabular-nums leading-none"
+                  style={{ color: L.ink, fontFamily: fontHeading }}
+                >
+                  1,250
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium" style={{ color: L.sea }}>
+                  +5.8%
+                </p>
+              </div>
+
+              {/* Featured teal card */}
+              <div
+                className="absolute start-[8%] top-[34%] z-[3] w-[52%] rounded-[1.4rem] p-5 text-white"
+                style={{
+                  background: `linear-gradient(145deg, ${L.lagoon}, ${L.sea})`,
+                  boxShadow: L.shadow,
+                }}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                    <Video className="h-4 w-4" />
+                  </div>
+                  <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold">
+                    {t('hero.ui.live', 'Telehealth')}
+                  </span>
+                </div>
+                <p
+                  className="text-[0.95rem] font-semibold leading-snug"
+                  style={{ fontFamily: isRTL ? fontArabic : fontHeading }}
+                >
+                  {t('hero.ui.sessionTitle', 'Follow-up consultation')}
+                </p>
+                <p className="mt-1.5 text-xs text-white/85">
+                  {t('hero.ui.sessionMeta', 'Tomorrow · 10:00 AM')}
+                </p>
+              </div>
+
+              {/* Messages — clear of teal card */}
+              <div
+                className="absolute end-[3%] top-[42%] z-[4] w-[34%] rounded-2xl bg-white p-4"
+                style={{ boxShadow: L.shadow, border: `1px solid ${L.lineSoft}` }}
+              >
+                <p className="text-[11px]" style={{ color: L.fog }}>
+                  {t('hero.ui.messagesLabel', 'Messages')}
+                </p>
+                <p
+                  className="mt-1 text-2xl font-bold tabular-nums leading-none"
+                  style={{ color: L.ink, fontFamily: fontHeading }}
+                >
+                  420
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium" style={{ color: L.sea }}>
+                  +12%
+                </p>
+              </div>
+
+              {/* Phone icon */}
+              <div
+                className="absolute start-[2%] top-[62%] z-[5] flex h-11 w-11 items-center justify-center rounded-full bg-white"
+                style={{ boxShadow: L.shadowSoft, color: L.sea }}
+              >
+                <Phone className="h-4 w-4" />
+              </div>
+
+              {/* Calendar icon */}
+              <div
+                className="absolute end-[40%] top-[58%] z-[5] flex h-11 w-11 items-center justify-center rounded-full bg-white"
+                style={{ boxShadow: L.shadowSoft, color: L.sea }}
+              >
+                <Calendar className="h-5 w-5" />
+              </div>
+
+              {/* Progress chart */}
+              <div
+                className="absolute bottom-[2%] start-[12%] z-[2] w-[54%] rounded-2xl bg-white p-4 sm:p-5"
+                style={{ boxShadow: L.shadow, border: `1px solid ${L.lineSoft}` }}
+              >
+                <p
+                  className="mb-2 text-xs font-semibold"
+                  style={{ color: L.ink, fontFamily: isRTL ? fontArabic : fontBody }}
+                >
+                  {t('hero.ui.milestones', 'Care progress')}
+                </p>
+                <svg viewBox="0 0 180 52" className="h-14 w-full">
+                  <path
+                    d="M0 38 C28 38 32 16 54 18 C76 20 80 36 108 24 C136 12 148 8 180 6"
+                    fill="none"
+                    stroke={L.sea}
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M0 42 C32 40 40 28 64 30 C88 32 100 20 128 26 C156 32 168 16 180 18"
+                    fill="none"
+                    stroke={L.tide}
+                    strokeWidth="2.1"
+                    strokeLinecap="round"
+                    opacity="0.75"
+                  />
+                </svg>
+              </div>
+            </div>
           </motion.div>
         </div>
-      </div>
-
-      {/* 5-Pillar Trust Strip — overlaps the photo */}
-      <div className="relative z-20 -mb-14 px-5 sm:-mb-16 sm:px-6">
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(18px)' }}
-          animate={{ opacity: 1, transform: 'translateY(0px)' }}
-          transition={{ duration: 0.5, delay: reduceMotion ? 0 : 0.26, ease: easeOut }}
-          className="mx-auto grid max-w-6xl grid-cols-2 gap-4 rounded-[1.5rem] bg-white p-5 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4 sm:p-6"
-          style={{
-            boxShadow: '0 24px 50px -18px rgba(15,23,42,0.18)',
-            border: '1px solid rgba(15,23,42,0.06)',
-          }}
-        >
-          {trustStripItems.map(({ icon: Icon, title, desc, bg, color }, i) => (
-            <motion.div
-              key={title}
-              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(10px)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px)' }}
-              transition={{
-                duration: 0.4,
-                delay: reduceMotion ? 0 : 0.3 + i * 0.06,
-                ease: easeOut,
-              }}
-              className="flex items-start gap-3"
-            >
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11"
-                style={{ background: bg, color }}
-              >
-                <Icon className="h-5 w-5" aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <p
-                  className="text-[13.5px] font-bold leading-snug"
-                  style={{
-                    color: L.ink,
-                    fontFamily: isRTL ? fontArabic : fontHeading,
-                    lineHeight: isRTL ? 1.4 : 1.25,
-                  }}
-                >
-                  {title}
-                </p>
-                <p
-                  className="mt-0.5 text-xs"
-                  style={{
-                    color: L.fog,
-                    fontFamily: isRTL ? fontArabic : fontBody,
-                    lineHeight: isRTL ? 1.5 : 1.35,
-                  }}
-                >
-                  {desc}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
       </div>
     </section>
   );

@@ -16,6 +16,10 @@ router.get('/', (req, res, next) => {
   VoiceRecordingController.list(req, res).catch(next);
 });
 
+router.get('/patients', (req, res, next) => {
+  VoiceRecordingController.listPatients(req, res).catch(next);
+});
+
 router.post('/', upload.single('file'), (req, res, next) => {
   VoiceRecordingController.create(req, res).catch(next);
 });

@@ -57,6 +57,8 @@ router.post('/admin/login', adminLimiter, async (req: Request, res: Response, ne
 // Public auth
 router.post('/register', registerLimiter, RegistrationController.register);
 router.post('/auth/register', registerLimiter, RegistrationController.register);
+router.post('/register/phone', registerLimiter, RegistrationController.registerPhone);
+router.post('/auth/register/phone', registerLimiter, RegistrationController.registerPhone);
 router.post('/login', loginLimiter, AuthController.login);
 router.post('/auth/login', loginLimiter, AuthController.login);
 router.post('/forgot-password', otpLimiter, AuthController.forgotPassword);

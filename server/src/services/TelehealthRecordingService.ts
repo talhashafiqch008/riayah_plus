@@ -16,6 +16,7 @@ import {
   type SessionAccessRow,
   type TelehealthActor,
 } from './LiveKitAccess';
+import { isFamilyRole } from '../utils/careAccess';
 
 export const RECORDING_UNAVAILABLE = 'recording_unavailable';
 
@@ -109,6 +110,8 @@ export function canViewRecording(
   row: SessionAccessRow | MeetingAccessRow,
   actor: TelehealthActor,
 ): boolean {
+  // Family never sees or downloads session/meeting recordings (staff-only).
+  if (isFamilyRole(actor.role)) return false;
   if (kind === 'session') return canJoinSessionRoom(row as SessionAccessRow, actor);
   return canJoinMeeting(row as MeetingAccessRow, actor);
 }

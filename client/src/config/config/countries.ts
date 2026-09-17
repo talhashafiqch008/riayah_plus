@@ -14,7 +14,8 @@ export enum CountryCode {
     KW = 'KW', // Kuwait
     QA = 'QA', // Qatar
     BH = 'BH', // Bahrain
-    OM = 'OM'  // Oman
+    OM = 'OM', // Oman
+    PK = 'PK', // Pakistan (testing / SMS)
 }
 
 // ============================================================================
@@ -383,6 +384,56 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
         business_hours: { start: '08:00', end: '17:00' },
         support_phone: '+968 24 123 456',
         support_email: 'support.om@raiyahplus.com'
+    },
+
+    [CountryCode.PK]: {
+        code: CountryCode.PK,
+        name: { en: 'Pakistan', ar: 'باكستان' },
+        flag: '🇵🇰',
+        currency: 'PKR',
+
+        phone_code: '+92',
+        // Mobile: 3XX XXXXXXX (10 digits, often entered without leading 0)
+        phone_format: '^(3)\\d{9}$',
+        phone_example: '300 1234567',
+
+        id_types: [
+            {
+                code: 'CNIC',
+                name: { en: 'CNIC', ar: 'بطاقة الهوية' },
+                format: '^\\d{5}-\\d{7}-\\d$',
+                length: 15,
+                example: '42101-1234567-1'
+            },
+            {
+                code: 'PASSPORT',
+                name: { en: 'Passport', ar: 'جواز السفر' },
+                format: '^[A-Z]{2}\\d{7}$',
+                length: 9,
+                example: 'AB1234567'
+            }
+        ],
+        primary_id_type: 'CNIC',
+
+        data_residency_required: false,
+        medical_license_required: false,
+        background_check_required: false,
+        insurance_required: false,
+
+        max_working_hours_per_week: 48,
+        min_provider_age: 18,
+
+        payment_gateways: ['STRIPE'],
+        supported_languages: ['en', 'ur'],
+        default_language: 'en',
+
+        tax_rate: 0,
+        platform_fee_percentage: 15,
+
+        timezone: 'Asia/Karachi',
+        business_hours: { start: '09:00', end: '18:00' },
+        support_phone: '+92 300 0000000',
+        support_email: 'support.pk@raiyahplus.com'
     }
 };
 

@@ -19,14 +19,14 @@ export function Navbar() {
   const isHomePage = location.pathname === '/';
 
   const navLinks = [
-    { label: t('nav.howItWorks', 'How It Works'), href: isHomePage ? '#how-it-works' : '/#how-it-works' },
-    { label: t('nav.disabilityCare', 'Disability Care'), href: isHomePage ? '#who-we-care-for' : '/#who-we-care-for' },
-    { label: t('nav.agedCare', 'Aged Care'), href: isHomePage ? '#who-we-care-for' : '/#who-we-care-for' },
-    { label: t('nav.services', 'Services'), href: isHomePage ? '#services' : '/#services' },
+    { label: t('nav.howItWorks', 'How it works'), href: isHomePage ? '#how-it-works' : '/#how-it-works' },
     { label: t('nav.carePlan', 'Care Plan'), href: isHomePage ? '#care-plan' : '/#care-plan' },
+    { label: t('nav.services', 'Services'), href: isHomePage ? '#services' : '/#services' },
+    { label: t('nav.enterprise', 'Enterprise'), href: isHomePage ? '#enterprise' : '/#enterprise' },
     { label: t('nav.coordinator', 'Care Coordinator'), href: isHomePage ? '#coordinator' : '/#coordinator' },
+    { label: t('nav.faq', 'FAQ'), href: isHomePage ? '#faq' : '/#faq' },
     { label: t('nav.about', 'About'), href: '/about' },
-    { label: t('nav.knowledgeHub', 'Knowledge Hub'), href: '/blog' },
+    { label: t('nav.knowledgeHub', 'Blogs'), href: '/blog' },
   ];
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function Navbar() {
           boxShadow: scrolled ? '0 8px 24px -16px rgba(15,23,42,0.12)' : 'none',
         }}
       >
-        <div className="mx-auto flex h-[4.5rem] w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className={`mx-auto flex h-[4.5rem] w-full max-w-[90rem] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12`}>
           <Link
             to="/"
             className="flex shrink-0 items-center gap-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#14B8A6]"
@@ -135,10 +135,11 @@ export function Navbar() {
             <LandingButton
               to="/register"
               variant="solid"
-              fill="left"
+              fill="none"
               className="min-h-10 whitespace-nowrap px-5 text-sm"
+              style={{ background: L.ink, borderColor: L.ink, boxShadow: 'none' }}
             >
-              {t('nav.bookConsultation', 'Book a Consultation')}
+              {t('nav.bookConsultation', 'Sign up')}
             </LandingButton>
           </div>
 

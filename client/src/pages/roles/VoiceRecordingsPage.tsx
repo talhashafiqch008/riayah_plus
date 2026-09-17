@@ -6,9 +6,11 @@ import { isApiError } from '@/lib/errors';
 import {
   deleteVoiceRecording,
   getVoiceRecordingPlayback,
+  listVoiceRecordingPatients,
   listVoiceRecordings,
   uploadVoiceRecording,
   type VoiceRecording,
+  type VoiceRecordingPatient,
 } from '@/lib/api/voiceRecordings';
 
 function formatDuration(seconds?: number | null): string {
@@ -39,13 +41,15 @@ type Props = {
 
 export default function VoiceRecordingsPage({
   title = 'Voice recordings',
-  description = 'Record voice notes during or after a meeting, then replay or delete them from your history.',
+  description = 'Choose an assigned patient first, then record a voice note. Replay or delete from your history.',
 }: Props) {
   const [params] = useSearchParams();
   const sessionId = params.get('sessionId') ?? undefined;
   const meetingId = params.get('meetingId') ?? undefined;
 
   const [rows, setRows] = useState<VoiceRecording[]>([]);
+  const [patients, setPatients] = useState<VoiceRecordingPatient[]>([]);
+  const [selectedPatientKey, setSelectedPatientKey] = useState('');
   const [loading, setLoading] = useState(true);
   const [titleDraft, setTitleDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
@@ -55,6 +59,8 @@ export default function VoiceRecordingsPage({
   const [uploading, setUploading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientKey) ?? null;
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -78,7 +84,15 @@ export default function VoiceRecordingsPage({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setRows(await listVoiceRecordings());
+      const [recordingRows, patientRows] = await Promise.all([
+        listVoiceRecordings(),
+        listVoiceRecordingPatients(),
+      ]);
+      setRows(recordingRows);
+      setPatients(patientRows);
+      setSelectedPatientKey((prev) =>
+        prev && patientRows.some((p) => p.id === prev) ? prev : patientRows[0]?.id ?? '',
+      );
     } catch (error: unknown) {
       toast.error(isApiError(error) ? error.message : 'Failed to load voice recordings');
     } finally {
@@ -101,6 +115,10 @@ export default function VoiceRecordingsPage({
 
   const startRecording = async () => {
     if (isRecording || uploading) return;
+    if (!selectedPatient) {
+      toast.error('Choose an assigned patient before recording.');
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       toast.error('Voice recording is not supported in this browser.');
       return;
@@ -140,6 +158,11 @@ export default function VoiceRecordingsPage({
               : blobType.includes('mp4')
                 ? 'm4a'
                 : 'webm';
+            const patient = selectedPatient;
+            if (!patient) {
+              toast.error('Choose an assigned patient before recording.');
+              return;
+            }
             await uploadVoiceRecording({
               file: blob,
               fileName: `voice-${Date.now()}.${ext}`,
@@ -148,6 +171,9 @@ export default function VoiceRecordingsPage({
               durationSeconds,
               sessionId,
               meetingId,
+              patientId: patient.patientId,
+              careRecipientId: patient.careRecipientId,
+              episodeId: patient.episodeId,
             });
             setTitleDraft('');
             setNotesDraft('');
@@ -290,6 +316,30 @@ export default function VoiceRecordingsPage({
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Record</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm text-stone-700 sm:col-span-2">
+            Patient <span className="font-normal text-rose-600">*</span>
+            <select
+              value={selectedPatientKey}
+              onChange={(e) => setSelectedPatientKey(e.target.value)}
+              disabled={isRecording || uploading || patients.length === 0}
+              className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-400 disabled:bg-stone-50"
+            >
+              {patients.length === 0 ? (
+                <option value="">No assigned patients</option>
+              ) : (
+                patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {p.episodeTitle}
+                  </option>
+                ))
+              )}
+            </select>
+            {patients.length === 0 ? (
+              <p className="mt-1 text-xs text-amber-700">
+                You can only record for patients on your active or validated care episodes.
+              </p>
+            ) : null}
+          </label>
           <label className="block text-sm text-stone-700">
             Title <span className="font-normal text-stone-400">(optional)</span>
             <input
@@ -318,7 +368,7 @@ export default function VoiceRecordingsPage({
             <button
               type="button"
               onClick={() => void startRecording()}
-              disabled={uploading}
+              disabled={uploading || !selectedPatient}
               className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
             >
               <Mic className="size-4" />
@@ -389,6 +439,7 @@ export default function VoiceRecordingsPage({
                     {row.title?.trim() || 'Untitled recording'}
                   </p>
                   <p className="mt-0.5 text-xs text-stone-500">
+                    {row.patientName ? `${row.patientName} · ` : ''}
                     {new Date(row.createdAt).toLocaleString('en-QA')} ·{' '}
                     {formatDuration(row.durationSeconds)} · {formatBytes(row.sizeBytes)}
                     {row.sessionId ? ` · session` : ''}

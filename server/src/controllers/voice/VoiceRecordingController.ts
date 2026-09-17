@@ -15,6 +15,12 @@ async function actorFromRequest(req: Request) {
 }
 
 export class VoiceRecordingController {
+  static async listPatients(req: Request, res: Response): Promise<void> {
+    const actor = await actorFromRequest(req);
+    const data = await VoiceRecordingService.listEligiblePatients(actor);
+    res.json({ data });
+  }
+
   static async list(req: Request, res: Response): Promise<void> {
     const actor = await actorFromRequest(req);
     const data = await VoiceRecordingService.list(actor);
@@ -30,6 +36,9 @@ export class VoiceRecordingController {
         durationSeconds: z.coerce.number().int().min(0).max(86_400).optional(),
         sessionId: z.string().min(1).max(64).optional(),
         meetingId: z.string().min(1).max(64).optional(),
+        patientId: z.string().min(1),
+        careRecipientId: z.string().min(1).optional(),
+        episodeId: z.string().min(1).optional(),
       })
       .parse(req.body);
 
@@ -41,6 +50,9 @@ export class VoiceRecordingController {
       durationSeconds: body.durationSeconds,
       sessionId: body.sessionId,
       meetingId: body.meetingId,
+      patientId: body.patientId,
+      careRecipientId: body.careRecipientId,
+      episodeId: body.episodeId,
     });
     res.status(201).json({ data });
   }
