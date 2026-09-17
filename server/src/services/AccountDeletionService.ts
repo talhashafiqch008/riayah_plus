@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuditService } from './AuditService';
 import { NotificationService } from './NotificationService';
 import { recordLogoutAll } from '../middleware/auth';
+import { disconnectUserSockets } from './RealtimeService';
 import { clearAuthCookies } from '../utils/authCookies';
 
 export type DeletionBlocker = {
@@ -150,6 +151,7 @@ export async function performAccountDeletion(opts: {
     data: { revokedAt: new Date() },
   });
   await recordLogoutAll(userId);
+  disconnectUserSockets(userId);
   if (res) clearAuthCookies(res);
 
   await AuditService.log({

@@ -119,7 +119,8 @@ router.use('/sessions', bookingRoutes);
 router.use('/providers', providerRoutes);
 router.use('/matching', providerRoutes);
 
-// Documents
+// Documents — AUTHZ-04: mount statistics/type/download router BEFORE `/:id`
+router.use('/documents', documentsRoutes);
 router.use('/documents', documentRoutes);
 
 // Shifts & tasks
@@ -198,8 +199,7 @@ router.use('/providers', marketplaceOffersRoutes);
 // Client-side offer and care-needs paths
 router.use('/client', clientRoutes);
 
-// Document download/stats/type + upload + signed URLs
-router.use('/documents', documentsRoutes);
+// Document download/stats/type mounted earlier (before documentRoutes `/:id`)
 router.use('/storage', storageRoutes);
 router.use('/upload', uploadRoutes);
 

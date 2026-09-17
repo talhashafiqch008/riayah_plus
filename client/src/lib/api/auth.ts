@@ -146,9 +146,12 @@ export async function getUser() {
     return getMe();
 }
 
-export async function enable2fa() {
+export async function enable2fa(password: string, code?: string) {
     try {
-        const response = await client.post('/2fa/enable');
+        const response = await client.post('/2fa/enable', {
+            password,
+            ...(code ? { code } : {}),
+        });
         const data = response.data as { secret?: string; qrCode?: string; qr_code_url?: string };
         return {
             ...data,
@@ -161,18 +164,22 @@ export async function enable2fa() {
     }
 }
 
-export async function verify2faSetup(secret: string, code: string) {
+export async function verify2faSetup(_secret: string, code: string) {
     try {
-        const response = await client.post('/2fa/verify-setup', { secret, code });
+        // AUTH-03: secret is staged server-side; only the confirmation code is required
+        const response = await client.post('/2fa/verify-setup', { code });
         return response.data;
     } catch (error: unknown) {
         throw extractDomainError(error); // MIGRATED: domain error handling
     }
 }
 
-export async function disable2fa(password: string) {
+export async function disable2fa(password: string, code?: string) {
     try {
-        const response = await client.post('/2fa/disable', { password });
+        const response = await client.post('/2fa/disable', {
+            password,
+            ...(code ? { code } : {}),
+        });
         return response.data;
     } catch (error: unknown) {
         throw extractDomainError(error); // MIGRATED: domain error handling

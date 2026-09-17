@@ -66,12 +66,21 @@ router.get('/:id/summary-pdf', async (req: Request, res: Response, next: NextFun
     }
 
     if (episode.summaryPdfUrl) {
-      res.json({ success: true, pdfUrl: episode.summaryPdfUrl });
+      const pdfUrl = await CareSummaryPDFService.getSignedDownloadUrl(episode.summaryPdfUrl);
+      res.json({ success: true, pdfUrl, expiresIn: 300 });
       return;
     }
 
-    const pdfUrl = await CareSummaryPDFService.generateForEpisode(req.params.id);
-    res.json({ success: true, pdfUrl });
+    await CareSummaryPDFService.generateForEpisode(req.params.id);
+    const refreshed = await prisma.careEpisode.findUnique({
+      where: { id: req.params.id },
+      select: { summaryPdfUrl: true },
+    });
+    if (!refreshed?.summaryPdfUrl) {
+      throw new AppError('Failed to generate care summary PDF.', 500);
+    }
+    const pdfUrl = await CareSummaryPDFService.getSignedDownloadUrl(refreshed.summaryPdfUrl);
+    res.json({ success: true, pdfUrl, expiresIn: 300 });
   } catch (err) {
     next(err);
   }

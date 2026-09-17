@@ -6,11 +6,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
+import { AuditService } from '../services/AuditService';
 import {
   UPLOAD_MAX_BYTES,
   assertAllowedUploadMime,
   sanitizeUploadFilename,
 } from '../utils/uploadAllowlist';
+import { assertSignableObjectKey, clampSignedUrlTtl } from '../utils/signedUrlPolicy';
 
 const s3 = new S3Client({ region: env.AWS_DEFAULT_REGION });
 const upload = multer({
@@ -67,32 +69,46 @@ export class DocumentController {
       }
 
       const isAdmin = ['admin', 'super_admin', 'support_admin'].includes(req.user!.role);
-      const owned =
-        key.startsWith(`documents/${req.user!.userId}/`) ||
-        key.startsWith(`intake/${req.user!.userId}/`);
-
-      if (!isAdmin && !owned) {
-        const doc = await prisma.document.findFirst({
-          where: {
-            userId: req.user!.userId,
-            deletedAt: null,
-            OR: [
-              { metadata: { path: ['fileKey'], equals: key } },
-              { url: { contains: key } },
-            ],
-          },
-          select: { id: true },
-        });
-        if (!doc) throw new AppError('Document not found', 404);
+      try {
+        assertSignableObjectKey(key, { userId: req.user!.userId, isAdmin });
+      } catch (e) {
+        const code = e instanceof Error ? e.message : '';
+        if (code === 'NOT_OWNED') {
+          const doc = await prisma.document.findFirst({
+            where: {
+              userId: req.user!.userId,
+              deletedAt: null,
+              OR: [
+                { metadata: { path: ['fileKey'], equals: key } },
+                { url: { contains: key } },
+              ],
+            },
+            select: { id: true },
+          });
+          if (!doc) throw new AppError('Document not found', 404);
+        } else {
+          throw new AppError('Document not found', 404);
+        }
       }
 
+      const ttl = clampSignedUrlTtl(expiresIn, 3600);
       const command = new GetObjectCommand({
         Bucket: env.AWS_BUCKET!,
         Key: key,
         ResponseContentDisposition: 'attachment',
       });
-      const url = await getSignedUrl(s3, command, { expiresIn: parseInt(expiresIn) });
-      res.json({ data: { url, expiresIn: parseInt(expiresIn) } });
+      const url = await getSignedUrl(s3, command, { expiresIn: ttl });
+
+      if (isAdmin) {
+        await AuditService.log({
+          userId: req.user!.userId,
+          action: 'admin_signed_url',
+          after: { key, expiresIn: ttl },
+          req,
+        });
+      }
+
+      res.json({ data: { url, expiresIn: ttl } });
     } catch (err) {
       next(err);
     }

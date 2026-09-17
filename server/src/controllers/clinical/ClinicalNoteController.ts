@@ -37,6 +37,50 @@ function canSeePrivateNote(
   ].includes(role);
 }
 
+/**
+ * AUTHZ-03: Clinicians may only read notes for episodes they are assigned to
+ * (coordinator, session provider, or assessor) — or notes they authored.
+ * Platform admins retain org-wide access.
+ */
+async function assertCareRelationship(
+  req: Request,
+  episodeId: string | null,
+  noteAuthorId?: string,
+): Promise<void> {
+  const role = req.user!.role;
+  const userId = req.user!.userId;
+
+  if (ADMIN_ROLES.includes(role)) return;
+  if (noteAuthorId && noteAuthorId === userId) return;
+  if (!episodeId) throw new AppError('Forbidden.', 403);
+
+  // Org admins: tenant gate already applied — org-wide clinical read is intentional
+  if (role === 'org_admin') return;
+
+  if (role === 'care_coordinator') {
+    const episode = await prisma.careEpisode.findFirst({
+      where: { id: episodeId, coordinatorId: userId },
+      select: { id: true },
+    });
+    if (episode) return;
+    throw new AppError('Forbidden.', 403);
+  }
+
+  const [asProvider, asAssessor] = await Promise.all([
+    prisma.session.findFirst({
+      where: { episodeId, providerId: userId },
+      select: { id: true },
+    }),
+    prisma.assessment.findFirst({
+      where: { episodeId, assessorId: userId },
+      select: { id: true },
+    }),
+  ]);
+
+  if (asProvider || asAssessor) return;
+  throw new AppError('Forbidden.', 403);
+}
+
 async function resolveEpisodeScope(params: {
   episodeId?: string;
   sessionId?: string;
@@ -98,6 +142,7 @@ export class ClinicalNoteController {
 
     const scope = await resolveEpisodeScope({ episodeId, sessionId });
     assertTenantOrgAccess(req, scope.organizationId);
+    await assertCareRelationship(req, scope.episodeId);
 
     const where: Record<string, unknown> = {};
     if (scope.episodeId) where.episodeId = scope.episodeId;
@@ -145,6 +190,11 @@ export class ClinicalNoteController {
       note.session?.episode?.organizationId ??
       null;
     assertTenantOrgAccess(req, organizationId);
+    await assertCareRelationship(
+      req,
+      note.episodeId ?? note.session?.episodeId ?? null,
+      note.authorId,
+    );
 
     if (!canSeePrivateNote(req.user!.role, req.user!.userId, note)) {
       throw new AppError('Forbidden.', 403);

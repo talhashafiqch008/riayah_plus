@@ -34,9 +34,14 @@ const DEFAULT_USERS: Record<TestRole, TestUser> = {
 export function makeToken(role: TestRole = 'client', overrides: Partial<TestUser> = {}): string {
   const user = { ...DEFAULT_USERS[role], ...overrides };
   return jwt.sign(
-    { userId: user.id, email: user.email, role: user.role },
+    { userId: user.id, email: user.email, role: user.role, sub: user.id, typ: 'access' },
     env.JWT_ACCESS_SECRET,
-    { expiresIn: '1h' }
+    {
+      expiresIn: '1h',
+      algorithm: 'HS256',
+      issuer: env.JWT_ISSUER,
+      audience: env.JWT_AUDIENCE,
+    },
   );
 }
 

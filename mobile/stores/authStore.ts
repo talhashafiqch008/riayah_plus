@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { apiClient, setApiAuthToken } from '../lib/api/client';
+import {
+  ACCESS_TOKEN_KEY,
+  apiClient,
+  clearAuthTokens,
+  hydrateRefreshToken,
+  persistAuthTokensFromResponse,
+  setApiAuthToken,
+} from '../lib/api/client';
 import { router } from 'expo-router';
 
 export type UserRole =
@@ -71,7 +78,6 @@ export const ORG_ADMIN_ROLES: UserRole[] = ['org_admin'];
 export const PLATFORM_ADMIN_ROLES: UserRole[] = ['admin', 'super_admin', 'support_admin'];
 export const SUPER_ADMIN_ROLES: UserRole[] = ['super_admin'];
 
-const TOKEN_KEY = 'auth_token';
 const BIO_EMAIL_KEY = 'auth_bio_email';
 
 function orgNameFromRaw(raw: Record<string, unknown>): string | null {
@@ -145,7 +151,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   hydrate: async () => {
     try {
-      const stored = await SecureStore.getItemAsync(TOKEN_KEY);
+      const stored = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+      await hydrateRefreshToken();
       if (!stored) {
         set({ isLoading: false });
         return;
@@ -170,25 +177,26 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
       set({ token: stored, user, isLoading: false });
     } catch {
-      await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => undefined);
-      setApiAuthToken(null);
+      await clearAuthTokens();
       set({ token: null, user: null, isLoading: false });
     }
   },
 
   login: async (email, password) => {
-    const { data } = await apiClient.post('/api/login', { email, password });
+    const res = await apiClient.post('/api/login', { email, password });
+    const data = res.data;
     if (data.requires2fa || data.requires_2fa) {
       throw Object.assign(new Error('Two-factor authentication required.'), {
         code: '2FA_REQUIRED',
-        userId: data.userId ?? data.two_fa_token,
+        // AUTH-11: signed pending token (not raw user id)
+        mfaPendingToken: data.mfaPendingToken ?? data.two_fa_token,
+        userId: data.mfaPendingToken ?? data.two_fa_token,
       });
     }
     const jwt: string = data.token ?? data.accessToken ?? data.access_token;
     if (!jwt) throw new Error('Login succeeded but no token was returned.');
 
-    await SecureStore.setItemAsync(TOKEN_KEY, jwt);
-    setApiAuthToken(jwt);
+    await persistAuthTokensFromResponse(jwt, res.headers as Record<string, unknown>);
 
     let user: AuthUser;
     if (data.user) {
@@ -220,8 +228,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     } catch {
       // ignore — local clear still required
     }
-    await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => undefined);
-    setApiAuthToken(null);
+    await clearAuthTokens();
     set({ token: null, user: null });
     router.replace('/(auth)/login');
   },

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,8 +8,18 @@ import { isApiError } from '@/lib/errors';
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const email = searchParams.get('email') ?? '';
-  const token = searchParams.get('token') ?? '';
+
+  // AUTH-23: capture once, then scrub token from the address bar / history
+  const [email] = useState(() => searchParams.get('email') ?? '');
+  const [token] = useState(() => searchParams.get('token') ?? '');
+
+  useEffect(() => {
+    if (!searchParams.get('token')) return;
+    const next = new URL(window.location.href);
+    next.searchParams.delete('token');
+    const qs = next.searchParams.toString();
+    window.history.replaceState({}, '', `${next.pathname}${qs ? `?${qs}` : ''}`);
+  }, [searchParams]);
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

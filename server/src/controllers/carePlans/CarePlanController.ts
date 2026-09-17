@@ -245,7 +245,13 @@ export class CarePlanController {
 
     const role = req.user!.role;
     if (FAMILY_ROLES.includes(role)) {
-      where.episode = { patientId: req.user!.userId };
+      // AUTHZ-09: same ownership predicate as assertCarePlanAccess (patient OR care-unit holder)
+      where.episode = {
+        OR: [
+          { patientId: req.user!.userId },
+          { careUnit: { familyUserId: req.user!.userId } },
+        ],
+      };
     } else {
       const orgFilter: { organizationId?: string } = {};
       mergeTenantOrg(req, orgFilter);

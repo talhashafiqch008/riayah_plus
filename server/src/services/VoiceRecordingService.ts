@@ -246,6 +246,50 @@ export class VoiceRecordingService {
       input.episodeId?.trim() || null,
     );
 
+    // AUTHZ-05: sessionId / meetingId must exist and belong to this patient relationship
+    const sessionId = input.sessionId?.trim() || null;
+    const meetingId = input.meetingId?.trim() || null;
+    if (sessionId) {
+      const session = await prisma.session.findFirst({
+        where: {
+          id: sessionId,
+          episode: {
+            patientId: patient.patientId,
+            ...(patient.careRecipientId ? { careRecipientId: patient.careRecipientId } : {}),
+          },
+        },
+        select: { id: true, providerId: true, episodeId: true },
+      });
+      if (!session) {
+        throw new AppError('sessionId is invalid for this patient.', 422);
+      }
+      if (
+        session.providerId !== actor.userId &&
+        actor.role !== 'admin' &&
+        actor.role !== 'super_admin' &&
+        actor.role !== 'org_admin' &&
+        actor.role !== 'care_coordinator'
+      ) {
+        throw new AppError('sessionId is not assigned to you.', 403);
+      }
+    }
+    if (meetingId) {
+      const meeting = await prisma.meeting.findFirst({
+        where: {
+          id: meetingId,
+          OR: [
+            { hostId: actor.userId },
+            { participantId: actor.userId },
+            ...(patient.episodeId ? [{ episodeId: patient.episodeId }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      if (!meeting) {
+        throw new AppError('meetingId is invalid or not linked to this recording context.', 422);
+      }
+    }
+
     if (!input.file) throw new AppError('Audio file is required.', 400);
     if (input.file.size > VOICE_RECORDING_MAX_BYTES) {
       throw new AppError('Voice recording exceeds the 25 MB limit.', 400);
@@ -285,8 +329,8 @@ export class VoiceRecordingService {
           typeof input.durationSeconds === 'number' && Number.isFinite(input.durationSeconds)
             ? Math.max(0, Math.round(input.durationSeconds))
             : null,
-        sessionId: input.sessionId?.trim() || null,
-        meetingId: input.meetingId?.trim() || null,
+        sessionId,
+        meetingId,
         retentionExpiresAt: retentionExpiresAtFromNow(RETENTION_DAYS.voiceRecording),
       },
       include: {

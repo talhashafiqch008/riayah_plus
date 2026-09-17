@@ -323,6 +323,10 @@ model User {
   assignedFamilies      User[]           @relation("AssignedFamilies")
   twoFactorSecret  String?
   twoFactorEnabled Boolean          @default(false)
+  /// AUTH-10: last accepted TOTP time-step (30s counter) — reject replays at or below this
+  lastTotpStep     Int?
+  /// AUTH-07: access tokens issued before this timestamp are treated as revoked (logout-all / password change)
+  tokensInvalidBefore DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
@@ -431,6 +435,8 @@ model RefreshToken {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String    @unique /// HMAC-SHA256 hash of refresh JWT (plain token never stored)
+  /// AUTH-02: rotation family — reuse of any revoked member revokes the whole family
+  familyId  String
   deviceId  String?
   ipAddress String?
   userAgent String?
@@ -440,6 +446,7 @@ model RefreshToken {
 
   @@index([userId])
   @@index([token])
+  @@index([familyId])
   @@map("refresh_tokens")
 }
 
@@ -471,6 +478,7 @@ model OtpVerification {
   verifiedAt DateTime?
   createdAt  DateTime  @default(now())
 
+  @@unique([identifier, type])
   @@index([identifier])
   @@map("otp_verifications")
 }

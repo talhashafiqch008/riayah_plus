@@ -15,6 +15,8 @@ import {
   assertAllowedUploadMime,
   sanitizeUploadFilename,
 } from '../utils/uploadAllowlist';
+import { assertSignableObjectKey } from '../utils/signedUrlPolicy';
+import { AuditService } from '../services/AuditService';
 
 const s3 = new S3Client({ region: env.AWS_DEFAULT_REGION });
 const upload = multer({
@@ -74,15 +76,13 @@ router.post('/upload', documentLimiter, upload.single('file'), async (req: Reque
   });
 });
 
-// Get signed URL — ownership required (M-9 / M-34)
+// Get signed URL — ownership required; admin limited to documents/intake prefixes (AUTHZ-08)
 router.post('/signed-url', async (req: Request, res: Response) => {
   const { key } = z.object({ key: z.string().min(1) }).parse(req.body);
-  if (key.includes('..') || key.startsWith('/')) notFoundDoc();
-
   const isAdmin = ['admin', 'super_admin', 'support_admin'].includes(req.user!.role);
-  const ownedPrefix = `documents/${req.user!.userId}/`;
-  const intakePrefix = `intake/${req.user!.userId}/`;
-  if (!isAdmin && !key.startsWith(ownedPrefix) && !key.startsWith(intakePrefix)) {
+  try {
+    assertSignableObjectKey(key, { userId: req.user!.userId, isAdmin });
+  } catch {
     notFoundDoc();
   }
 
@@ -92,6 +92,14 @@ router.post('/signed-url', async (req: Request, res: Response) => {
     ResponseContentDisposition: 'attachment',
   });
   const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+  if (isAdmin) {
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'admin_signed_url',
+      after: { key, expiresIn: 3600 },
+      req,
+    });
+  }
   res.json({ url });
 });
 

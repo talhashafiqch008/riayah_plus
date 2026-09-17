@@ -94,7 +94,11 @@ export default function SecurityPage() {
  const [qrCodeUrl, setQrCodeUrl] = useState('');
  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
  const [disablePassword, setDisablePassword] = useState('');
+ const [disableCode, setDisableCode] = useState('');
  const [showDisableModal, setShowDisableModal] = useState(false);
+ const [showEnablePasswordModal, setShowEnablePasswordModal] = useState(false);
+ const [enablePassword, setEnablePassword] = useState('');
+ const [pendingMfaMethod, setPendingMfaMethod] = useState<'app' | 'sms' | null>(null);
  const [loading, setLoading] = useState(false);
 
  useEffect(() => {
@@ -125,20 +129,34 @@ export default function SecurityPage() {
  fetchDevices();
  }, [fetchDevices]);
 
- const handleEnableMfa = async (method: 'app' | 'sms') => {
+ const handleEnableMfa = (method: 'app' | 'sms') => {
  if (method === 'sms') {
  toast.error('SMS 2FA is not yet available. Please use an authenticator app.');
  return;
  }
- setMfaMethod(method);
+ setPendingMfaMethod(method);
+ setEnablePassword('');
+ setShowEnablePasswordModal(true);
+ };
+
+ const confirmStartMfaSetup = async () => {
+ if (!enablePassword) {
+ toast.error('Please enter your password');
+ return;
+ }
+ if (!pendingMfaMethod) return;
+ setMfaMethod(pendingMfaMethod);
  setSetupStep(1);
  setRecoveryCodes(null);
  setVerificationCode('');
  setLoading(true);
  try {
-    const data = await enable2fa();
+    const data = await enable2fa(enablePassword);
     setTwoFaSecret(data.secret ?? '');
     setQrCodeUrl(data.qrCode ?? data.qr_code_url ?? '');
+    setShowEnablePasswordModal(false);
+    setEnablePassword('');
+    setPendingMfaMethod(null);
     setShowMfaSetup(true);
  } catch (error: unknown) {
  if (isApiError(error)) {
@@ -180,13 +198,18 @@ export default function SecurityPage() {
  toast.error('Please enter your password');
  return;
  }
+ if (!disableCode || disableCode.length < 6) {
+ toast.error('Please enter your authenticator code');
+ return;
+ }
  setLoading(true);
  try {
- await disable2fa(disablePassword);
+ await disable2fa(disablePassword, disableCode);
  setMfaEnabled(false);
  setMfaMethod(null);
  setShowDisableModal(false);
  setDisablePassword('');
+ setDisableCode('');
  await refreshUser();
  toast.success('Two-factor authentication disabled');
  } catch (error: unknown) {
@@ -575,6 +598,45 @@ export default function SecurityPage() {
  </div>
  )}
 
+ {/* Enable 2FA password step (AUTH-03) */}
+ {showEnablePasswordModal && (
+ <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setShowEnablePasswordModal(false); } }} onClick={() => setShowEnablePasswordModal(false)}>
+ <div className="bg-white/90 backdrop-blur-xl rounded-2xl w-full max-w-md" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); } }} onClick={e => e.stopPropagation()}>
+ <div className="p-6 border-b ring-1 ring-stone-200/50">
+ <h2 className="text-lg font-semibold text-stone-900">Confirm your password</h2>
+ </div>
+ <div className="p-6 space-y-4">
+ <p className="text-stone-600">
+ Enter your account password to begin two-factor authentication setup.
+ </p>
+ <div className="relative">
+ <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-stone-400" />
+ <input
+ type="password"
+ value={enablePassword}
+ onChange={(e) => setEnablePassword(e.target.value)}
+ placeholder="Current password"
+ className="w-full pl-12 pr-4 py-3 bg-stone-50 border-2 ring-1 ring-stone-200/50 rounded-xl focus:border-teal-500 focus:outline-none transition-colors"
+ autoFocus
+ />
+ </div>
+ <div className="flex gap-3">
+ <Button variant="outline" className="flex-1" onClick={() => { setShowEnablePasswordModal(false); setEnablePassword(''); setPendingMfaMethod(null); }}>
+ Cancel
+ </Button>
+ <Button
+ className="flex-1 bg-teal-600 hover:bg-teal-700"
+ onClick={confirmStartMfaSetup}
+ disabled={loading || !enablePassword}
+ >
+ {loading ? 'Starting…' : 'Continue'}
+ </Button>
+ </div>
+ </div>
+ </div>
+ </div>
+ )}
+
  {/* Disable 2FA Modal */}
  {showDisableModal && (
  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setShowDisableModal(false); } }} onClick={() => setShowDisableModal(false)}>
@@ -584,7 +646,7 @@ export default function SecurityPage() {
  </div>
  <div className="p-6 space-y-4">
  <p className="text-stone-600">
- To disable 2FA, please enter your current password for security verification.
+ To disable 2FA, enter your password and a current authenticator code.
  </p>
  <div className="relative">
  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-stone-400" />
@@ -596,16 +658,25 @@ export default function SecurityPage() {
  className="w-full pl-12 pr-4 py-3 bg-stone-50 border-2 ring-1 ring-stone-200/50 rounded-xl focus:border-teal-500 focus:outline-none transition-colors"
  />
  </div>
+ <input
+ type="text"
+ inputMode="numeric"
+ maxLength={8}
+ value={disableCode}
+ onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+ placeholder="Authenticator code"
+ className="w-full px-4 py-3 bg-stone-50 border-2 ring-1 ring-stone-200/50 rounded-xl focus:border-teal-500 focus:outline-none transition-colors tracking-widest"
+ />
  <div className="flex gap-3">
- <Button variant="outline" className="flex-1" onClick={() => setShowDisableModal(false)}>
+ <Button variant="outline" className="flex-1" onClick={() => { setShowDisableModal(false); setDisablePassword(''); setDisableCode(''); }}>
  Cancel
  </Button>
  <Button
  className="flex-1 bg-red-600 hover:bg-red-700"
  onClick={handleDisableMfa}
- disabled={loading || !disablePassword}
+ disabled={loading || !disablePassword || disableCode.length < 6}
  >
- {loading ? 'Disabling&hellip;' : 'Disable 2FA'}
+ {loading ? 'Disabling…' : 'Disable 2FA'}
  </Button>
  </div>
  </div>

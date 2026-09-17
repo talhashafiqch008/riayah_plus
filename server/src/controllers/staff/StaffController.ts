@@ -129,20 +129,41 @@ export class StaffController {
       const staff = await prisma.agencyStaff.findUnique({ where: { id: body.staffId } });
       if (!staff || staff.agencyId !== agencyId) throw new AppError('Staff member not found.', 404);
 
-      // Verify referenced booking/shift exist and belong to this agency's scope
+      // AUTHZ-02: referenced booking/shift must belong to this agency's scope
       if (body.bookingId) {
         const booking = await prisma.booking.findUnique({
           where: { id: body.bookingId },
-          select: { id: true },
+          select: { id: true, providerId: true, clientId: true },
         });
         if (!booking) throw new AppError('Booking not found.', 404);
+        if (booking.providerId !== agencyId && booking.clientId !== agencyId) {
+          throw new AppError('Booking is outside this agency scope.', 403);
+        }
       }
       if (body.shiftId) {
         const shift = await prisma.shift.findUnique({
           where: { id: body.shiftId },
-          select: { id: true },
+          select: {
+            id: true,
+            workerId: true,
+            worker: { select: { organizationId: true } },
+          },
         });
         if (!shift) throw new AppError('Shift not found.', 404);
+
+        const agency = await prisma.user.findUnique({
+          where: { id: agencyId },
+          select: { organizationId: true },
+        });
+        const sameOrg =
+          agency?.organizationId &&
+          shift.worker.organizationId &&
+          agency.organizationId === shift.worker.organizationId;
+        const isAgencyWorker = shift.workerId === agencyId;
+
+        if (!sameOrg && !isAgencyWorker) {
+          throw new AppError('Shift is outside this agency scope.', 403);
+        }
       }
 
       const assignment = await prisma.staffAssignment.create({

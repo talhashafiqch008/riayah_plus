@@ -17,9 +17,21 @@ const coordsSchema = z.object({
 const MAP_ROLES = new Set([
   'care_coordinator',
   'org_admin',
+  // AUTHZ-13: platform admins may view maps (tenant scope still applies when present)
+  'admin',
+  'super_admin',
+  'support_admin',
 ]);
 
 function orgScope(req: Request): string | null {
+  // Platform admins may omit org (view platform-wide); tenant roles still require one
+  if (['admin', 'super_admin', 'support_admin'].includes(req.user!.role)) {
+    const tw = tenantOrgWhere(req);
+    if (tw.organizationId && tw.organizationId !== '__no_tenant__') {
+      return tw.organizationId;
+    }
+    return null;
+  }
   const tw = tenantOrgWhere(req);
   if (tw.organizationId === '__no_tenant__') {
     throw new AppError('No organization assigned to this account.', 403);
@@ -182,6 +194,14 @@ export class GPSController {
   static async activeWorkers(req: Request, res: Response): Promise<void> {
     assertMapRole(req);
     const organizationId = orgScope(req);
+    if (['admin', 'super_admin', 'support_admin'].includes(req.user!.role)) {
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: 'gps_map_access',
+        after: { purpose: 'platform_admin_monitoring', organizationId },
+        req,
+      });
+    }
     const workers = await GPSService.listActiveWorkers(organizationId);
     res.json({ workers });
   }

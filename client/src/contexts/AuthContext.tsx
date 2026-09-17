@@ -69,7 +69,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (identifier: string, password: string, isPhone?: boolean) => Promise<User>;
-  complete2faLogin: (userId: string, code: string) => Promise<User>;
+  complete2faLogin: (mfaPendingToken: string, code: string) => Promise<User>;
   register: (data: RegisterData) => Promise<RegisterResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -256,8 +256,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = response.data as Record<string, unknown>;
 
       if (data.requires2fa || data.requires_2fa) {
-        const userId = (data.userId || data.two_fa_token) as string;
-        throw new TwoFactorRequiredError(userId);
+        const mfaToken = (data.mfaPendingToken || data.two_fa_token) as string;
+        throw new TwoFactorRequiredError(mfaToken);
       }
 
       if (!data || !data.user) {
@@ -280,10 +280,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const complete2faLogin = async (userId: string, code: string): Promise<User> => {
+  const complete2faLogin = async (mfaPendingToken: string, code: string): Promise<User> => {
     isAuthenticating.current = true;
     try {
-      const response = await client.post('/auth/2fa-verify', { userId, code });
+      const response = await client.post('/auth/2fa-verify', {
+        mfaPendingToken,
+        two_fa_token: mfaPendingToken,
+        code,
+      });
       const data = response.data as Record<string, unknown>;
 
       if (!data?.user) {

@@ -4,12 +4,14 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { EmailService } from '../../services/EmailService';
+import { AuditService } from '../../services/AuditService';
 import { generateAccessToken, generateRefreshToken, AuthPayload } from '../../middleware/auth';
-import { setAuthCookies } from '../../utils/authCookies';
+import { setAuthCookies, exposeMobileRefreshToken } from '../../utils/authCookies';
 import { persistRefreshToken } from '../../utils/refreshTokenStore';
 import { sanitizedString } from '../../utils/sanitize';
 import { normalizePhoneE164 } from '../../utils/phoneAuth';
 import { TwilioSmsService } from '../../services/TwilioSmsService';
+import { issueMfaPendingToken } from '../../utils/mfaPending';
 
 const sendSchema = z.object({
   identifier: sanitizedString(z.string().min(3)),
@@ -30,7 +32,7 @@ export class OtpController {
     const type = raw.type ?? (raw.phone ? 'phone' : 'email');
     const { identifier: parsedIdentifier, type: parsedType } = sendSchema.parse({ identifier, type });
 
-    const otp = crypto.randomInt(100000, 999999).toString();
+    const otp = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     let storeIdentifier = parsedIdentifier;
@@ -42,12 +44,22 @@ export class OtpController {
       }
     }
 
-    await prisma.otpVerification.deleteMany({
-      where: { identifier: storeIdentifier, type: parsedType, verifiedAt: null },
-    });
-
-    await prisma.otpVerification.create({
-      data: { identifier: storeIdentifier, otp, type: parsedType, expiresAt },
+    await prisma.otpVerification.upsert({
+      where: {
+        identifier_type: { identifier: storeIdentifier, type: parsedType },
+      },
+      create: {
+        identifier: storeIdentifier,
+        otp,
+        type: parsedType,
+        expiresAt,
+      },
+      update: {
+        otp,
+        expiresAt,
+        verifiedAt: null,
+        userId: null,
+      },
     });
 
     if (parsedType === 'email') {
@@ -55,6 +67,12 @@ export class OtpController {
     } else {
       await TwilioSmsService.sendOtp(storeIdentifier, otp);
     }
+
+    await AuditService.log({
+      action: 'otp_send',
+      after: { type: parsedType },
+      req,
+    });
 
     res.json({ message: 'OTP sent.', identifier: storeIdentifier });
   }
@@ -93,9 +111,20 @@ export class OtpController {
       },
     });
 
-    if (!record) throw new AppError('Invalid or expired OTP.', 422);
+    if (!record) {
+      await AuditService.log({
+        action: 'otp_failed',
+        after: { type: parsedType },
+        req,
+      });
+      throw new AppError('Invalid or expired OTP.', 422);
+    }
 
-    await prisma.otpVerification.delete({ where: { id: record.id } });
+    await prisma.otpVerification.update({
+      where: { id: record.id },
+      data: { verifiedAt: new Date() },
+    });
+
     await prisma.otpVerification.deleteMany({
       where: {
         identifier: parsedIdentifier,
@@ -123,20 +152,41 @@ export class OtpController {
       }
     }
 
+    // AUTH-25: OTP-login must enforce account state + MFA (same gates as password login)
     const allowOtpLogin = process.env.ALLOW_OTP_LOGIN === 'true';
     if (user && allowOtpLogin) {
+      if (!user.isActive) {
+        throw new AppError('Your account has been suspended.', 403);
+      }
+      if (user.twoFactorEnabled) {
+        const mfaPendingToken = issueMfaPendingToken(user.id);
+        res.json({
+          verified: true,
+          loginRequired: false,
+          requires2fa: true,
+          requires_2fa: true,
+          two_fa_token: mfaPendingToken,
+          mfaPendingToken,
+          is_registered: true,
+        });
+        return;
+      }
+
       const payload: AuthPayload = { userId: user.id, role: user.role, email: user.email };
       const accessToken = generateAccessToken(payload);
       const refreshToken = generateRefreshToken({ userId: user.id });
       await persistRefreshToken(user.id, refreshToken, req);
       setAuthCookies(res, accessToken, refreshToken);
+      exposeMobileRefreshToken(req, res, refreshToken);
 
+      await AuditService.log({ userId: user.id, action: 'otp_login', req });
+
+      // AUTH-08: no refreshToken in JSON body
       res.json({
         verified: true,
         loginRequired: false,
         token: accessToken,
         accessToken,
-        refreshToken,
         user: { id: user.id, name: user.name, email: user.email, role: user.role },
         is_registered: true,
       });

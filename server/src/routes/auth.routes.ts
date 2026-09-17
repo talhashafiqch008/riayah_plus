@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { AuthController } from '../controllers/auth/AuthController';
 import { RegistrationController } from '../controllers/auth/RegistrationController';
 import { OtpController } from '../controllers/auth/OtpController';
@@ -7,28 +8,42 @@ import { UserProfileController } from '../controllers/users/UserProfileControlle
 import { StaffProfileController, staffAvatarUploadMiddleware } from '../controllers/users/StaffProfileController';
 import { authenticate, optionalAuth, generateAccessToken } from '../middleware/auth';
 import { requireAdmin } from '../middleware/rbac';
-import { loginLimiter, otpLimiter, registerLimiter, adminLimiter, avatarUploadLimiter } from '../middleware/rateLimiter';
+import { loginLimiter, otpLimiter, registerLimiter, avatarUploadLimiter, refreshLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
 import { setAuthCookies } from '../utils/authCookies';
 
+function timingSafeEqualString(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 const router = Router();
 
-// Admin secret login — disabled by default (M-48). Enable only with ALLOW_ADMIN_SECRET_LOGIN=true.
-router.post('/admin/login', adminLimiter, async (req: Request, res: Response, next: NextFunction) => {
+// AUTH-15: break-glass — disabled by default; when enabled requires bound user id + constant-time secret
+router.post('/admin/login', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (process.env.ALLOW_ADMIN_SECRET_LOGIN !== 'true') {
       throw new AppError('Admin secret login is disabled.', 403);
     }
-    const { secret, email } = req.body;
-    if (!secret || !env.ADMIN_SECRET || secret !== env.ADMIN_SECRET) {
+    if (!env.ADMIN_SECRET || !env.ADMIN_BREAK_GLASS_USER_ID) {
+      throw new AppError('Admin break-glass is not configured.', 403);
+    }
+
+    const { secret } = (req.body ?? {}) as { secret?: string };
+    if (!secret || !timingSafeEqualString(secret, env.ADMIN_SECRET)) {
       throw new AppError('Invalid admin secret.', 401);
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !['admin', 'super_admin'].includes(user.role)) {
-      throw new AppError('Admin user not found.', 404);
+    // Bind to a fixed admin identity — never accept client-supplied email/userId
+    const user = await prisma.user.findUnique({
+      where: { id: env.ADMIN_BREAK_GLASS_USER_ID, deletedAt: null },
+    });
+    if (!user || !user.isActive || !['admin', 'super_admin'].includes(user.role)) {
+      throw new AppError('Admin break-glass target is invalid.', 404);
     }
 
     const token = generateAccessToken({ userId: user.id, role: user.role, email: user.email });
@@ -40,7 +55,7 @@ router.post('/admin/login', adminLimiter, async (req: Request, res: Response, ne
       action: 'admin_secret_login',
       entity: 'User',
       entityId: user.id,
-      after: { method: 'ADMIN_SECRET', email: user.email },
+      after: { method: 'ADMIN_SECRET', breakGlass: true },
       req,
     });
 
@@ -62,9 +77,9 @@ router.post('/auth/register/phone', registerLimiter, RegistrationController.regi
 router.post('/login', loginLimiter, AuthController.login);
 router.post('/auth/login', loginLimiter, AuthController.login);
 router.post('/forgot-password', otpLimiter, AuthController.forgotPassword);
-router.post('/reset-password', AuthController.resetPassword);
-router.post('/set-password', AuthController.setPasswordFromInvite);
-router.post('/auth/set-password', AuthController.setPasswordFromInvite);
+router.post('/reset-password', otpLimiter, AuthController.resetPassword);
+router.post('/set-password', otpLimiter, AuthController.setPasswordFromInvite);
+router.post('/auth/set-password', otpLimiter, AuthController.setPasswordFromInvite);
 router.post('/email/resend-verification', otpLimiter, AuthController.resendVerificationPublic);
 router.post('/2fa/verify', loginLimiter, AuthController.verify2faLogin);
 router.post('/auth/2fa-verify', loginLimiter, AuthController.verify2faLogin);
@@ -72,7 +87,7 @@ router.post('/otp/send', otpLimiter, OtpController.send);
 router.post('/otp/verify', otpLimiter, OtpController.verify);
 router.post('/auth/otp-verify', otpLimiter, OtpController.verify);
 router.post('/auth/phone-otp-verify', otpLimiter, OtpController.verify);
-router.post('/auth/refresh', AuthController.refresh);
+router.post('/auth/refresh', refreshLimiter, AuthController.refresh);
 router.get('/auth/session', AuthController.session);
 router.post('/logout', optionalAuth, AuthController.logout);
 router.post('/auth/logout', optionalAuth, AuthController.logout);
@@ -90,12 +105,12 @@ router.post('/logout-all', AuthController.logoutAll);
 router.get('/me', AuthController.me);
 router.get('/users/me', AuthController.me);
 router.post('/auth/resend-verification', AuthController.resendVerification);
-router.post('/2fa/enable', AuthController.enable2fa);
-router.post('/2fa/verify-setup', AuthController.verify2faSetup);
-router.post('/2fa/disable', AuthController.disable2fa);
+router.post('/2fa/enable', loginLimiter, AuthController.enable2fa);
+router.post('/2fa/verify-setup', loginLimiter, AuthController.verify2faSetup);
+router.post('/2fa/disable', loginLimiter, AuthController.disable2fa);
 router.get('/sessions', AuthController.listSessions);
-router.delete('/sessions/:id', AuthController.revokeSession);
-router.post('/sessions/revoke-others', AuthController.revokeOtherSessions);
+router.delete('/sessions/:id', loginLimiter, AuthController.revokeSession);
+router.post('/sessions/revoke-others', loginLimiter, AuthController.revokeOtherSessions);
 
 router.post('/device-tokens', DeviceTokenController.register);
 router.post('/auth/device-tokens', DeviceTokenController.register);

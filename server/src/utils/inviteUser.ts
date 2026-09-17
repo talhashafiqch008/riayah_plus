@@ -20,17 +20,20 @@ export async function sendInviteSetPassword(user: {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  await prisma.otpVerification.deleteMany({
-    where: { identifier: user.email, type: INVITE_TOKEN_TYPE, verifiedAt: null },
-  });
-
-  await prisma.otpVerification.create({
-    data: {
+  await prisma.otpVerification.upsert({
+    where: { identifier_type: { identifier: user.email, type: INVITE_TOKEN_TYPE } },
+    create: {
       userId: user.id,
       identifier: user.email,
       otp: token,
       type: INVITE_TOKEN_TYPE,
       expiresAt,
+    },
+    update: {
+      userId: user.id,
+      otp: token,
+      expiresAt,
+      verifiedAt: null,
     },
   });
 

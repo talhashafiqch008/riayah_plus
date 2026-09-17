@@ -65,7 +65,11 @@ describe('POST /api/login', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
+    expect(res.body.refreshToken).toBeUndefined();
+    // AUTH-08: refresh is cookie-only
+    const cookies = res.headers['set-cookie'];
+    const cookieList = Array.isArray(cookies) ? cookies : cookies ? [cookies] : [];
+    expect(cookieList.some((c) => /refresh/i.test(c))).toBe(true);
   });
 
   it('rejects wrong password', async () => {

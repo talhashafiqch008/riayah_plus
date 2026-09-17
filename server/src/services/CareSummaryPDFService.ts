@@ -1,15 +1,39 @@
 import PDFDocument from 'pdfkit';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 import { env } from '../config/env';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import {
+  assertPhiS3UploadConfigured,
+  createPhiS3Client,
+  phiPutObjectInput,
+} from '../utils/phiS3';
 
-const s3 = new S3Client({ region: env.AWS_DEFAULT_REGION });
+const SIGNED_URL_TTL_SECONDS = 300;
+
+/** Extract S3 object key from a stored key or legacy public URL. */
+export function careSummaryObjectKey(stored: string): string | null {
+  const trimmed = stored.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('care-summaries/')) return trimmed;
+  try {
+    const url = new URL(trimmed);
+    const path = decodeURIComponent(url.pathname.replace(/^\//, ''));
+    if (path.startsWith('care-summaries/')) return path;
+  } catch {
+    // not a URL
+  }
+  return null;
+}
 
 export class CareSummaryPDFService {
+  /** Upload privately via phiS3; persist the S3 key (never a public URL). */
   static async generateForEpisode(episodeId: string): Promise<string> {
+    assertPhiS3UploadConfigured('Care summary PDF storage');
+
     const episode = await prisma.careEpisode.findUnique({
       where: { id: episodeId },
       include: {
@@ -24,17 +48,39 @@ export class CareSummaryPDFService {
     const pdfBuffer = await CareSummaryPDFService.buildPDF(episode);
 
     const key = `care-summaries/${episodeId}-${uuidv4()}.pdf`;
-    await s3.send(new PutObjectCommand({
-      Bucket: env.AWS_BUCKET,
-      Key: key,
-      Body: pdfBuffer,
-      ContentType: 'application/pdf',
-    }));
+    const s3 = createPhiS3Client();
+    await s3.send(
+      new PutObjectCommand(
+        phiPutObjectInput('invoice_pdf', {
+          key,
+          body: pdfBuffer,
+          contentType: 'application/pdf',
+        }),
+      ),
+    );
 
-    const url = `https://${env.AWS_BUCKET}.s3.${env.AWS_DEFAULT_REGION}.amazonaws.com/${key}`;
-    await prisma.careEpisode.update({ where: { id: episodeId }, data: { summaryPdfUrl: url } });
+    // AUTHZ-01: store key only — never a permanent public object URL
+    await prisma.careEpisode.update({
+      where: { id: episodeId },
+      data: { summaryPdfUrl: key },
+    });
 
-    return url;
+    return key;
+  }
+
+  /** Return a short-lived signed GET URL for an existing care-summary object. */
+  static async getSignedDownloadUrl(stored: string): Promise<string> {
+    const key = careSummaryObjectKey(stored);
+    if (!key) {
+      throw new AppError('Care summary PDF is unavailable. Please regenerate.', 404);
+    }
+    assertPhiS3UploadConfigured('Care summary PDF storage');
+    const s3 = createPhiS3Client();
+    return getSignedUrl(
+      s3,
+      new GetObjectCommand({ Bucket: env.AWS_BUCKET, Key: key }),
+      { expiresIn: SIGNED_URL_TTL_SECONDS },
+    );
   }
 
   private static buildPDF(episode: {

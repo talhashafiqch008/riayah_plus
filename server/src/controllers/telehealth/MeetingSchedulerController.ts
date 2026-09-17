@@ -15,10 +15,19 @@ import {
   canJoinMeeting,
   isJoinableMeeting,
   issueLiveKitJoinToken,
+  meetingAccessRow,
   receiveLiveKitWebhookEvent,
 } from '../../services/LiveKitAccess';
 import { assertCanScheduleMeeting } from '../../utils/meetingScheduleAccess';
 
+async function episodeOrganizationId(episodeId: string | null | undefined): Promise<string | null> {
+  if (!episodeId) return null;
+  const episode = await prisma.careEpisode.findUnique({
+    where: { id: episodeId },
+    select: { organizationId: true },
+  });
+  return episode?.organizationId ?? null;
+}
 const scheduleSchema = z.object({
   participantId: z.string(),
   title: z.string().optional(),
@@ -109,8 +118,16 @@ export class MeetingSchedulerController {
       const meeting = await prisma.meeting.findUnique({ where: { id } });
       if (!meeting) throw new AppError('Meeting not found.', 404);
 
-      const actor = { userId, role: req.user!.role };
-      if (!canJoinMeeting(meeting, actor)) throw new AppError('Forbidden.', 403);
+      // AUTHZ-06: same access-row construction as TelehealthController (include episode org)
+      const orgId = await episodeOrganizationId(meeting.episodeId);
+      const actor = {
+        userId,
+        role: req.user!.role,
+        organizationId: req.tenant?.organizationId,
+      };
+      if (!canJoinMeeting(meetingAccessRow(meeting, orgId), actor)) {
+        throw new AppError('Forbidden.', 403);
+      }
       if (!isJoinableMeeting(meeting)) throw new AppError('This meeting cannot be joined.', 400);
       await TelehealthConsentService.assertJoinConsent(actor);
 

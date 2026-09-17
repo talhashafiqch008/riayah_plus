@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import speakeasy from 'speakeasy';
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../../config/database';
@@ -10,7 +9,9 @@ import { AuditService } from '../../services/AuditService';
 import { anonymizeUser } from '../../utils/anonymizeUser';
 import { performAccountDeletion } from '../../services/AccountDeletionService';
 import { recordLogoutAll } from '../../middleware/auth';
+import { disconnectUserSockets } from '../../services/RealtimeService';
 import { clearAuthCookies } from '../../utils/authCookies';
+import { verifyTotpNoReplay } from '../../utils/totpReplay';
 
 const updatePasswordSchema = z.object({
   current_password: z.string(),
@@ -70,12 +71,7 @@ export class UserProfileController {
       if (!totpCode || !user.twoFactorSecret) {
         throw new AppError('Two-factor authentication code is required.', 422);
       }
-      const valid = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
-        encoding: 'base32',
-        token: totpCode,
-        window: 1,
-      });
+      const valid = await verifyTotpNoReplay(user.id, user.twoFactorSecret, totpCode);
       if (!valid) throw new AppError('Invalid authentication code.', 422);
     }
 
@@ -92,6 +88,7 @@ export class UserProfileController {
       }),
     ]);
     await recordLogoutAll(user.id);
+    disconnectUserSockets(user.id);
     clearAuthCookies(res);
     await AuditService.log({ userId: user.id, action: 'password_changed', req });
 

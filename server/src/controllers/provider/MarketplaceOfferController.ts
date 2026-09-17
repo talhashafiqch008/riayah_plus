@@ -55,8 +55,15 @@ export class MarketplaceOfferController {
       const offer = await prisma.providerMarketplaceOffer.findUnique({
         where: { id },
         include: {
+          // AUTHZ-14: public surface — minimize provider PII / internal profile fields
           provider: {
-            select: { id: true, name: true, providerProfileExt: true, providerProfile: true },
+            select: {
+              id: true,
+              name: true,
+              providerProfileExt: {
+                select: { averageRating: true, bio: true, reviewCount: true },
+              },
+            },
           },
         },
       });

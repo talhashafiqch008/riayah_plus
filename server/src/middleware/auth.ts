@@ -27,50 +27,106 @@ declare global {
 const USER_STATUS_CACHE_TTL_SECONDS = 30;
 const LOGOUT_ALL_TTL_SECONDS = 7 * 24 * 60 * 60; // matches max refresh token lifetime
 
-/** M1: pin JWT algorithms — reject alg=none / unexpected algs. */
-const ACCESS_VERIFY_OPTS: jwt.VerifyOptions = { algorithms: ['HS256'] };
-const REFRESH_VERIFY_OPTS: jwt.VerifyOptions = { algorithms: ['HS256'] };
+/** M1 + AUTH-24: pin alg and require iss/aud. */
+const ACCESS_VERIFY_OPTS: jwt.VerifyOptions = {
+  algorithms: ['HS256'],
+  issuer: env.JWT_ISSUER,
+  audience: env.JWT_AUDIENCE,
+};
+const REFRESH_VERIFY_OPTS: jwt.VerifyOptions = {
+  algorithms: ['HS256'],
+  issuer: env.JWT_ISSUER,
+  audience: env.JWT_AUDIENCE,
+};
 
 export async function recordLogoutAll(userId: string): Promise<void> {
+  const now = new Date();
+  // AUTH-07: DB is source of truth; Redis is a fast cache
   try {
-    await redis.set(`auth:logoutall:${userId}`, Date.now().toString(), 'EX', LOGOUT_ALL_TTL_SECONDS);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokensInvalidBefore: now },
+    });
   } catch {
-    // Redis unavailable — tokens will expire naturally
+    // User may already be deleted — continue to Redis best-effort
+  }
+  try {
+    await redis.set(
+      `auth:logoutall:${userId}`,
+      now.getTime().toString(),
+      'EX',
+      LOGOUT_ALL_TTL_SECONDS,
+    );
+  } catch {
+    // Redis unavailable — DB watermark still enforces revocation
   }
 }
 
 export async function wasLoggedOutAll(userId: string, iatSeconds: number): Promise<boolean> {
+  const iatMs = iatSeconds * 1000;
+
   try {
     const val = await redis.get(`auth:logoutall:${userId}`);
-    if (!val) return false;
-    return iatSeconds * 1000 < parseInt(val, 10);
+    if (val) return iatMs < parseInt(val, 10);
   } catch {
+    // fall through to DB
+  }
+
+  // AUTH-07: fail to DB watermark (not open). If DB also fails, fail closed.
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokensInvalidBefore: true },
+    });
+    if (user?.tokensInvalidBefore) {
+      return iatMs < user.tokensInvalidBefore.getTime();
+    }
     return false;
+  } catch {
+    return true; // fail closed for revocation-sensitive checks
   }
 }
 
 export async function assertUserActive(userId: string): Promise<boolean> {
-  const cacheKey = `auth:active:${userId}`;
+  const claims = await getFreshUserClaims(userId);
+  return Boolean(claims);
+}
+
+/** AUTH-13: re-read role/email from DB (30s cache) so demotions take effect quickly. */
+export async function getFreshUserClaims(
+  userId: string,
+): Promise<{ role: UserRole; email: string } | null> {
+  const cacheKey = `auth:claims:${userId}`;
   try {
     const cached = await redis.get(cacheKey);
-    if (cached === '1') return true;
-    if (cached === '0') return false;
+    if (cached === '0') return null;
+    if (cached) {
+      const parsed = JSON.parse(cached) as { role: UserRole; email: string };
+      if (parsed?.role && parsed?.email) return parsed;
+    }
   } catch {
-    // Redis unavailable — fall through to DB
+    // fall through
   }
 
   const user = await prisma.user.findFirst({
     where: { id: userId, isActive: true, deletedAt: null },
-    select: { id: true },
+    select: { role: true, email: true },
   });
 
-  const active = Boolean(user);
   try {
-    await redis.set(cacheKey, active ? '1' : '0', 'EX', USER_STATUS_CACHE_TTL_SECONDS);
+    if (!user) {
+      await redis.set(cacheKey, '0', 'EX', USER_STATUS_CACHE_TTL_SECONDS);
+      // Keep legacy active cache in sync
+      await redis.set(`auth:active:${userId}`, '0', 'EX', USER_STATUS_CACHE_TTL_SECONDS);
+    } else {
+      await redis.set(cacheKey, JSON.stringify(user), 'EX', USER_STATUS_CACHE_TTL_SECONDS);
+      await redis.set(`auth:active:${userId}`, '1', 'EX', USER_STATUS_CACHE_TTL_SECONDS);
+    }
   } catch {
     // ignore cache write failures
   }
-  return active;
+
+  return user;
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
@@ -87,19 +143,24 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
         env.JWT_ACCESS_SECRET,
         ACCESS_VERIFY_OPTS,
       ) as AuthPayload & { iat: number };
-      const [active, terminated] = await Promise.all([
-        assertUserActive(payload.userId),
+      const [claims, terminated] = await Promise.all([
+        getFreshUserClaims(payload.userId),
         wasLoggedOutAll(payload.userId, payload.iat),
       ]);
       if (terminated) {
         res.status(401).json({ message: 'Session terminated.' });
         return;
       }
-      if (!active) {
+      if (!claims) {
         res.status(403).json({ message: 'Account suspended or deleted.' });
         return;
       }
-      req.user = payload;
+      // AUTH-13: overwrite stale JWT role/email with fresh DB claims
+      req.user = {
+        ...payload,
+        role: claims.role,
+        email: claims.email,
+      };
 
       // G-1: attach processing restriction and block mutating processing
       const restrictedUser = await prisma.user.findUnique({
@@ -185,30 +246,51 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
 }
 
 export function generateAccessToken(payload: AuthPayload): string {
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN,
-    algorithm: 'HS256',
-  } as jwt.SignOptions);
+  return jwt.sign(
+    { ...payload, sub: payload.userId, typ: 'access' },
+    env.JWT_ACCESS_SECRET,
+    {
+      expiresIn: env.JWT_ACCESS_EXPIRES_IN,
+      algorithm: 'HS256',
+      issuer: env.JWT_ISSUER,
+      audience: env.JWT_AUDIENCE,
+    } as jwt.SignOptions,
+  );
 }
 
 export function generateRefreshToken(payload: Pick<AuthPayload, 'userId'>): string {
-  return jwt.sign({ ...payload, jti: randomUUID() }, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
-    algorithm: 'HS256',
-  } as jwt.SignOptions);
+  return jwt.sign(
+    { ...payload, sub: payload.userId, typ: 'refresh', jti: randomUUID() },
+    env.JWT_REFRESH_SECRET,
+    {
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+      algorithm: 'HS256',
+      issuer: env.JWT_ISSUER,
+      audience: env.JWT_AUDIENCE,
+    } as jwt.SignOptions,
+  );
 }
 
 export function verifyAccessToken(token: string): AuthPayload & { iat: number } {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET, ACCESS_VERIFY_OPTS) as AuthPayload & {
+  const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET, ACCESS_VERIFY_OPTS) as AuthPayload & {
     iat: number;
+    typ?: string;
   };
+  if (decoded.typ && decoded.typ !== 'access') {
+    throw new jwt.JsonWebTokenError('Invalid token type');
+  }
+  return decoded;
 }
 
 export function verifyRefreshToken(token: string): Pick<AuthPayload, 'userId'> {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET, REFRESH_VERIFY_OPTS) as Pick<
+  const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET, REFRESH_VERIFY_OPTS) as Pick<
     AuthPayload,
     'userId'
-  >;
+  > & { typ?: string };
+  if (decoded.typ && decoded.typ !== 'refresh') {
+    throw new jwt.JsonWebTokenError('Invalid token type');
+  }
+  return decoded;
 }
 
 export async function getUserFromRequest(req: Request) {

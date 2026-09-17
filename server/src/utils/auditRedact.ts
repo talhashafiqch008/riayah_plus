@@ -10,6 +10,8 @@ const SENSITIVE_KEYS = new Set([
   'accesstoken',
   'access_token',
   'otp',
+  'code', // AUTH-06: TOTP / verification codes
+  'totp',
   'secret',
   'twofactorsecret',
   'two_factor_secret',

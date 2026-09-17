@@ -57,8 +57,13 @@ export function getAccessTokenFromRequest(req: Request): string | undefined {
   return undefined;
 }
 
-/** Cookie-only — no body.refreshToken fallback (M1 / M3 auth finding). */
+/** Cookie or mobile header — no JSON body.refreshToken (AUTH-08). */
 export function getRefreshTokenFromRequest(req: Request): string | undefined {
+  const header = req.headers['x-refresh-token'];
+  if (typeof header === 'string' && header.trim()) {
+    return header.trim();
+  }
+
   const fromCookie = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
   if (fromCookie) return fromCookie;
 
@@ -85,6 +90,29 @@ export function setAuthCookies(
       ...refreshCookieOptions(),
       maxAge: REFRESH_MAX_AGE_MS,
     });
+  }
+}
+
+/**
+ * AUTH-08/16: native clients opt in with `X-Client: mobile` to receive the
+ * refresh token via response header (not JSON body) for SecureStore.
+ */
+export function exposeMobileRefreshToken(
+  req: Request,
+  res: Response,
+  refreshToken: string,
+): void {
+  const client = req.headers['x-client'];
+  if (typeof client === 'string' && client.toLowerCase() === 'mobile') {
+    res.setHeader('X-Refresh-Token', refreshToken);
+    const existing = res.getHeader('Access-Control-Expose-Headers');
+    const exposed = typeof existing === 'string' ? existing : '';
+    if (!/x-refresh-token/i.test(exposed)) {
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        exposed ? `${exposed}, X-Refresh-Token` : 'X-Refresh-Token',
+      );
+    }
   }
 }
 

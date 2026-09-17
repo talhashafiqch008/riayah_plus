@@ -9,7 +9,6 @@ jest.mock('../../services/AuditService', () => ({ AuditService: { log: jest.fn()
 jest.mock('../../config/redis', () => ({ redis: { set: jest.fn(), get: jest.fn(), del: jest.fn() } }));
 
 import { AuthController } from '../../controllers/auth/AuthController';
-import { hashRefreshToken } from '../../utils/refreshTokenHash';
 
 function mockRes() {
   const res: Partial<Response> = {};
@@ -51,6 +50,7 @@ describe('AuthController.login', () => {
       role: 'client', isActive: true, twoFactorEnabled: false, isEmailVerified: true, deletedAt: null,
     } as any);
     prismaMock.refreshToken.create.mockResolvedValue({ id: 'rt-1' } as any);
+    prismaMock.userSession.create.mockResolvedValue({ id: 'us-1' } as any);
 
     const req = mockReq({ email: 'u@test.com', password: 'Password123!' });
     const res = mockRes();
@@ -61,6 +61,7 @@ describe('AuthController.login', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           userId: 'u-1',
+          familyId: expect.any(String),
           token: expect.stringMatching(/^[a-f0-9]{64}$/),
         }),
       }),
@@ -69,14 +70,20 @@ describe('AuthController.login', () => {
     const createCall = prismaMock.refreshToken.create.mock.calls[0][0] as {
       data: { token: string };
     };
-    const responseBody = (res.json as jest.Mock).mock.calls[0][0] as { refreshToken: string };
-    expect(createCall.data.token).toBe(hashRefreshToken(responseBody.refreshToken));
-    expect(createCall.data.token).not.toBe(responseBody.refreshToken);
+    // AUTH-08: refresh stays in httpOnly cookie — not in JSON body
+    const responseBody = (res.json as jest.Mock).mock.calls[0][0] as {
+      token: string;
+      accessToken: string;
+      refreshToken?: string;
+    };
+    expect(responseBody.refreshToken).toBeUndefined();
+    expect(createCall.data.token).toMatch(/^[a-f0-9]{64}$/);
+    expect(res.cookie).toHaveBeenCalled();
 
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         token: expect.any(String),
-        refreshToken: expect.any(String),
+        accessToken: expect.any(String),
       })
     );
   });

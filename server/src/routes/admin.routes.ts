@@ -12,6 +12,10 @@ import {
 } from '../middleware/permissions';
 import { adminLimiter } from '../middleware/rateLimiter';
 import { AuditService } from '../services/AuditService';
+import { AppError } from '../middleware/errorHandler';
+import { ADMIN_USER_SELECT, pickAdminUserUpdate } from '../utils/sanitizeUser';
+import { disconnectUserSockets } from '../services/RealtimeService';
+import { recordLogoutAll } from '../middleware/auth';
 import { AdvancedAdminController } from '../controllers/admin/AdvancedAdminController';
 import adminDocController from '../controllers/admin/AdminDocumentController';
 import adminPayoutController from '../controllers/admin/AdminPayoutController';
@@ -49,8 +53,15 @@ router.get('/users', requireView('user'), async (req: Request, res: Response) =>
     { email: { contains: search, mode: 'insensitive' } },
   ];
 
+  // AUTH-04: project safe fields only — never return passwordHash / twoFactorSecret
   const [users, total] = await Promise.all([
-    prisma.user.findMany({ where, skip, take: parseInt(limit), orderBy: { createdAt: 'desc' } }),
+    prisma.user.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+      select: ADMIN_USER_SELECT,
+    }),
     prisma.user.count({ where }),
   ]);
 
@@ -60,13 +71,56 @@ router.get('/users', requireView('user'), async (req: Request, res: Response) =>
 router.get('/users/:id', requireView('user'), async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.params.id },
-    include: { providerProfile: true, clientProfile: true },
+    select: {
+      ...ADMIN_USER_SELECT,
+      providerProfile: true,
+      clientProfile: true,
+    },
   });
   res.json({ data: user });
 });
 
 router.patch('/users/:id', requireEdit('user'), async (req: Request, res: Response) => {
-  const user = await prisma.user.update({ where: { id: req.params.id }, data: req.body });
+  // AUTH-04: Zod-style whitelist — reject credential / MFA mass-assignment
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const forbidden = [
+    'passwordHash',
+    'twoFactorSecret',
+    'twoFactorEnabled',
+    'role',
+    'mustSetPassword',
+    'deletedAt',
+  ];
+  const attempted = forbidden.filter((k) => body[k] !== undefined);
+  if (attempted.length > 0) {
+    throw new AppError(`Updating restricted fields is not allowed: ${attempted.join(', ')}`, 422);
+  }
+
+  const data = pickAdminUserUpdate(body);
+  if (Object.keys(data).length === 0) {
+    throw new AppError('No updatable fields provided.', 422);
+  }
+
+  const user = await prisma.user.update({
+    where: { id: req.params.id },
+    data,
+    select: ADMIN_USER_SELECT,
+  });
+  // AUTH-05: if admin deactivated the account, tear down realtime + sessions watermark
+  if (data.isActive === false) {
+    await Promise.all([
+      prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      recordLogoutAll(user.id),
+    ]);
+    disconnectUserSockets(user.id);
+  }
   await AuditService.log({ userId: req.user!.userId, action: 'admin_user_updated', entity: 'User', entityId: user.id, req });
   res.json({ data: user });
 });
@@ -299,8 +353,31 @@ router.get('/reviews', requireView('user'), async (req: Request, res: Response, 
 // ── User soft-delete / restore ─────────────────────────────────────────────────
 router.delete('/users/:id', requireDelete('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await prisma.user.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
-    await AuditService.log({ userId: req.user!.userId, action: 'admin_user_delete', entity: 'User', entityId: req.params.id, req });
+    const userId = req.params.id;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+    // AUTH-22: soft-delete must revoke credentials and tear down sockets
+    await Promise.all([
+      prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      recordLogoutAll(userId),
+    ]);
+    disconnectUserSockets(userId);
+    await AuditService.log({
+      userId: req.user!.userId,
+      action: 'admin_user_delete',
+      entity: 'User',
+      entityId: userId,
+      req,
+    });
     res.json({ success: true, message: 'User soft-deleted.' });
   } catch (err) {
     next(err);
@@ -365,6 +442,18 @@ router.get('/platform-staff', requireView('user'), async (req: Request, res: Res
 router.patch('/platform-staff/:id/suspend', requireEdit('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.user.update({ where: { id: req.params.id }, data: { isActive: false } });
+    await Promise.all([
+      prisma.refreshToken.updateMany({
+        where: { userId: req.params.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: req.params.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      recordLogoutAll(req.params.id),
+    ]);
+    disconnectUserSockets(req.params.id);
     await AuditService.log({ userId: req.user!.userId, action: 'staff_suspended', entity: 'User', entityId: req.params.id, req });
     res.json({ success: true, message: 'Staff member suspended.' });
   } catch (err) {

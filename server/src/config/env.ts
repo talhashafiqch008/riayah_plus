@@ -22,7 +22,12 @@ export const env = {
   // A-3: validated below
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  /** AUTH-24: JWT issuer / audience */
+  JWT_ISSUER: process.env.JWT_ISSUER || 'riayah-plus',
+  JWT_AUDIENCE: process.env.JWT_AUDIENCE || 'riayah-plus-api',
   BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
+  /** AUTH-15: when break-glass is enabled, bind to this admin user id (not client-supplied email) */
+  ADMIN_BREAK_GLASS_USER_ID: process.env.ADMIN_BREAK_GLASS_USER_ID || '',
 
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',

@@ -12,10 +12,28 @@ import {
 
 export { chatUserRoom, conversationRoom, notificationUserRoom, tokenFromSocketHandshake };
 
+/** How often connected sockets re-check account/session status (AUTH-05). */
+const SOCKET_REVALIDATE_MS = 60_000;
+
 let realtimeIo: SocketIOServer | undefined;
 
 export function getRealtimeIo(): SocketIOServer | undefined {
   return realtimeIo;
+}
+
+/**
+ * AUTH-05: Force-disconnect all Socket.IO connections for a user after
+ * logout / logout-all / password reset / password change / suspension.
+ */
+export function disconnectUserSockets(userId: string): void {
+  const io = realtimeIo;
+  if (!io || !userId) return;
+  try {
+    io.in(chatUserRoom(userId)).disconnectSockets(true);
+    io.in(notificationUserRoom(userId)).disconnectSockets(true);
+  } catch (err) {
+    logger.warn(`Failed to disconnect user sockets for ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 export function emitNotification(userId: string, payload: unknown): void {
@@ -92,6 +110,7 @@ export function attachRealtime(io: SocketIOServer): void {
         return;
       }
       socket.data.userId = payload.userId;
+      socket.data.tokenIat = payload.iat ?? 0;
       await Promise.all([
         socket.join(chatUserRoom(payload.userId)),
         socket.join(notificationUserRoom(payload.userId)),
@@ -106,13 +125,43 @@ export function attachRealtime(io: SocketIOServer): void {
     const userId = socket.data.userId as string;
     logger.debug(`Socket connected: ${userId}`);
 
+    // AUTH-05: periodic session revalidation — disconnect if revoked / suspended
+    const revalidateTimer = setInterval(() => {
+      void (async () => {
+        try {
+          const tokenIat = typeof socket.data.tokenIat === 'number' ? socket.data.tokenIat : 0;
+          const [active, terminated] = await Promise.all([
+            assertUserActive(userId),
+            wasLoggedOutAll(userId, tokenIat),
+          ]);
+          if (!active || terminated) {
+            socket.disconnect(true);
+          }
+        } catch {
+          socket.disconnect(true);
+        }
+      })();
+    }, SOCKET_REVALIDATE_MS);
+
     socket.on('join_conversation', (conversationId: unknown) => {
       if (typeof conversationId !== 'string' || !conversationId.trim()) return;
-      void ConversationService.requireParticipant(conversationId, userId)
-        .then(() => {
-          socket.join(conversationRoom(conversationId));
-        })
-        .catch(() => undefined);
+      void (async () => {
+        try {
+          const tokenIat = typeof socket.data.tokenIat === 'number' ? socket.data.tokenIat : 0;
+          const [active, terminated] = await Promise.all([
+            assertUserActive(userId),
+            wasLoggedOutAll(userId, tokenIat),
+          ]);
+          if (!active || terminated) {
+            socket.disconnect(true);
+            return;
+          }
+          await ConversationService.requireParticipant(conversationId, userId);
+          await socket.join(conversationRoom(conversationId));
+        } catch {
+          // deny silently
+        }
+      })();
     });
 
     socket.on('leave_conversation', (conversationId: unknown) => {
@@ -121,6 +170,7 @@ export function attachRealtime(io: SocketIOServer): void {
     });
 
     socket.on('disconnect', () => {
+      clearInterval(revalidateTimer);
       logger.debug(`Socket disconnected: ${userId}`);
     });
   });

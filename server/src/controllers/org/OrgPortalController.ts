@@ -3,13 +3,30 @@ import { z } from 'zod';
 import { IntakeStatus } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { recordLogoutAll } from '../../middleware/auth';
 import { AuditService } from '../../services/AuditService';
 import { EmailService } from '../../services/EmailService';
+import { disconnectUserSockets } from '../../services/RealtimeService';
 import {
   INVITE_PASSWORD_PLACEHOLDER,
   sendInviteSetPassword,
 } from '../../utils/inviteUser';
 
+async function revokeCredentialsOnDeactivate(userId: string): Promise<void> {
+  // AUTH-12: suspension / deactivate must kill refresh + access watermark + sockets
+  await Promise.all([
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+    prisma.userSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+    recordLogoutAll(userId),
+  ]);
+  disconnectUserSockets(userId);
+}
 const FAMILY_ROLES = ['family', 'patient', 'client', 'consumer'] as const;
 
 /** Clinical + support roles org admins can invite (not coordinators — those have their own page). */
@@ -220,6 +237,9 @@ export class OrgPortalController {
         : body.isActive === true
           ? 'org_coordinator_reactivated'
           : 'org_coordinator_updated';
+      if (body.isActive === false) {
+        await revokeCredentialsOnDeactivate(existing.id);
+      }
       await AuditService.log({
         userId: req.user!.userId,
         action,
@@ -577,6 +597,9 @@ export class OrgPortalController {
         : body.isActive === true
           ? 'org_staff_reactivated'
           : 'org_staff_updated';
+      if (body.isActive === false) {
+        await revokeCredentialsOnDeactivate(existing.id);
+      }
       await AuditService.log({
         userId: req.user!.userId,
         action: staffAction,

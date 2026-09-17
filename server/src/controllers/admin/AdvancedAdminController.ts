@@ -254,10 +254,18 @@ export class AdvancedAdminController {
   // GET /api/admin/export/bookings
   static async exportBookings(req: Request, res: Response, next: NextFunction) {
     try {
-      const { from, to } = req.query as Record<string, string>;
+      const { from, to, organizationId } = req.query as Record<string, string>;
+      // AUTHZ-07: hard cap below prior 10k; optional org filter for tenant-scoped exports
+      const take = Math.min(Number(req.query.limit) || 1000, 1000);
 
       const where: Record<string, unknown> = {};
       if (from && to) where.createdAt = { gte: new Date(from), lte: new Date(to) };
+      if (organizationId) {
+        where.OR = [
+          { client: { organizationId } },
+          { provider: { organizationId } },
+        ];
+      }
 
       const bookings = await prisma.booking.findMany({
         where,
@@ -267,7 +275,7 @@ export class AdvancedAdminController {
           payment: { select: { amount: true, currency: true, status: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: 10000,
+        take,
       });
 
       const records = bookings.map(b => ({
@@ -291,6 +299,14 @@ export class AdvancedAdminController {
 
       const csv = csvStringifier.getHeaderString()! + csvStringifier.stringifyRecords(records);
 
+      // AUTHZ-15
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: 'admin_export_bookings',
+        after: { rowCount: records.length, take, organizationId: organizationId ?? null, from, to },
+        req,
+      });
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="bookings-export-${Date.now()}.csv"`);
       res.send(csv);
@@ -302,11 +318,18 @@ export class AdvancedAdminController {
   // GET /api/admin/export/users
   static async exportUsers(req: Request, res: Response, next: NextFunction) {
     try {
+      const { organizationId, role } = req.query as Record<string, string>;
+      const take = Math.min(Number(req.query.limit) || 1000, 1000);
+
+      const where: Record<string, unknown> = { deletedAt: null };
+      if (organizationId) where.organizationId = organizationId;
+      if (role) where.role = role;
+
       const users = await prisma.user.findMany({
-        where: { deletedAt: null },
+        where,
         select: { id: true, name: true, email: true, role: true, verificationStatus: true, createdAt: true, phone: true },
         orderBy: { createdAt: 'desc' },
-        take: 10000,
+        take,
       });
 
       const csvStringifier = createObjectCsvStringifier({
@@ -315,6 +338,14 @@ export class AdvancedAdminController {
       const csv = csvStringifier.getHeaderString()! + csvStringifier.stringifyRecords(users.map(u => ({
         ...u, createdAt: u.createdAt.toISOString(),
       })));
+
+      // AUTHZ-15
+      await AuditService.log({
+        userId: req.user!.userId,
+        action: 'admin_export_users',
+        after: { rowCount: users.length, take, organizationId: organizationId ?? null, role: role ?? null },
+        req,
+      });
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="users-export-${Date.now()}.csv"`);
