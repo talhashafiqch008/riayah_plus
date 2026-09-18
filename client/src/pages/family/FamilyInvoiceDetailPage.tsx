@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
+import { familyDateLocale } from '@/lib/familyLanguage';
 import {
   canPayInvoice,
   confirmInvoicePayment,
@@ -17,6 +19,8 @@ import {
 } from '@/lib/api/invoices';
 
 export default function FamilyInvoiceDetailPage() {
+  const { t } = useTranslation('family');
+  const dateLocale = familyDateLocale();
   const { id = '' } = useParams();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,7 +36,7 @@ export default function FamilyInvoiceDetailPage() {
           if (confirmed.data) next = confirmed.data;
           else if (confirmed.paid || confirmed.alreadyPaid) next = await getInvoice(id);
           if (confirmed.paid && !confirmed.alreadyPaid) {
-            toast.success('Payment received');
+            toast.success(t('invoiceDetail.paymentReceived'));
           }
         } catch {
           /* PayTabs query is best-effort after hosted checkout */
@@ -40,11 +44,11 @@ export default function FamilyInvoiceDetailPage() {
       }
       setInvoice(next);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load document');
+      toast.error(isApiError(error) ? error.message : t('invoiceDetail.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -56,7 +60,7 @@ export default function FamilyInvoiceDetailPage() {
     try {
       const result = await payInvoice(invoice.id);
       if (result.alreadyPaid) {
-        toast.success('This invoice is already paid');
+        toast.success(t('invoiceDetail.alreadyPaid'));
         await load();
         return;
       }
@@ -64,11 +68,11 @@ export default function FamilyInvoiceDetailPage() {
         window.location.assign(result.paymentUrl);
         return;
       }
-      toast.error('Payment could not be started');
+      toast.error(t('invoiceDetail.paymentStartFailed'));
     } catch (error: unknown) {
-      const message = isApiError(error) ? error.message : 'Payment failed';
+      const message = isApiError(error) ? error.message : t('invoiceDetail.paymentFailed');
       if (isApiError(error) && error.statusCode === 503) {
-        toast.error('Online payment is not available yet. Your care team can take payment another way.');
+        toast.error(t('invoiceDetail.paymentUnavailable'));
       } else {
         toast.error(message);
       }
@@ -83,7 +87,7 @@ export default function FamilyInvoiceDetailPage() {
     try {
       await downloadInvoicePdf(invoice.id, invoice.invoiceNumber);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'PDF download failed');
+      toast.error(error instanceof Error ? error.message : t('invoiceDetail.pdfFailed'));
     } finally {
       setBusy(false);
     }
@@ -100,9 +104,9 @@ export default function FamilyInvoiceDetailPage() {
   if (!invoice) {
     return (
       <div className="max-w-3xl">
-        <p className="text-stone-600">This document was not found.</p>
+        <p className="text-stone-600">{t('invoiceDetail.notFound')}</p>
         <Link to="/family/billing" className="mt-4 inline-flex text-sm font-semibold text-teal-700">
-          Back to billing
+          {t('invoiceDetail.back')}
         </Link>
       </div>
     );
@@ -117,14 +121,14 @@ export default function FamilyInvoiceDetailPage() {
         to={isQuotation ? '/family/billing?tab=quotations' : '/family/billing'}
         className="inline-flex items-center gap-1 text-sm font-semibold text-stone-600 hover:text-stone-900"
       >
-        <ArrowLeft className="size-4" /> Billing
+        <ArrowLeft className="size-4" /> {t('invoiceDetail.back')}
       </Link>
 
       <div className="rounded-xl border border-stone-100 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
-              {isQuotation ? 'Quotation' : 'Invoice'}
+              {isQuotation ? t('invoiceDetail.quotation') : t('invoiceDetail.invoice')}
             </p>
             <h2 className="mt-1 text-2xl font-semibold text-stone-900">{invoice.invoiceNumber}</h2>
           </div>
@@ -137,20 +141,19 @@ export default function FamilyInvoiceDetailPage() {
 
         {isQuotation && (
           <p className="mt-4 rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">
-            This is an estimate from your approved care plan. You will receive a separate invoice after
-            services are completed.
+            {t('invoiceDetail.quotationHint')}
           </p>
         )}
 
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 text-sm">
           <div>
-            <dt className="text-stone-500">Total</dt>
+            <dt className="text-stone-500">{t('invoiceDetail.total')}</dt>
             <dd className="font-semibold text-stone-900">
               {formatMoney(invoice.total, invoice.currency)}
             </dd>
           </div>
           <div>
-            <dt className="text-stone-500">Tax</dt>
+            <dt className="text-stone-500">{t('invoiceDetail.tax')}</dt>
             <dd className="text-stone-800">
               {formatMoney(invoice.taxAmount, invoice.currency)} (
               {(Number(invoice.taxRate) * 100).toFixed(0)}%)
@@ -158,14 +161,20 @@ export default function FamilyInvoiceDetailPage() {
           </div>
           {invoice.dueDate && (
             <div>
-              <dt className="text-stone-500">Due</dt>
-              <dd className="text-stone-800">{new Date(invoice.dueDate).toLocaleDateString('en-QA')}</dd>
+              <dd className="text-stone-800">
+                {t('invoiceDetail.dueDate', {
+                  date: new Date(invoice.dueDate).toLocaleDateString(dateLocale),
+                })}
+              </dd>
             </div>
           )}
           {invoice.paidAt && (
             <div>
-              <dt className="text-stone-500">Paid</dt>
-              <dd className="text-stone-800">{new Date(invoice.paidAt).toLocaleDateString('en-QA')}</dd>
+              <dd className="text-stone-800">
+                {t('invoiceDetail.issued', {
+                  date: new Date(invoice.paidAt).toLocaleDateString(dateLocale),
+                })}
+              </dd>
             </div>
           )}
         </dl>
@@ -174,9 +183,9 @@ export default function FamilyInvoiceDetailPage() {
           <table className="mt-6 w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left text-stone-500">
-                <th className="py-2 font-medium">Item</th>
+                <th className="py-2 font-medium">{t('invoiceDetail.lineItems')}</th>
                 <th className="py-2 font-medium text-right">Qty</th>
-                <th className="py-2 font-medium text-right">Amount</th>
+                <th className="py-2 font-medium text-right">{t('invoiceDetail.total')}</th>
               </tr>
             </thead>
             <tbody>
@@ -201,7 +210,7 @@ export default function FamilyInvoiceDetailPage() {
               onClick={() => void onPay()}
               className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
             >
-              Pay now
+              {t('invoiceDetail.payNow')}
             </button>
           )}
           <button
@@ -210,7 +219,7 @@ export default function FamilyInvoiceDetailPage() {
             onClick={() => void onPdf()}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 disabled:opacity-60"
           >
-            <Download className="size-4" /> Download PDF
+            <Download className="size-4" /> {t('invoiceDetail.downloadPdf')}
           </button>
         </div>
       </div>

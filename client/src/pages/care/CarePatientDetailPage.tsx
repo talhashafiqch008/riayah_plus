@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, History, Loader2, Save } from 'lucide-react';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import toast from 'react-hot-toast';
@@ -23,7 +24,12 @@ import {
   mergeFamilyWizardPayload,
   type FamilyWizardDraft,
 } from '@/lib/familyCareseekerIntake';
-import { familyEpisodeStatusLabel, familyIntakeStatusLabel } from '@/lib/familyLanguage';
+import {
+  formatFamilyDate,
+  formatFamilyDateTime,
+  familyEpisodeStatusLabel,
+  familyIntakeStatusLabel,
+} from '@/lib/familyLanguage';
 
 type Props = {
   basePath: string;
@@ -52,10 +58,28 @@ const GENDER_OPTIONS = [
   { id: 'no_preference', label: 'No Preference' },
 ] as const;
 
-function genderLabel(value?: string | null) {
+function genderLabel(
+  value: string | null | undefined,
+  isFamily: boolean,
+  t: (key: string) => string,
+) {
   if (!value) return '—';
+  if (isFamily) {
+    if (value === 'male') return t('patientDetail.male');
+    if (value === 'female') return t('patientDetail.female');
+    if (value === 'no_preference') return t('patientDetail.noPreference');
+  }
   const match = GENDER_OPTIONS.find((o) => o.id === value);
   return match?.label ?? value;
+}
+
+function profileFieldLabel(
+  key: string,
+  isFamily: boolean,
+  t: (key: string) => string,
+  staffFallback: string,
+) {
+  return isFamily ? t(`patientDetail.${key}`) : staffFallback;
 }
 
 export default function CarePatientDetailPage({ basePath }: Props) {
@@ -80,6 +104,7 @@ export default function CarePatientDetailPage({ basePath }: Props) {
   const [requestDraft, setRequestDraft] = useState<FamilyWizardDraft>(emptyFamilyWizardDraft());
 
   const isFamilyView = basePath.startsWith('/family');
+  const { t } = useTranslation('family');
 
   const applyProfileToForm = (found: CarePatient) => {
     setName(found.name ?? '');
@@ -159,7 +184,7 @@ export default function CarePatientDetailPage({ basePath }: Props) {
       });
       setPatient(updated);
       setEditingProfile(false);
-      toast.success(isFamilyView ? 'Person profile updated' : 'Patient profile updated');
+      toast.success(isFamilyView ? t('patientDetail.updated') : 'Patient profile updated');
       const revData = await listPatientRevisions(unitId, patientId);
       setRevisions(revData);
     } catch (error: unknown) {
@@ -269,7 +294,11 @@ export default function CarePatientDetailPage({ basePath }: Props) {
   }
 
   if (!patient || !unit) {
-    return <p className="text-stone-500">Patient not found on this care unit.</p>;
+    return (
+      <p className="text-stone-500">
+        {isFamilyView ? t('patientDetail.notFound') : 'Patient not found on this care unit.'}
+      </p>
+    );
   }
 
   return (
@@ -277,7 +306,7 @@ export default function CarePatientDetailPage({ basePath }: Props) {
       <div>
         <Breadcrumb
           items={[
-            { label: isFamilyView ? 'Home' : 'Care Units', href: basePath },
+            { label: isFamilyView ? t('patientDetail.home') : 'Care Units', href: basePath },
             { label: unit.name, href: `${basePath}/${unitId}` },
             { label: patient.name },
           ]}
@@ -286,7 +315,8 @@ export default function CarePatientDetailPage({ basePath }: Props) {
           to={`${basePath}/${unitId}`}
           className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
         >
-          <ArrowLeft className="size-4" /> Back to {unit.name}
+          <ArrowLeft className="size-4" />{' '}
+          {isFamilyView ? t('patientDetail.backTo', { name: unit.name }) : `Back to ${unit.name}`}
         </Link>
         <div className="mt-3">
           <h2 className="text-2xl font-semibold text-stone-900">{patient.name}</h2>
@@ -334,7 +364,7 @@ export default function CarePatientDetailPage({ basePath }: Props) {
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-sm font-semibold text-stone-900">
-            {isFamilyView ? 'Person profile' : 'Patient profile'}
+            {isFamilyView ? t('patientDetail.personProfile') : 'Patient profile'}
           </h3>
           {sectionActions(
             editingProfile,
@@ -348,13 +378,15 @@ export default function CarePatientDetailPage({ basePath }: Props) {
               applyProfileToForm(patient);
             },
             () => void handleSaveProfile(),
-            'Edit profile',
+            isFamilyView ? t('patientDetail.edit') : 'Edit profile',
           )}
         </div>
         {editingProfile ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="sm:col-span-2 text-sm">
-              <span className="text-xs font-semibold text-stone-500">Name</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('name', isFamilyView, t, 'Name')}
+              </span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -362,7 +394,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Date of birth</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('dateOfBirth', isFamilyView, t, 'Date of birth')}
+              </span>
               <input
                 type="date"
                 value={dateOfBirth}
@@ -371,22 +405,28 @@ export default function CarePatientDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Gender</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('gender', isFamilyView, t, 'Gender')}
+              </span>
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 bg-white"
               >
-                <option value="">Select gender</option>
+                <option value="">
+                  {isFamilyView ? t('patientDetail.gender') : 'Select gender'}
+                </option>
                 {GENDER_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
-                    {option.label}
+                    {genderLabel(option.id, isFamilyView, t)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Relationship</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('relationship', isFamilyView, t, 'Relationship')}
+              </span>
               <input
                 value={relationship}
                 onChange={(e) => setRelationship(e.target.value)}
@@ -394,7 +434,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Point of contact</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('pointOfContact', isFamilyView, t, 'Point of contact')}
+              </span>
               <input
                 value={pocName}
                 onChange={(e) => setPocName(e.target.value)}
@@ -402,7 +444,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">POC phone</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('pocPhone', isFamilyView, t, 'POC phone')}
+              </span>
               <input
                 value={pocPhone}
                 onChange={(e) => setPocPhone(e.target.value)}
@@ -423,7 +467,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
               </label>
             )}
             <label className="sm:col-span-2 text-sm">
-              <span className="text-xs font-semibold text-stone-500">Notes</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('notes', isFamilyView, t, 'Notes')}
+              </span>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -434,25 +480,41 @@ export default function CarePatientDetailPage({ basePath }: Props) {
         ) : (
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             <div className="sm:col-span-2">
-              <dt className="text-xs font-semibold text-stone-500">Name</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('name', isFamilyView, t, 'Name')}
+              </dt>
               <dd className="mt-0.5 text-stone-900">{patient.name || '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Date of birth</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('dateOfBirth', isFamilyView, t, 'Date of birth')}
+              </dt>
               <dd className="mt-0.5 text-stone-900">
-                {patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : '—'}
+                {patient.dateOfBirth
+                  ? isFamilyView
+                    ? formatFamilyDate(patient.dateOfBirth)
+                    : new Date(patient.dateOfBirth).toLocaleDateString()
+                  : '—'}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Gender</dt>
-              <dd className="mt-0.5 text-stone-900">{genderLabel(patient.gender)}</dd>
+              <dt className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('gender', isFamilyView, t, 'Gender')}
+              </dt>
+              <dd className="mt-0.5 text-stone-900">
+                {genderLabel(patient.gender, isFamilyView, t)}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Relationship</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('relationship', isFamilyView, t, 'Relationship')}
+              </dt>
               <dd className="mt-0.5 text-stone-900">{patient.relationship || '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Point of contact</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {profileFieldLabel('pointOfContact', isFamilyView, t, 'Point of contact')}
+              </dt>
               <dd className="mt-0.5 text-stone-900">
                 {patient.pocName || '—'}
                 {patient.pocPhone ? ` · ${patient.pocPhone}` : ''}
@@ -460,7 +522,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
             </div>
             {!isFamilyView && (
               <div className="sm:col-span-2">
-                <dt className="text-xs font-semibold text-stone-500 mb-1.5">Diagnoses</dt>
+                <dt className="text-xs font-semibold text-stone-500 mb-1.5">
+                  {profileFieldLabel('diagnoses', isFamilyView, t, 'Diagnoses')}
+                </dt>
                 <dd className="flex flex-wrap gap-1.5">
                   {(patient.diagnosisCodes ?? []).length > 0 ? (
                     patient.diagnosisCodes!.map((code) => (
@@ -479,7 +543,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
             )}
             {patient.notes && (
               <div className="sm:col-span-2">
-                <dt className="text-xs font-semibold text-stone-500">Notes</dt>
+                <dt className="text-xs font-semibold text-stone-500">
+                  {profileFieldLabel('notes', isFamilyView, t, 'Notes')}
+                </dt>
                 <dd className="mt-0.5 text-stone-900 whitespace-pre-wrap">{patient.notes}</dd>
               </div>
             )}
@@ -490,13 +556,11 @@ export default function CarePatientDetailPage({ basePath }: Props) {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border bg-white shadow-sm p-5">
           <h3 className="text-sm font-semibold text-stone-900 mb-3">
-            {isFamilyView ? 'Care journeys' : 'Linked episodes'}
+            {isFamilyView ? t('patientDetail.careJourneys') : 'Linked episodes'}
           </h3>
           {linkedEpisodes.length === 0 ? (
             <p className="text-sm text-stone-500">
-              {isFamilyView
-                ? 'No care journey for this person yet.'
-                : 'No episodes for this patient yet.'}
+              {isFamilyView ? t('patientDetail.noJourneys') : 'No episodes for this patient yet.'}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -525,11 +589,11 @@ export default function CarePatientDetailPage({ basePath }: Props) {
 
         <div className="rounded-2xl border bg-white shadow-sm p-5">
           <h3 className="text-sm font-semibold text-stone-900 mb-3">
-            {isFamilyView ? 'Request history' : 'Intake history'}
+            {isFamilyView ? t('patientDetail.requestHistory') : 'Intake history'}
           </h3>
           {linkedIntakes.length === 0 ? (
             <p className="text-sm text-stone-500">
-              {isFamilyView ? 'No care requests yet.' : 'No intake records yet.'}
+              {isFamilyView ? t('patientDetail.noRequests') : 'No intake records yet.'}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -540,7 +604,9 @@ export default function CarePatientDetailPage({ basePath }: Props) {
                 >
                   <span className="text-stone-600 text-xs">
                     {intake.submittedAt
-                      ? new Date(intake.submittedAt).toLocaleString()
+                      ? isFamilyView
+                        ? formatFamilyDateTime(intake.submittedAt)
+                        : new Date(intake.submittedAt).toLocaleString()
                       : isFamilyView
                         ? 'Care request'
                         : `${intake.id.slice(0, 10)}…`}
@@ -560,10 +626,14 @@ export default function CarePatientDetailPage({ basePath }: Props) {
       <div className="rounded-2xl border bg-white shadow-sm p-5">
         <div className="flex items-center gap-2 mb-3">
           <History className="size-4 text-stone-500" />
-          <h3 className="text-sm font-semibold text-stone-900">Edit history</h3>
+          <h3 className="text-sm font-semibold text-stone-900">
+            {isFamilyView ? t('patientDetail.editHistory') : 'Edit history'}
+          </h3>
         </div>
         {revisions.length === 0 ? (
-          <p className="text-sm text-stone-500">No revisions recorded yet.</p>
+          <p className="text-sm text-stone-500">
+            {isFamilyView ? t('patientDetail.noRevisions') : 'No revisions recorded yet.'}
+          </p>
         ) : (
           <ul className="space-y-3">
             {revisions.map((rev) => {
@@ -578,13 +648,19 @@ export default function CarePatientDetailPage({ basePath }: Props) {
                     <span className="font-medium text-stone-900">
                       {rev.changeSummary || 'Updated'}
                     </span>
-                    <span className="text-xs text-stone-500">{formatWhen(rev.createdAt)}</span>
+                    <span className="text-xs text-stone-500">
+                      {isFamilyView
+                        ? formatFamilyDateTime(rev.createdAt)
+                        : formatWhen(rev.createdAt)}
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-stone-500">
-                    by {rev.changedBy?.name || rev.changedBy?.email || 'Unknown'}
+                    {isFamilyView ? t('patientDetail.by') : 'by'}{' '}
+                    {rev.changedBy?.name || rev.changedBy?.email || 'Unknown'}
                   </p>
                   <p className="mt-2 text-stone-700">
-                    Snapshot: <span className="font-medium">{snapName}</span>
+                    {isFamilyView ? t('patientDetail.snapshot') : 'Snapshot'}:{' '}
+                    <span className="font-medium">{snapName}</span>
                     {!isFamilyView && snapCodes !== '—' && (
                       <>
                         {' '}

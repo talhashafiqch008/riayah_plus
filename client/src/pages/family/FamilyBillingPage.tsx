@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Receipt, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
+import { familyDateLocale } from '@/lib/familyLanguage';
 import {
   canPayInvoice,
   confirmInvoicePayment,
@@ -16,7 +18,15 @@ import {
 
 type Tab = 'invoices' | 'quotations';
 
-function InvoiceCard({ invoice }: { invoice: Invoice }) {
+function InvoiceCard({
+  invoice,
+  dateLocale,
+  t,
+}: {
+  invoice: Invoice;
+  dateLocale: string;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
   const isQuotation = invoice.type === 'quotation';
   return (
     <Link
@@ -32,13 +42,15 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
-            {isQuotation ? 'Quotation' : 'Invoice'}
+            {isQuotation ? t('billing.quotation') : t('billing.invoice')}
           </p>
           <h3 className="mt-0.5 font-semibold text-stone-900">{invoice.invoiceNumber}</h3>
           <p className="mt-1 text-sm text-stone-600">
             {formatMoney(invoice.total, invoice.currency)}
             {invoice.dueDate
-              ? ` · due ${new Date(invoice.dueDate).toLocaleDateString('en-QA')}`
+              ? ` · ${t('common.due', {
+                  date: new Date(invoice.dueDate).toLocaleDateString(dateLocale),
+                })}`
               : ''}
           </p>
         </div>
@@ -53,6 +65,8 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
 }
 
 export default function FamilyBillingPage() {
+  const { t } = useTranslation('family');
+  const dateLocale = familyDateLocale();
   const [params] = useSearchParams();
   const invoiceId = params.get('invoiceId');
   const tab = (params.get('tab') === 'quotations' ? 'quotations' : 'invoices') as Tab;
@@ -80,16 +94,16 @@ export default function FamilyBillingPage() {
         const byId = new Map(updates.map((row) => [row.id, row]));
         next = next.map((row) => byId.get(row.id) ?? row);
         if (updates.some((row, i) => row.status === 'paid' && payable[i]?.status !== 'paid')) {
-          toast.success('Payment received');
+          toast.success(t('billing.paymentReceived'));
         }
       }
       setRows(next);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load billing');
+      toast.error(isApiError(error) ? error.message : t('billing.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -107,25 +121,23 @@ export default function FamilyBillingPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">Billing</h2>
-          <p className="mt-1 text-stone-600">
-            Quotations from your care plan, and invoices you can pay in QAR.
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900">{t('billing.title')}</h2>
+          <p className="mt-1 text-stone-600">{t('billing.description')}</p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700"
         >
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {t('common.refresh')}
         </button>
       </div>
 
       <div className="flex gap-2">
         {(
           [
-            { id: 'invoices', label: 'Invoices', count: invoices.length },
-            { id: 'quotations', label: 'Quotations', count: quotations.length },
+            { id: 'invoices' as const, label: t('billing.invoices'), count: invoices.length },
+            { id: 'quotations' as const, label: t('billing.quotations'), count: quotations.length },
           ] as const
         ).map((item) => (
           <Link
@@ -150,15 +162,13 @@ export default function FamilyBillingPage() {
         <div className="rounded-xl border border-dashed border-stone-200 bg-white p-10 text-center">
           <Receipt className="mx-auto size-10 text-stone-300" />
           <p className="mt-3 text-stone-600">
-            {tab === 'quotations'
-              ? 'No quotations yet. They appear when a care plan is approved.'
-              : 'No invoices yet. They appear after a session or service is completed.'}
+            {tab === 'quotations' ? t('billing.emptyQuotations') : t('billing.emptyInvoices')}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {visible.map((invoice) => (
-            <InvoiceCard key={invoice.id} invoice={invoice} />
+            <InvoiceCard key={invoice.id} invoice={invoice} dateLocale={dateLocale} t={t} />
           ))}
         </div>
       )}

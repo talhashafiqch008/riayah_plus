@@ -1,3 +1,4 @@
+import i18n from '@/i18n/config';
 import { client } from './client';
 import { extractApiError } from '@/lib/errors';
 
@@ -63,7 +64,7 @@ export function invoiceLineItems(invoice: Invoice): InvoiceLineItem[] {
 }
 
 export function invoiceStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
+  const english: Record<string, string> = {
     draft: 'Preparing',
     sent: 'Due',
     overdue: 'Overdue',
@@ -71,7 +72,11 @@ export function invoiceStatusLabel(status: string): string {
     cancelled: 'Cancelled',
     disputed: 'Disputed',
   };
-  return labels[status] ?? status.replace(/_/g, ' ');
+  const fallback = english[status] ?? status.replace(/_/g, ' ');
+  const key = `status.invoice.${status}`;
+  const translated = i18n.t(key, { ns: 'family', defaultValue: '' });
+  if (translated && translated !== key) return translated;
+  return fallback;
 }
 
 export function invoiceStatusBadgeClass(status: string): string {

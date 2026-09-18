@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, MessageCircle, Paperclip, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +22,7 @@ import {
   type MessagesReadPayload,
 } from '@/lib/api/conversations';
 import { connectRealtime, subscribeChatRealtime } from '@/lib/realtime';
+import { familyConversationTypeLabel, familyDateLocale } from '@/lib/familyLanguage';
 
 const FILE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx';
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
@@ -35,18 +37,22 @@ interface RoleMessagesPageProps {
   canStartStaffThreads?: boolean;
 }
 
-function previewText(conversation: Conversation): string {
+function previewText(
+  conversation: Conversation,
+  familyUi: boolean,
+  t: (key: string) => string,
+): string {
   const last = conversation.messages?.[0];
-  if (!last || last.deleted) return 'No messages yet';
-  if (last.fileUrl) return last.content?.trim() || 'Attachment';
-  return last.content?.trim() || 'No messages yet';
+  if (!last || last.deleted) return familyUi ? t('messages.noMessagesYet') : 'No messages yet';
+  if (last.fileUrl) return last.content?.trim() || (familyUi ? t('messages.attachment') : 'Attachment');
+  return last.content?.trim() || (familyUi ? t('messages.noMessagesYet') : 'No messages yet');
 }
 
-function formatTime(iso?: string | null): string {
+function formatTime(iso: string | null | undefined, locale: string): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString('en-QA', { dateStyle: 'medium', timeStyle: 'short' });
+  return date.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export default function RoleMessagesPage({
@@ -54,6 +60,9 @@ export default function RoleMessagesPage({
   canStartCoordinatorThread = false,
   canStartStaffThreads = false,
 }: RoleMessagesPageProps) {
+  const { t } = useTranslation('family');
+  const isFamily = basePath.startsWith('/family');
+  const dateLocale = familyDateLocale();
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -84,11 +93,13 @@ export default function RoleMessagesPage({
     try {
       setThreads(await listConversations());
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load messages');
+      toast.error(
+        isApiError(error) ? error.message : isFamily ? t('messages.loadError') : 'Failed to load messages',
+      );
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [isFamily, t]);
 
   useEffect(() => {
     void loadThreads();
@@ -207,7 +218,9 @@ export default function RoleMessagesPage({
         void loadThreads();
       } catch (error: unknown) {
         if (!cancelled) {
-          toast.error(isApiError(error) ? error.message : 'Failed to open conversation');
+          toast.error(
+            isApiError(error) ? error.message : isFamily ? t('messages.openFailed') : 'Failed to open conversation',
+          );
         }
       } finally {
         if (!cancelled) setLoadingThread(false);
@@ -216,7 +229,7 @@ export default function RoleMessagesPage({
     return () => {
       cancelled = true;
     };
-  }, [conversationId, loadThreads]);
+  }, [conversationId, loadThreads, isFamily, t]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });
@@ -232,7 +245,9 @@ export default function RoleMessagesPage({
       await loadThreads();
       navigate(`${basePath}/${thread.id}`);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not start a conversation');
+      toast.error(
+        isApiError(error) ? error.message : isFamily ? t('messages.startFailed') : 'Could not start a conversation',
+      );
     } finally {
       setStarting(false);
     }
@@ -244,7 +259,7 @@ export default function RoleMessagesPage({
     const content = draft.trim();
     if (!content && !file) return;
     if (file && file.size > FILE_MAX_BYTES) {
-      toast.error('File must be 10 MB or smaller');
+      toast.error(isFamily ? t('messages.fileTooLarge') : 'File must be 10 MB or smaller');
       return;
     }
     setSending(true);
@@ -256,7 +271,7 @@ export default function RoleMessagesPage({
       if (fileInputRef.current) fileInputRef.current.value = '';
       void loadThreads();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Message failed to send');
+      toast.error(isApiError(error) ? error.message : isFamily ? t('messages.sendFailed') : 'Message failed to send');
     } finally {
       setSending(false);
     }
@@ -273,8 +288,12 @@ export default function RoleMessagesPage({
         } w-full md:w-72 lg:w-80 shrink-0 flex-col border-r border-stone-100`}
       >
         <div className="border-b border-stone-100 px-4 py-3">
-          <h2 className="font-semibold text-stone-900">Messages</h2>
-          <p className="mt-0.5 text-xs text-stone-500">Secure threads with your care team</p>
+          <h2 className="font-semibold text-stone-900">
+            {isFamily ? t('messages.title') : 'Messages'}
+          </h2>
+          <p className="mt-0.5 text-xs text-stone-500">
+            {isFamily ? t('messages.description') : 'Secure threads with your care team'}
+          </p>
         </div>
         <div className="flex-1 overflow-y-auto">
           {loadingList ? (
@@ -298,14 +317,16 @@ export default function RoleMessagesPage({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className={`text-sm ${unread ? 'font-semibold text-stone-900' : 'font-medium text-stone-800'}`}>
-                      {peer?.name ?? 'Care team'}
+                      {peer?.name ?? (isFamily ? t('common.careTeam') : 'Care team')}
                     </p>
                     {unread && <span className="mt-1 size-2 shrink-0 rounded-full bg-teal-600" />}
                   </div>
                   <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-teal-700">
-                    {conversationTypeLabel(thread.type)}
+                    {isFamily ? familyConversationTypeLabel(thread.type) : conversationTypeLabel(thread.type)}
                   </p>
-                  <p className="mt-1 truncate text-xs text-stone-500">{previewText(thread)}</p>
+                  <p className="mt-1 truncate text-xs text-stone-500">
+                    {previewText(thread, isFamily, t)}
+                  </p>
                 </Link>
               );
             })
@@ -321,7 +342,10 @@ export default function RoleMessagesPage({
                 onClick={() => void onStartThread(option)}
                 className="w-full rounded-xl bg-teal-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
               >
-                Message {option.name}
+                {isFamily ? t('messages.startThread') : `Message ${option.name}`}
+                {!isFamily ? null : (
+                  <span className="mt-0.5 block text-[11px] font-normal text-teal-100">{option.name}</span>
+                )}
                 <span className="mt-0.5 block text-[11px] font-normal text-teal-100">{option.episodeTitle}</span>
               </button>
             ))}
@@ -334,9 +358,13 @@ export default function RoleMessagesPage({
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
             <MessageCircle className="size-10 text-stone-300" />
             <p className="mt-3 max-w-sm text-sm text-stone-600">
-              {canStartCoordinatorThread || canStartStaffThreads
-                ? 'Select a conversation or start a new thread about an episode.'
-                : 'Select a conversation to read and reply.'}
+              {isFamily
+                ? canStartCoordinatorThread || canStartStaffThreads
+                  ? t('messages.emptyHint')
+                  : t('messages.emptyHintStaff')
+                : canStartCoordinatorThread || canStartStaffThreads
+                  ? 'Select a conversation or start a new thread about an episode.'
+                  : 'Select a conversation to read and reply.'}
             </p>
           </div>
         ) : (
@@ -345,14 +373,20 @@ export default function RoleMessagesPage({
               <Link
                 to={basePath}
                 className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100 md:hidden"
-                aria-label="Back to conversations"
+                aria-label={isFamily ? t('messages.backAria') : 'Back to conversations'}
               >
                 <ArrowLeft className="size-4" />
               </Link>
               <div className="min-w-0">
-                <p className="truncate font-semibold text-stone-900">{other?.name ?? 'Care team'}</p>
+                <p className="truncate font-semibold text-stone-900">
+                  {other?.name ?? (isFamily ? t('common.careTeam') : 'Care team')}
+                </p>
                 {selected && (
-                  <p className="text-xs text-stone-500">{conversationTypeLabel(selected.type)}</p>
+                  <p className="text-xs text-stone-500">
+                    {isFamily
+                      ? familyConversationTypeLabel(selected.type)
+                      : conversationTypeLabel(selected.type)}
+                  </p>
                 )}
               </div>
             </div>
@@ -363,7 +397,9 @@ export default function RoleMessagesPage({
                   <div className="size-8 animate-spin rounded-full border-b-2 border-teal-600" />
                 </div>
               ) : messages.length === 0 ? (
-                <p className="py-10 text-center text-sm text-stone-500">No messages yet. Say hello.</p>
+                <p className="py-10 text-center text-sm text-stone-500">
+                  {isFamily ? t('messages.noMessagesYet') : 'No messages yet. Say hello.'}
+                </p>
               ) : (
                 messages.map((message) => {
                   const mine = message.senderId === myId;
@@ -401,7 +437,7 @@ export default function RoleMessagesPage({
                           </>
                         )}
                         <p className={`mt-1 text-[10px] ${mine ? 'text-teal-100' : 'text-stone-400'}`}>
-                          {formatTime(message.createdAt)}
+                          {formatTime(message.createdAt, isFamily ? dateLocale : 'en-QA')}
                           {mine && message.status === 'read' ? ' · Read' : ''}
                         </p>
                       </div>
@@ -440,7 +476,7 @@ export default function RoleMessagesPage({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-xl border border-stone-200 p-2.5 text-stone-600 hover:bg-stone-50"
-                  aria-label="Attach a file"
+                  aria-label={isFamily ? t('messages.attachAria') : 'Attach a file'}
                 >
                   <Paperclip className="size-4" />
                 </button>
@@ -454,14 +490,14 @@ export default function RoleMessagesPage({
                     }
                   }}
                   rows={1}
-                  placeholder="Write a message"
+                  placeholder={isFamily ? t('messages.placeholder') : 'Write a message'}
                   className="max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-800 outline-none focus:border-teal-400"
                 />
                 <button
                   type="submit"
                   disabled={sending || (!draft.trim() && !file)}
                   className="rounded-xl bg-teal-600 p-2.5 text-white hover:bg-teal-700 disabled:opacity-50"
-                  aria-label="Send"
+                  aria-label={isFamily ? t('messages.send') : 'Send'}
                 >
                   <Send className="size-4" />
                 </button>

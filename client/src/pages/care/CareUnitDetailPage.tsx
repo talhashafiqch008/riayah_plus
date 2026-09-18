@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Loader2, Save, UserRound } from 'lucide-react';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import toast from 'react-hot-toast';
@@ -10,6 +11,7 @@ import {
   type CareUnit,
 } from '@/lib/api/intake';
 import { parseFamilyWizardSummary } from '@/lib/familyCareseekerIntake';
+import { familyEpisodeStatusLabel, familyEnumLabel, familyIntakeStatusLabel } from '@/lib/familyLanguage';
 
 type Props = {
   basePath: string;
@@ -49,6 +51,7 @@ function formatCountry(code?: string | null) {
 }
 
 export default function CareUnitDetailPage({ basePath }: Props) {
+  const { t } = useTranslation('family');
   const { unitId = '' } = useParams();
   const [unit, setUnit] = useState<CareUnit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,21 +128,22 @@ export default function CareUnitDetailPage({ basePath }: Props) {
     );
   }
 
+  const isFamilyView = basePath.startsWith('/family');
+
   if (!unit) {
-    return <p className="text-stone-500">Care unit not found.</p>;
+    return <p className="text-stone-500">{isFamilyView ? t('careUnit.notFound') : 'Care unit not found.'}</p>;
   }
 
   const patients = unit.careRecipients ?? [];
   const episodes = unit.careEpisodes ?? [];
   const intakes = unit.intakeRecords ?? [];
-  const isFamilyView = basePath.startsWith('/family');
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
         <Breadcrumb
           items={[
-            { label: isFamilyView ? 'Home' : 'Care Units', href: basePath },
+            { label: isFamilyView ? t('careUnit.home') : 'Care Units', href: basePath },
             { label: unit.name },
           ]}
         />
@@ -147,16 +151,22 @@ export default function CareUnitDetailPage({ basePath }: Props) {
           to={basePath}
           className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
         >
-          <ArrowLeft className="size-4" /> Back to care units
+          <ArrowLeft className="size-4" />{' '}
+          {isFamilyView ? t('careUnit.back') : 'Back to care units'}
         </Link>
         <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-stone-900">{unit.name}</h2>
             <p className="mt-1 text-sm text-stone-500">
-              {patients.length} {isFamilyView ? 'person' : 'patient'}
-              {patients.length === 1 ? '' : 's'} needing care
+              {patients.length}{' '}
               {isFamilyView
-                ? ` · open a person below to see their care request`
+                ? patients.length === 1
+                  ? t('careUnit.person')
+                  : t('careUnit.people')
+                : `patient${patients.length === 1 ? '' : 's'}`}{' '}
+              {isFamilyView ? t('careUnit.needingCare') : 'needing care'}
+              {isFamilyView
+                ? ` · ${t('careUnit.membersHint', { count: patients.length })}`
                 : ` · ${episodes.length} episode${episodes.length === 1 ? '' : 's'}`}
             </p>
           </div>
@@ -169,7 +179,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
               }}
               className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
             >
-              Edit care unit
+              {isFamilyView ? t('careUnit.edit') : 'Edit care unit'}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -181,7 +191,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
                 }}
                 className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
               >
-                Cancel
+                {isFamilyView ? t('careUnit.cancel') : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -190,7 +200,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
                 className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                Save
+                {isFamilyView ? t('careUnit.save') : 'Save'}
               </button>
             </div>
           )}
@@ -199,12 +209,14 @@ export default function CareUnitDetailPage({ basePath }: Props) {
 
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
         <h3 className="text-sm font-semibold text-stone-900">
-          {isFamilyView ? 'Household details' : 'Care unit details'}
+          {isFamilyView ? t('careUnit.householdDetails') : 'Care unit details'}
         </h3>
         {editing ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="sm:col-span-2 text-sm">
-              <span className="text-xs font-semibold text-stone-500">Name</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? t('careUnit.name') : 'Name'}
+              </span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -213,7 +225,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
             </label>
             <label className="text-sm">
               <span className="text-xs font-semibold text-stone-500">
-                {isFamilyView ? 'Account holder' : 'Primary caregiver'}
+                {isFamilyView ? t('careUnit.accountHolder') : 'Primary caregiver'}
               </span>
               <input
                 value={caregiverName}
@@ -222,7 +234,9 @@ export default function CareUnitDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Phone</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? t('careUnit.phone') : 'Phone'}
+              </span>
               <input
                 value={caregiverPhone}
                 onChange={(e) => setCaregiverPhone(e.target.value)}
@@ -230,7 +244,9 @@ export default function CareUnitDetailPage({ basePath }: Props) {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Relation</span>
+              <span className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? t('careUnit.relation') : 'Relation'}
+              </span>
               <input
                 value={caregiverRelation}
                 onChange={(e) => setCaregiverRelation(e.target.value)}
@@ -258,20 +274,26 @@ export default function CareUnitDetailPage({ basePath }: Props) {
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <dt className="text-xs font-semibold text-stone-500">
-                {isFamilyView ? 'Account holder' : 'Primary caregiver'}
+                {isFamilyView ? t('careUnit.accountHolder') : 'Primary caregiver'}
               </dt>
               <dd className="mt-0.5 text-stone-900">{unit.primaryCaregiverName || '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Phone</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? t('careUnit.phone') : 'Phone'}
+              </dt>
               <dd className="mt-0.5 text-stone-900">{unit.primaryCaregiverPhone || '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Relation</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? t('careUnit.relation') : 'Relation'}
+              </dt>
               <dd className="mt-0.5 text-stone-900">{unit.primaryCaregiverRelation || '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold text-stone-500">Location</dt>
+              <dt className="text-xs font-semibold text-stone-500">
+                {isFamilyView ? t('careUnit.location') : 'Location'}
+              </dt>
               <dd className="mt-0.5 text-stone-900">
                 {[unit.address, unit.city, formatCountry(unit.country)].filter(Boolean).join(', ') ||
                   '—'}
@@ -284,19 +306,17 @@ export default function CareUnitDetailPage({ basePath }: Props) {
       <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b">
           <h3 className="text-sm font-semibold text-stone-900">
-            {isFamilyView ? 'Who needs care' : 'Patients'}
+            {isFamilyView ? t('careUnit.whoNeedsCare') : 'Patients'}
           </h3>
           {isFamilyView && (
             <p className="mt-1 text-xs text-stone-500">
-              Open a person to view and edit their individual care request.
+              {t('careUnit.membersHint', { count: patients.length })}
             </p>
           )}
         </div>
         {patients.length === 0 ? (
           <p className="p-6 text-sm text-stone-500">
-            {isFamilyView
-              ? 'No care recipient yet. Submit a care request from Onboarding.'
-              : 'No patients on this care unit yet.'}
+            {isFamilyView ? t('careUnit.emptyPatients') : 'No patients on this care unit yet.'}
           </p>
         ) : (
           <ul className="divide-y">
@@ -304,8 +324,10 @@ export default function CareUnitDetailPage({ basePath }: Props) {
               const patientIntake = intakes.find((i) => i.careRecipientId === patient.id);
               const patientSummary = parseFamilyWizardSummary(patientIntake?.wizardPayload);
               const statusLabel = patientIntake
-                ? FAMILY_INTAKE_STATUS[patientIntake.status] ??
-                  patientIntake.status.replace(/_/g, ' ')
+                ? isFamilyView
+                  ? familyIntakeStatusLabel(patientIntake.status)
+                  : FAMILY_INTAKE_STATUS[patientIntake.status] ??
+                    patientIntake.status.replace(/_/g, ' ')
                 : null;
               return (
                 <li key={patient.id}>
@@ -327,14 +349,22 @@ export default function CareUnitDetailPage({ basePath }: Props) {
                       </div>
                       <p className="mt-0.5 text-sm text-stone-500">
                         {[
-                          patient.relationship,
-                          patient.dateOfBirth ? `DOB ${formatDob(patient.dateOfBirth)}` : null,
+                          patient.relationship
+                            ? isFamilyView
+                              ? familyEnumLabel('relationship', patient.relationship)
+                              : patient.relationship
+                            : null,
+                          patient.dateOfBirth
+                            ? isFamilyView
+                              ? t('careUnit.dob', { date: formatDob(patient.dateOfBirth) })
+                              : `DOB ${formatDob(patient.dateOfBirth)}`
+                            : null,
                           patientSummary?.supportCategories?.length
                             ? patientSummary.supportCategories.join(', ')
                             : null,
                         ]
                           .filter(Boolean)
-                          .join(' · ') || (isFamilyView ? 'Open to view care request' : '—')}
+                          .join(' · ') || (isFamilyView ? t('careUnit.openCareRequest') : '—')}
                       </p>
                       {!isFamilyView &&
                         patient.diagnosisCodes &&
@@ -380,7 +410,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
 
       {isFamilyView && episodes.length > 0 && (
         <div className="rounded-2xl border bg-white shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-stone-900 mb-3">Care journeys</h3>
+          <h3 className="text-sm font-semibold text-stone-900 mb-3">{t('careUnit.journeysHeading')}</h3>
           <ul className="space-y-2">
             {episodes.map((ep) => (
               <li
@@ -389,7 +419,7 @@ export default function CareUnitDetailPage({ basePath }: Props) {
               >
                 <span className="font-medium text-stone-900">{ep.title}</span>
                 <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                  {ep.status.replace(/_/g, ' ')}
+                  {familyEpisodeStatusLabel(ep.status)}
                 </span>
               </li>
             ))}

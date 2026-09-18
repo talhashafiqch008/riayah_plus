@@ -25,6 +25,9 @@ import arCommon from '@/locales/ar/common.json';
 import enBlog from '@/locales/en/blog.json';
 import arBlog from '@/locales/ar/blog.json';
 
+import enFamily from '@/locales/en/family.json';
+import arFamily from '@/locales/ar/family.json';
+
 i18n
     .use(LanguageDetector)
     .use(initReactI18next)
@@ -36,6 +39,7 @@ i18n
                 about: enAbout,
                 common: enCommon,
                 blog: enBlog,
+                family: enFamily,
             },
             ar: {
                 translation: arTranslation,
@@ -43,11 +47,12 @@ i18n
                 about: arAbout,
                 common: arCommon,
                 blog: arBlog,
+                family: arFamily,
             },
         },
         fallbackLng: 'en',
         defaultNS: 'translation',
-        ns: ['translation', 'landing', 'about', 'common', 'blog'],
+        ns: ['translation', 'landing', 'about', 'common', 'blog', 'family'],
         debug: false,
         interpolation: {
             escapeValue: false,

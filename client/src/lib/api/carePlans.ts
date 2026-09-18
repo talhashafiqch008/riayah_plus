@@ -1,3 +1,4 @@
+import i18n from '@/i18n/config';
 import { client } from './client';
 
 /** Product care-plan statuses (never persist demo strings). */
@@ -113,24 +114,20 @@ export function normalizeCarePlanStatus(status: string): CarePlanStatus | string
 
 export function carePlanStatusLabel(status: string): string {
   const s = normalizeCarePlanStatus(status);
-  switch (s) {
-    case 'draft':
-      return 'Draft';
-    case 'submitted_for_approval':
-      return 'Awaiting family approval';
-    case 'approved':
-      return 'Approved';
-    case 'active':
-      return 'Active';
-    case 'revision_requested':
-      return 'Revision requested';
-    case 'rejected':
-      return 'Rejected';
-    case 'completed':
-      return 'Completed';
-    default:
-      return s.replace(/_/g, ' ');
-  }
+  const english: Record<string, string> = {
+    draft: 'Draft',
+    submitted_for_approval: 'Awaiting family approval',
+    approved: 'Approved',
+    active: 'Active',
+    revision_requested: 'Revision requested',
+    rejected: 'Rejected',
+    completed: 'Completed',
+  };
+  const fallback = english[s] ?? String(s).replace(/_/g, ' ');
+  const key = `status.carePlan.${s}`;
+  const translated = i18n.t(key, { ns: 'family', defaultValue: '' });
+  if (translated && translated !== key) return translated;
+  return fallback;
 }
 
 export function carePlanStatusBadgeClass(status: string): string {

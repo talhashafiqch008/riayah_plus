@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -14,6 +15,7 @@ import {
 } from '@/lib/api/carePlans';
 
 export default function FamilyCarePlanReviewPage() {
+  const { t } = useTranslation('family');
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [plan, setPlan] = useState<CarePlan | null>(null);
@@ -26,11 +28,11 @@ export default function FamilyCarePlanReviewPage() {
     try {
       setPlan(await getCarePlan(id));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load plan');
+      toast.error(isApiError(error) ? error.message : t('carePlanReview.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -42,10 +44,10 @@ export default function FamilyCarePlanReviewPage() {
     setBusy(true);
     try {
       await approveCarePlan(id);
-      toast.success('Care plan approved');
+      toast.success(t('carePlanReview.approved'));
       navigate('/family/care-plans');
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Approve failed');
+      toast.error(isApiError(error) ? error.message : t('carePlanReview.approveFailed'));
     } finally {
       setBusy(false);
     }
@@ -53,16 +55,16 @@ export default function FamilyCarePlanReviewPage() {
 
   async function onRevision() {
     if (!notes.trim()) {
-      toast.error('Please explain what changes you need');
+      toast.error(t('carePlanReview.needExplanation'));
       return;
     }
     setBusy(true);
     try {
       await requestCarePlanRevision(id, notes.trim());
-      toast.success('Revision requested');
+      toast.success(t('carePlanReview.revisionRequested'));
       navigate('/family/care-plans');
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Request failed');
+      toast.error(isApiError(error) ? error.message : t('carePlanReview.requestFailed'));
     } finally {
       setBusy(false);
     }
@@ -72,10 +74,10 @@ export default function FamilyCarePlanReviewPage() {
     setBusy(true);
     try {
       await rejectCarePlan(id, notes.trim() || undefined);
-      toast.success('Care plan rejected');
+      toast.success(t('carePlanReview.rejected'));
       navigate('/family/care-plans');
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Reject failed');
+      toast.error(isApiError(error) ? error.message : t('carePlanReview.rejectFailed'));
     } finally {
       setBusy(false);
     }
@@ -89,7 +91,7 @@ export default function FamilyCarePlanReviewPage() {
     );
   }
 
-  if (!plan) return <p className="text-stone-600">Plan not found.</p>;
+  if (!plan) return <p className="text-stone-600">{t('carePlanReview.notFound')}</p>;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -97,7 +99,7 @@ export default function FamilyCarePlanReviewPage() {
         to="/family/care-plans"
         className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
       >
-        <ArrowLeft className="size-4" /> All care plans
+        <ArrowLeft className="size-4" /> {t('carePlanReview.back')}
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -121,7 +123,7 @@ export default function FamilyCarePlanReviewPage() {
         return (
           <section className="rounded-xl border border-teal-200 bg-teal-50/70 p-5 shadow-sm">
             <h3 className="text-xs font-bold uppercase tracking-wide text-teal-800">
-              What the care team changed
+              {t('carePlanReview.teamChanged')}
             </h3>
             <p className="mt-2 text-sm text-stone-800">{changeNotes}</p>
           </section>
@@ -129,14 +131,16 @@ export default function FamilyCarePlanReviewPage() {
       })()}
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-900 mb-3">Care goals</h3>
+        <h3 className="font-semibold text-stone-900 mb-3">{t('carePlanReview.careGoals')}</h3>
         <ul className="space-y-2">
           {(plan.goals ?? []).map((g) => (
             <li key={g.id} className="rounded-lg bg-stone-50 px-3 py-2">
               <p className="font-medium text-stone-900">{g.title}</p>
               {g.description && <p className="text-sm text-stone-600">{g.description}</p>}
               {g.measurement && (
-                <p className="text-xs text-stone-500 mt-1">Measure: {g.measurement}</p>
+                <p className="text-xs text-stone-500 mt-1">
+                  {t('carePlanReview.measure', { value: g.measurement })}
+                </p>
               )}
             </li>
           ))}
@@ -144,7 +148,7 @@ export default function FamilyCarePlanReviewPage() {
       </section>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-900 mb-3">Services &amp; costs</h3>
+        <h3 className="font-semibold text-stone-900 mb-3">{t('carePlanReview.servicesCosts')}</h3>
         <ul className="space-y-2">
           {(plan.items ?? []).map((item) => (
             <li key={item.id} className="flex justify-between gap-3 text-sm rounded-lg bg-stone-50 px-3 py-2">
@@ -166,12 +170,12 @@ export default function FamilyCarePlanReviewPage() {
 
       {canAct && (
         <section className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 space-y-4">
-          <h3 className="font-semibold text-stone-900">Your decision</h3>
+          <h3 className="font-semibold text-stone-900">{t('carePlanReview.yourDecision')}</h3>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Optional notes (required for request changes)"
+            placeholder={t('carePlanReview.notesPlaceholder')}
             className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap gap-2">
@@ -181,7 +185,7 @@ export default function FamilyCarePlanReviewPage() {
               onClick={() => void onApprove()}
               className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Approve
+              {t('carePlanReview.approve')}
             </button>
             <button
               type="button"
@@ -189,7 +193,7 @@ export default function FamilyCarePlanReviewPage() {
               onClick={() => void onRevision()}
               className="rounded-xl border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-800 disabled:opacity-50"
             >
-              Request changes
+              {t('carePlanReview.requestChanges')}
             </button>
             <button
               type="button"
@@ -197,7 +201,7 @@ export default function FamilyCarePlanReviewPage() {
               onClick={() => void onReject()}
               className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50"
             >
-              Reject
+              {t('carePlanReview.reject')}
             </button>
           </div>
         </section>

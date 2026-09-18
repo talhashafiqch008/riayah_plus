@@ -1,11 +1,16 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HeartHandshake } from 'lucide-react';
 import {
   parseFamilyWizardSummary,
   type FamilyWizardDraft,
   type FamilyWizardSummary,
 } from '@/lib/familyCareseekerIntake';
-import { familyIntakeStatusLabel } from '@/lib/familyLanguage';
+import {
+  familyEnumLabel,
+  formatFamilyDateTime,
+  familyIntakeStatusLabel,
+} from '@/lib/familyLanguage';
 
 const ACCOUNT_OPTIONS = [
   { id: 'myself', label: 'Individual (for myself)' },
@@ -69,36 +74,98 @@ const TIME_OPTIONS = [
   { id: 'overnight', label: 'Overnight' },
 ];
 
+const SUPPORT_EN_TO_ID: Record<string, string> = {
+  'Home Care': 'aged_care',
+  Disability: 'disability_support',
+  Babysitting: 'child_family',
+  Therapy: 'allied_health',
+  'Home Visit': 'home_support',
+};
+
+const GENDER_EN_TO_ID: Record<string, string> = {
+  'Female provider only': 'female_only',
+  'Male provider only': 'male_only',
+  'No preference': 'no_preference',
+};
+
+const CARE_LOCATION_EN_TO_ID: Record<string, string> = {
+  'In-person / at home': 'home',
+  Clinic: 'clinic',
+  Virtual: 'telehealth',
+  Flexible: 'flexible',
+  'In-person': 'home',
+};
+
+function localizeSummaryToken(group: string, raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  let slug = trimmed;
+  if (group === 'support' && SUPPORT_EN_TO_ID[trimmed]) slug = SUPPORT_EN_TO_ID[trimmed];
+  if (group === 'gender' && GENDER_EN_TO_ID[trimmed]) slug = GENDER_EN_TO_ID[trimmed];
+  if (group === 'careLocation' && CARE_LOCATION_EN_TO_ID[trimmed]) {
+    slug = CARE_LOCATION_EN_TO_ID[trimmed];
+  }
+  const translated = familyEnumLabel(group, slug);
+  return translated !== slug.replace(/_/g, ' ') ? translated : trimmed;
+}
+
+function joinLocalized(group: string, parts: string[], separator: string): string {
+  return parts.map((p) => localizeSummaryToken(group, p)).join(separator);
+}
+
 function SummaryGrid({ summary }: { summary: FamilyWizardSummary }) {
+  const { t } = useTranslation('family');
   const rows: { label: string; value: string }[] = [
-    summary.accountType ? { label: 'Account type', value: summary.accountType } : null,
-    summary.country ? { label: 'Location', value: summary.country } : null,
+    summary.accountType ? { label: t('careUnit.summary.accountType'), value: summary.accountType } : null,
+    summary.country ? { label: t('careUnit.summary.location'), value: summary.country } : null,
     summary.preferredLanguage
-      ? { label: 'Language', value: summary.preferredLanguage }
+      ? { label: t('careUnit.summary.language'), value: summary.preferredLanguage }
       : null,
     summary.supportCategories.length
-      ? { label: 'Support needed', value: summary.supportCategories.join(', ') }
+      ? {
+          label: t('careUnit.summary.supportNeeded'),
+          value: joinLocalized('support', summary.supportCategories, ', '),
+        }
       : null,
     summary.specificNeeds.length
-      ? { label: 'Specific needs', value: summary.specificNeeds.join(' · ') }
+      ? { label: t('careUnit.summary.specificNeeds'), value: summary.specificNeeds.join(' · ') }
       : null,
     summary.practitionerGender
-      ? { label: 'Provider gender', value: summary.practitionerGender }
+      ? {
+          label: t('careUnit.summary.providerGender'),
+          value: localizeSummaryToken('gender', summary.practitionerGender),
+        }
       : null,
     summary.providerLanguages.length
-      ? { label: 'Provider languages', value: summary.providerLanguages.join(', ') }
+      ? { label: t('careUnit.summary.providerLanguages'), value: summary.providerLanguages.join(', ') }
       : null,
-    summary.careLocation ? { label: 'Care location', value: summary.careLocation } : null,
-    summary.address ? { label: 'Address', value: summary.address } : null,
-    summary.scheduleType ? { label: 'Schedule', value: summary.scheduleType } : null,
+    summary.careLocation
+      ? {
+          label: t('careUnit.summary.careLocation'),
+          value: localizeSummaryToken('careLocation', summary.careLocation),
+        }
+      : null,
+    summary.address ? { label: t('careUnit.summary.address'), value: summary.address } : null,
+    summary.scheduleType
+      ? {
+          label: t('careUnit.summary.schedule'),
+          value: localizeSummaryToken('schedule', summary.scheduleType),
+        }
+      : null,
     summary.preferredDays.length
-      ? { label: 'Preferred days', value: summary.preferredDays.join(', ') }
+      ? {
+          label: t('careUnit.summary.preferredDays'),
+          value: joinLocalized('day', summary.preferredDays, ', '),
+        }
       : null,
     summary.preferredTimeSlots.length
-      ? { label: 'Preferred times', value: summary.preferredTimeSlots.join(', ') }
+      ? {
+          label: t('careUnit.summary.preferredTimes'),
+          value: joinLocalized('time', summary.preferredTimeSlots, ', '),
+        }
       : null,
-    summary.startTiming ? { label: 'Start timing', value: summary.startTiming } : null,
-    summary.ndisPlanType ? { label: 'NDIS plan', value: summary.ndisPlanType } : null,
+    summary.startTiming ? { label: t('careUnit.summary.startTiming'), value: summary.startTiming } : null,
+    summary.ndisPlanType ? { label: t('careUnit.summary.ndisPlan'), value: summary.ndisPlanType } : null,
   ].filter(Boolean) as { label: string; value: string }[];
 
   if (rows.length === 0) return null;
@@ -357,6 +424,7 @@ export function FamilyCareRequestPanel({
   onDraftChange?: (draft: FamilyWizardDraft) => void;
   actions?: ReactNode;
 }) {
+  const { t } = useTranslation('family');
   const latest = intakes?.[0];
   if (!latest) return null;
 
@@ -373,13 +441,13 @@ export function FamilyCareRequestPanel({
             </div>
             <div>
               <p className="text-sm font-semibold text-teal-900">
-                {isFamily ? 'Your care request' : 'Family request summary'}
+                {isFamily ? t('careUnit.requestTitle') : 'Family request summary'}
               </p>
               <p className="text-xs text-teal-800/80 mt-0.5">
                 {editing
-                  ? 'Update your request details, then Save.'
+                  ? t('careUnit.requestEditHint')
                   : isFamily
-                    ? 'Details from your onboarding — our care team will follow up.'
+                    ? t('careUnit.requestHint')
                     : 'From simple family onboarding'}
               </p>
             </div>
@@ -392,7 +460,9 @@ export function FamilyCareRequestPanel({
               </span>
               {latest.submittedAt && (
                 <span className="text-[11px] text-teal-800/70">
-                  Submitted {new Date(latest.submittedAt).toLocaleString()}
+                  {t('careUnit.submitted', {
+                    date: formatFamilyDateTime(latest.submittedAt),
+                  })}
                 </span>
               )}
             </div>
@@ -407,7 +477,7 @@ export function FamilyCareRequestPanel({
         latest.reasonForCare && (
           <div className="rounded-xl bg-white border border-teal-100 px-3 py-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">
-              Reason for care
+              {isFamily ? t('careUnit.reasonForCare') : 'Reason for care'}
             </p>
             <p className="text-sm text-stone-800 mt-0.5">{latest.reasonForCare}</p>
           </div>
@@ -417,7 +487,7 @@ export function FamilyCareRequestPanel({
       {!editing && (latest.serviceInterests?.length ?? 0) > 0 && (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80 mb-1.5">
-            {isFamily ? 'Services requested' : 'Mapped service interests'}
+            {isFamily ? t('careUnit.servicesRequested') : 'Mapped service interests'}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {latest.serviceInterests!.map((s) => (

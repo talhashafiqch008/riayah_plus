@@ -1,5 +1,6 @@
 
 import { m, LazyMotion, domAnimation } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
  ArrowRight, ArrowLeft, Calendar, Clock, Check,
  Sun, Moon, Sunrise, Sunset, CalendarDays, Repeat,
@@ -57,7 +58,17 @@ const fadeIn = {
 };
 
 // Helper Component for Time Selection
-function TimePicker({ value, onChange }: { value: string, onChange: (val: string) => void }) {
+function TimePicker({
+ value,
+ onChange,
+ isFamily,
+ t,
+}: {
+ value: string;
+ onChange: (val: string) => void;
+ isFamily?: boolean;
+ t?: (key: string) => string;
+}) {
  // Parse time string (HH:mm) to internal state
  const parseTime = (timeStr: string) => {
  if (!timeStr) return { hour: '12', minute: '00', period: 'AM' };
@@ -118,8 +129,8 @@ function TimePicker({ value, onChange }: { value: string, onChange: (val: string
  value={period}
  onChange={(e) => updateTime(hour, minute, e.target.value)}
  >
- <option value="AM">AM</option>
- <option value="PM">PM</option>
+ <option value="AM">{isFamily && t ? t('onboarding.am') : 'AM'}</option>
+ <option value="PM">{isFamily && t ? t('onboarding.pm') : 'PM'}</option>
  </select>
  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400">
  <ChevronDown className="size-4" />
@@ -134,9 +145,12 @@ interface StepScheduleProps {
  onUpdate: (data: Record<string, unknown>) => void;
  onNext: () => void;
  onBack: () => void;
+ variant?: 'careseeker' | 'family';
 }
 
-export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepScheduleProps) {
+export default function StepSchedule({ data, onUpdate, onNext, onBack, variant = 'careseeker' }: StepScheduleProps) {
+ const { t } = useTranslation('family');
+ const isFamily = variant === 'family';
  const selectedDays: string[] = (data.preferredDays as string[]) || [];
  const selectedTimeSlots: string[] = ((data.preferredTimeSlots as string[]) as string[]) || [];
 
@@ -166,8 +180,12 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  <CalendarClock className="size-6 text-teal-600" />
  </div>
  <div>
- <h2 className="text-2xl font-semibold text-stone-900 leading-none">When do you need care?</h2>
- <p className="text-stone-500 mt-1">Select your preferred schedule.</p>
+ <h2 className="text-2xl font-semibold text-stone-900 leading-none">
+ {isFamily ? t('onboarding.stepTitles.whenCare') : 'When do you need care?'}
+ </h2>
+ <p className="text-stone-500 mt-1">
+ {isFamily ? t('onboarding.scheduleHint') : 'Select your preferred schedule.'}
+ </p>
  </div>
  </div>
  </m.div>
@@ -176,8 +194,12 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  <m.div {...fadeIn} transition={{ delay: 0.1 }}>
  <div className="flex items-center gap-2 mb-4">
  <Clock className="size-5 text-teal-600" />
- <h3 className="font-semibold text-stone-900">How often?</h3>
- <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">Required</span>
+ <h3 className="font-semibold text-stone-900">
+ {isFamily ? t('onboarding.howOften') : 'How often?'}
+ </h3>
+ <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">
+ {isFamily ? t('onboarding.required') : 'Required'}
+ </span>
  </div>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  {FREQUENCY_OPTIONS.map((option, index) => {
@@ -200,10 +222,12 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  </div>
  <div className="flex-1">
  <span className={`text-lg font-bold block mb-0.5 ${isSelected ? 'text-white' : 'text-stone-900'}`}>
- {option.label}
+ {isFamily ? t(`enums.schedule.${option.id}`, { defaultValue: option.label }) : option.label}
  </span>
  <span className={`text-xs ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>
- {option.description}
+ {isFamily
+ ? t(`enums.scheduleHint.${option.id}`, { defaultValue: option.description })
+ : option.description}
  </span>
  </div>
  {isSelected && <Check className="size-6 text-white" />}
@@ -226,12 +250,19 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  <div className="py-2 space-y-4">
  <div className="flex items-center gap-2">
  <CalendarDays className="size-5 text-teal-600" />
- <h3 className="font-semibold text-stone-900">Preferred Days</h3>
- <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-500 rounded-full uppercase tracking-wide">Optional</span>
+ <h3 className="font-semibold text-stone-900">
+ {isFamily ? t('onboarding.whichDays') : 'Preferred Days'}
+ </h3>
+ <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-500 rounded-full uppercase tracking-wide">
+ {isFamily ? t('onboarding.optional') : 'Optional'}
+ </span>
  </div>
  <div className="flex gap-2 w-full justify-between sm:justify-start">
  {DAYS_OF_WEEK.map((day) => {
  const isSelected = selectedDays.includes(day.id);
+ const dayLabel = isFamily
+ ? t(`enums.day.${day.id}`, { defaultValue: day.label })
+ : day.label;
  return (
  <m.button
  key={day.id}
@@ -240,8 +271,8 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  whileTap={{ scale: 0.9 }}
  className={`w-10 h-12 sm:w-12 sm:h-14 rounded-2xl border-2 font-bold text-sm transition-transform duration-300 flex flex-col items-center justify-center gap-1 ${isSelected ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'ring-1 ring-stone-100/50 text-stone-400 hover:border-stone-300 hover:text-stone-600' }`}
  >
- <span className="text-[10px] font-normal opacity-70 block sm:hidden">{day.label.charAt(0)}</span>
- <span className="text-[10px] font-normal opacity-70 hidden sm:block">{day.label}</span>
+ <span className="text-[10px] font-normal opacity-70 block sm:hidden">{dayLabel.charAt(0)}</span>
+ <span className="text-[10px] font-normal opacity-70 hidden sm:block">{dayLabel}</span>
  {isSelected && <div className="size-1 bg-white rounded-full mt-0.5" />}
  </m.button>
  );
@@ -256,8 +287,12 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  <m.div {...fadeIn} transition={{ delay: 0.2 }}>
  <div className="flex items-center gap-2 mb-4">
  <Clock className="size-5 text-teal-600" />
- <h3 className="font-semibold text-stone-900">Preferred Time Slots</h3>
- <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-500 rounded-full uppercase tracking-wide">Optional</span>
+ <h3 className="font-semibold text-stone-900">
+ {isFamily ? t('onboarding.whatTimes') : 'Preferred Time Slots'}
+ </h3>
+ <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-500 rounded-full uppercase tracking-wide">
+ {isFamily ? t('onboarding.optional') : 'Optional'}
+ </span>
  </div>
 
  <div className="grid grid-cols-2 gap-3 mb-4">
@@ -275,7 +310,7 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  <Icon className={`size-5 ${isSelected && !Boolean(data.isCustomTime) ? 'text-white' : 'text-stone-400'}`} />
  <div>
  <span className={`font-bold text-sm block ${isSelected && !Boolean(data.isCustomTime) ? 'text-white' : 'text-stone-900'}`}>
- {slot.label}
+ {isFamily ? t(`enums.time.${slot.id}`, { defaultValue: slot.label }) : slot.label}
  </span>
  <span className={`text-[10px] block ${isSelected && !Boolean(data.isCustomTime) ? 'text-stone-400' : 'text-stone-400'}`}>
  {slot.time}
@@ -306,8 +341,12 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  <Clock className="size-5" />
  </div>
  <div>
- <span className="font-bold text-stone-900 block">Custom Hours</span>
- <span className="text-xs text-stone-500">Choose specific start and end times</span>
+ <span className="font-bold text-stone-900 block">
+ {isFamily ? t('onboarding.customHours') : 'Custom Hours'}
+ </span>
+ <span className="text-xs text-stone-500">
+ {isFamily ? t('onboarding.customHoursHint') : 'Choose specific start and end times'}
+ </span>
  </div>
  </div>
  {Boolean(data.isCustomTime) && <Check className="size-5 text-stone-900" />}
@@ -321,17 +360,25 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  className="space-y-4 p-5 bg-stone-50 rounded-2xl ring-1 ring-stone-100/50"
  >
  <div className="space-y-1.5">
- <span className="text-xs font-bold text-stone-500 uppercase ml-1">Start Time</span>
+ <span className="text-xs font-bold text-stone-500 uppercase ml-1">
+ {isFamily ? t('onboarding.startTime') : 'Start Time'}
+ </span>
  <TimePicker
  value={data.customStartTime as string}
  onChange={(val) => onUpdate({ customStartTime: val })}
+ isFamily={isFamily}
+ t={t}
  />
  </div>
  <div className="space-y-1.5">
- <span className="text-xs font-bold text-stone-500 uppercase ml-1">End Time</span>
+ <span className="text-xs font-bold text-stone-500 uppercase ml-1">
+ {isFamily ? t('onboarding.endTime') : 'End Time'}
+ </span>
  <TimePicker
  value={data.customEndTime as string}
  onChange={(val) => onUpdate({ customEndTime: val })}
+ isFamily={isFamily}
+ t={t}
  />
  </div>
  </m.div>
@@ -350,7 +397,7 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  className="group flex items-center gap-2 text-stone-500 font-bold hover:text-stone-800 transition-colors px-4 py-2 rounded-xl hover:bg-stone-100"
  >
  <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
- Back
+ {isFamily ? t('onboarding.back') : 'Back'}
  </button>
  <m.button
  onClick={onNext}
@@ -359,8 +406,8 @@ export default function StepSchedule({ data, onUpdate, onNext, onBack }: StepSch
  whileTap={isValid ? { scale: 0.98 } : {}}
  className="px-8 py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-xl shadow-stone-900/10 hover:shadow-2xl hover:bg-stone-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-transform duration-300 flex items-center gap-2"
  >
- Continue
- <ArrowRight className="size-5" />
+ {isFamily ? t('onboarding.continue') : 'Continue'}
+ <ArrowRight className={`size-5${isFamily ? ' rtl-flip' : ''}`} />
  </m.button>
  </m.div>
  </div>

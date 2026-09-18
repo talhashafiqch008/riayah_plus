@@ -1,0 +1,701 @@
+{
+  "portalTitle": "بوابة العائلة",
+  "roleBadge": "عائلة",
+  "common": {
+    "refresh": "تحديث",
+    "back": "رجوع",
+    "careTeam": "فريق الرعاية",
+    "min": "{{count}} دقيقة",
+    "due": "استحقاق {{date}}",
+    "loading": "جارٍ التحميل…",
+    "goalsServices": "{{goals}} أهداف · {{services}} خدمات · ن{{version}}"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "onboarding": "طلب رعاية",
+    "care-unit": "وحدة الرعاية",
+    "episodes": "رحلة الرعاية",
+    "bookings": "المواعيد",
+    "telehealth": "جلسات الفيديو",
+    "documents": "المستندات",
+    "care-plans": "خطط الرعاية",
+    "billing": "الفوترة",
+    "messages": "الرسائل"
+  },
+  "layout": {
+    "signOut": "تسجيل الخروج",
+    "openMenu": "فتح القائمة",
+    "closeSidebar": "إغلاق الشريط الجانبي",
+    "closeMenu": "إغلاق القائمة",
+    "userFallback": "مستخدم",
+    "badgeAttention": "{{count}} تحتاج إلى انتباه",
+    "orgPending": "سيتم تعيين مؤسسة الرعاية الخاصة بكم قريبًا. يمكنكم متابعة طلب الرعاية في الوقت الحالي."
+  },
+  "dashboard": {
+    "title": "منزل العائلة",
+    "description": "اطلبوا الرعاية، تابعوا رحلة الرعاية، وابقوا على اطلاع — فريق الرعاية يتولى التفاصيل السريرية.",
+    "refresh": "تحديث",
+    "loadError": "تعذر تحميل إحصائيات لوحة التحكم",
+    "whatYouCanDo": "ما يمكنكم فعله",
+    "whatYouCanDoHint": "اطلبوا الرعاية وابقوا على اطلاع — فريق الرعاية يتولى التفاصيل السريرية.",
+    "startCareRequest": "بدء طلب رعاية",
+    "viewCareUnit": "عرض وحدة الرعاية",
+    "comingLater": "قريبًا",
+    "comingLaterHint": "تظهر هذه العناصر في القائمة لتعرفوا ما هو قادم — وهي ليست أدوات فعّالة بعد.",
+    "soon": "قريبًا",
+    "links": {
+      "onboarding": { "name": "طلب رعاية", "hint": "بدء أو تحديث طلب" },
+      "episodes": { "name": "رحلة الرعاية", "hint": "معرفة أين أنتم" },
+      "bookings": { "name": "المواعيد", "hint": "الاستشارات والحجوزات" },
+      "telehealth": { "name": "جلسات الفيديو", "hint": "الانضمام إلى غرفة الانتظار" },
+      "messages": { "name": "الرسائل", "hint": "التواصل مع فريق الرعاية" },
+      "care-plans": { "name": "خطط الرعاية", "hint": "مراجعة الخطط والموافقة عليها" },
+      "billing": { "name": "الفوترة", "hint": "عروض الأسعار والفواتير" },
+      "documents": { "name": "المستندات", "hint": "رفع الملفات أو مراجعتها" }
+    }
+  },
+  "stats": {
+    "activeJourneys": "رحلات رعاية نشطة",
+    "upcomingSessions": "جلسات قادمة",
+    "unreadAlerts": "تنبيهات غير مقروءة"
+  },
+  "placeholders": {
+    "documents": {
+      "title": "المستندات",
+      "description": "رفع المستندات متاح من طلب الرعاية ووحدة الرعاية. سيتم توسيع مركز المستندات في إصدار لاحق.",
+      "badge": "عنصر مؤقت · سيتم التوسيع قريبًا"
+    }
+  },
+  "appointments": {
+    "title": "المواعيد",
+    "description": "جلسات رعاية مع الأخصائي المعين لكم. المنسق يحدد من تقابلون — وأنتم تختارون الوقت المتاح.",
+    "bookSession": "حجز جلسة",
+    "loadError": "تعذر تحميل المواعيد",
+    "empty": "لا توجد جلسات رعاية بعد.",
+    "upcoming": "القادمة",
+    "past": "السابقة",
+    "joinVideo": "انضم إلى الفيديو ←"
+  },
+  "bookSession": {
+    "back": "المواعيد",
+    "title": "حجز جلسة",
+    "description": "اختروا رحلة رعاية والمدة ووقتًا متاحًا مع الأخصائي المعين لكم.",
+    "careJourney": "رحلة الرعاية",
+    "yourClinician": "الأخصائي الخاص بكم",
+    "noClinician": "لم يُعيَّن أخصائي بعد. سيعين المنسق أحدًا قبل أن تتمكنوا من الحجز.",
+    "duration": "المدة",
+    "date": "التاريخ",
+    "openSlots": "الأوقات المتاحة",
+    "slotsHint": "تظهر هنا فقط الأوقات التي حددها الأخصائي كمتاحة.",
+    "noHours": "لا ساعات في هذا اليوم. جربوا تاريخًا آخر، أو اطلبوا من المنسق ضبط توفر الأخصائي.",
+    "bookCta": "حجز الجلسة",
+    "noJourneys": "لا توجد رحلات رعاية مفتوحة للحجز. ابدأوا بطلب رعاية أولًا.",
+    "loadJourneysError": "تعذر تحميل رحلات الرعاية",
+    "loadClinicianError": "تعذر تحميل الأخصائي",
+    "loadSlotsError": "تعذر تحميل الأوقات المتاحة",
+    "pickSlot": "اختروا وقتًا متاحًا",
+    "booked": "تم حجز الجلسة",
+    "bookingFailed": "فشل الحجز",
+    "taken": "محجوز",
+    "closed": "مغلق"
+  },
+  "telehealth": {
+    "title": "جلسات الفيديو",
+    "description": "انضموا من غرفة الانتظار. سيدخلكم الأخصائي عندما يكون جاهزًا.",
+    "loadError": "تعذر تحميل جلسات الفيديو",
+    "empty": "لا توجد جلسات فيديو بعد. احجزوا واحدة من المواعيد.",
+    "upcoming": "القادمة",
+    "past": "السابقة",
+    "joinWaitingRoom": "الانضمام إلى غرفة الانتظار"
+  },
+  "telehealthJoin": {
+    "back": "جلسات الفيديو",
+    "title": "جلسة فيديو",
+    "paymentRequired": "يلزم الدفع قبل الانضمام",
+    "joinFailed": "تعذر الانضمام إلى الجلسة",
+    "openFailed": "تعذر فتح الجلسة",
+    "consentSaved": "تم حفظ الموافقة",
+    "consentFailed": "تعذر حفظ الموافقة",
+    "waitingTitle": "غرفة الانتظار",
+    "waitingHint": "ابقوا في هذه الصفحة. ستنضمون إلى مكالمة الفيديو عندما يدخلكم الأخصائي.",
+    "payToJoin": "ادفعوا الفاتورة للانضمام",
+    "tryAgainPaid": "دفعتُ — حاولوا مرة أخرى",
+    "joining": "جارٍ الانضمام…",
+    "consentTitle": "قبل الانضمام",
+    "consentBody": "أكدوا أنكم تفهمون أن هذه جلسة فيديو سريرية وأن الآخرين في الغرفة قد يسمعون المحادثة.",
+    "consentCta": "أفهم — متابعة",
+    "admittedTitle": "تم قبولكم.",
+    "admittedBody": "سيبدأ الفيديو هنا عند تهيئة خادم المكالمات في العيادة. يمكنكم البقاء في هذه الصفحة — أنتم بالفعل في الجلسة.",
+    "leave": "مغادرة الجلسة"
+  },
+  "carePlans": {
+    "title": "خطط الرعاية",
+    "description": "راجعوا خطط فريق الرعاية — وافقوا، اطلبوا تعديلات، أو ارفضوا.",
+    "loadError": "تعذر تحميل خطط الرعاية",
+    "empty": "لا توجد خطط رعاية للمراجعة بعد.",
+    "needsAction": "تحتاج إلى إجراء منكم",
+    "otherPlans": "خطط أخرى"
+  },
+  "carePlanReview": {
+    "back": "كل خطط الرعاية",
+    "notFound": "الخطة غير موجودة.",
+    "loadError": "تعذر تحميل الخطة",
+    "approved": "تمت الموافقة على خطة الرعاية",
+    "approveFailed": "فشلت الموافقة",
+    "needExplanation": "يرجى توضيح التغييرات المطلوبة",
+    "revisionRequested": "تم طلب المراجعة",
+    "requestFailed": "فشل الطلب",
+    "rejected": "تم رفض خطة الرعاية",
+    "rejectFailed": "فشل الرفض",
+    "careGoals": "أهداف الرعاية",
+    "measure": "القياس: {{value}}",
+    "servicesCosts": "الخدمات والتكاليف",
+    "yourDecision": "قراركم",
+    "notesPlaceholder": "ملاحظات اختيارية (مطلوبة لطلب التغييرات)",
+    "approve": "الموافقة على الخطة",
+    "requestChanges": "طلب تغييرات",
+    "reject": "رفض الخطة",
+    "total": "الإجمالي",
+    "teamChanged": "ما غيّره فريق الرعاية"
+  },
+  "billing": {
+    "title": "الفوترة",
+    "description": "عروض الأسعار من خطة الرعاية، والفواتير التي يمكن دفعها بالريال القطري.",
+    "loadError": "تعذر تحميل الفوترة",
+    "paymentReceived": "تم استلام الدفع",
+    "invoices": "الفواتير",
+    "quotations": "عروض الأسعار",
+    "emptyQuotations": "لا توجد عروض أسعار بعد. تظهر عند الموافقة على خطة رعاية.",
+    "emptyInvoices": "لا توجد فواتير بعد. تظهر بعد إكمال جلسة أو خدمة.",
+    "quotation": "عرض سعر",
+    "invoice": "فاتورة"
+  },
+  "invoiceDetail": {
+    "back": "الفوترة",
+    "notFound": "لم يتم العثور على هذا المستند.",
+    "loadError": "تعذر تحميل المستند",
+    "alreadyPaid": "هذه الفاتورة مدفوعة بالفعل",
+    "paymentStartFailed": "تعذر بدء الدفع",
+    "paymentFailed": "فشل الدفع",
+    "paymentUnavailable": "الدفع عبر الإنترنت غير متاح بعد. يمكن لفريق الرعاية استلام الدفع بطريقة أخرى.",
+    "pdfFailed": "فشل تنزيل PDF",
+    "paymentReceived": "تم استلام الدفع",
+    "quotation": "عرض سعر",
+    "invoice": "فاتورة",
+    "payNow": "ادفع الآن",
+    "downloadPdf": "تنزيل PDF",
+    "lineItems": "بنود الفاتورة",
+    "subtotal": "المجموع الفرعي",
+    "tax": "الضريبة",
+    "total": "الإجمالي",
+    "dueDate": "الاستحقاق {{date}}",
+    "issued": "تاريخ الإصدار {{date}}",
+    "quotationHint": "هذا تقدير من خطة الرعاية المعتمدة. ستصلكم فاتورة منفصلة بعد إكمال الخدمات."
+  },
+  "messages": {
+    "title": "الرسائل",
+    "description": "محادثات آمنة مع فريق الرعاية حول رحلة رعايتكم.",
+    "loadError": "تعذر تحميل الرسائل",
+    "openFailed": "تعذر فتح المحادثة",
+    "startFailed": "تعذر بدء محادثة",
+    "fileTooLarge": "يجب ألا يتجاوز الملف 10 ميجابايت",
+    "sendFailed": "فشل إرسال الرسالة",
+    "noMessagesYet": "لا رسائل بعد",
+    "attachment": "مرفق",
+    "emptyHint": "اختروا محادثة أو ابدأوا موضوعًا جديدًا حول رحلة رعاية.",
+    "emptyHintStaff": "اختروا محادثة للقراءة والرد.",
+    "backAria": "العودة إلى المحادثات",
+    "attachAria": "إرفاق ملف",
+    "placeholder": "اكتبوا رسالة",
+    "startThread": "مراسلة المنسق",
+    "threads": "المحادثات",
+    "send": "إرسال",
+    "you": "أنتم",
+    "threadType": {
+      "family_coordinator": "منسق الرعاية",
+      "family_clinical": "أخصائي",
+      "coordinator_clinical": "فريق الرعاية",
+      "internal_staff": "داخلي"
+    }
+  },
+  "episodes": {
+    "title": "رحلة الرعاية",
+    "description": "تابعوا أين أنتم في الرعاية — من الطلب حتى الدعم النشط.",
+    "loadError": "تعذر تحميل رحلات الرعاية",
+    "journey": "رحلة",
+    "journeys": "رحلات",
+    "empty": "لا توجد رحلات رعاية بعد. ابدأوا بطلب رعاية.",
+    "all": "الكل",
+    "untitled": "رحلة رعاية"
+  },
+  "episodeDetail": {
+    "notFound": "رحلة الرعاية غير موجودة.",
+    "loadError": "تعذر تحميل رحلة الرعاية",
+    "breadcrumb": "رحلة الرعاية",
+    "back": "العودة إلى رحلة الرعاية",
+    "careSummary": "ملخص الرعاية",
+    "requestReceived": "تم استلام طلب الرعاية",
+    "teamReviewed": "راجع فريق الرعاية",
+    "careSessions": "جلسات الرعاية",
+    "sessionsHint": "المواعيد وزيارات الفيديو المرتبطة بهذه الرحلة.",
+    "bookSession": "حجز جلسة",
+    "current": "الحالي: {{status}}",
+    "milestones": "رحلتكم",
+    "noSessions": "لا جلسات مجدولة بعد.",
+    "sessionsBooked": "{{count}} محجوزة",
+    "reasonForCare": "سبب الرعاية",
+    "timeline": "سجل الرحلة",
+    "timelineHint": "أحداث مهمة في رحلة الرعاية هذه"
+  },
+  "milestones": {
+    "hint": "معالم بسيطة لتعرفوا دائمًا ما الخطوة التالية.",
+    "now": "الآن",
+    "comingSoon": "قريبًا",
+    "items": {
+      "received": {
+        "label": "تم استلام الطلب",
+        "description": "طلب الرعاية لدى فريقنا."
+      },
+      "reviewing": {
+        "label": "فريق الرعاية يراجع",
+        "description": "منسق يراجع طلبكم."
+      },
+      "started": {
+        "label": "بدأت رحلة الرعاية",
+        "description": "رحلة الرعاية جارية."
+      },
+      "booked": {
+        "label": "تم حجز جلسة",
+        "description": "تم جدولة جلسة رعاية."
+      },
+      "completed": {
+        "label": "اكتملت الجلسة",
+        "description": "أنهى الأخصائي جلسة رعاية."
+      },
+      "careplan": {
+        "label": "خطة الرعاية جاهزة",
+        "description": "متاحة في إصدار لاحق."
+      }
+    }
+  },
+  "careUnit": {
+    "home": "الرئيسية",
+    "listTitle": "وحدة الرعاية الخاصة بي",
+    "listDescription": "أسرتكم، متلقي الرعاية، والطلب الذي قدّمتموه أثناء التسجيل.",
+    "searchPlaceholder": "البحث في وحدات الرعاية…",
+    "unitCount": "{{count}} وحدة",
+    "unitCount_plural": "{{count}} وحدات",
+    "empty": "لا توجد وحدة رعاية بعد. أكملوا طلب الرعاية لإنشاء أسرتكم وطلبكم.",
+    "loadError": "تعذر تحميل وحدات الرعاية",
+    "back": "العودة إلى وحدات الرعاية",
+    "notFound": "وحدة الرعاية غير موجودة.",
+    "needingCare": "يحتاجون إلى رعاية",
+    "edit": "تعديل وحدة الرعاية",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "name": "الاسم",
+    "phone": "الهاتف",
+    "location": "الموقع",
+    "relation": "صلة القرابة",
+    "person": "شخص",
+    "people": "أشخاص",
+    "householdDetails": "تفاصيل الأسرة",
+    "accountHolder": "صاحب الحساب",
+    "whoNeedsCare": "من يحتاج إلى رعاية",
+    "openCareRequest": "افتحوا لعرض طلب الرعاية",
+    "dob": "تاريخ الميلاد {{date}}",
+    "journeysHeading": "رحلات رعايتكم",
+    "membersHint": "{{count}} في أسرتكم",
+    "emptyPatients": "لم يُدرج أحد يحتاج إلى رعاية بعد.",
+    "viewPerson": "عرض الملف",
+    "requestTitle": "طلب الرعاية الخاص بكم",
+    "requestHint": "تفاصيل من تسجيل طلبكم — سيتابع فريق الرعاية معكم.",
+    "requestEditHint": "حدّثوا تفاصيل الطلب، ثم احفظوا.",
+    "submitted": "أُرسل {{date}}",
+    "reasonForCare": "سبب الرعاية",
+    "servicesRequested": "الخدمات المطلوبة",
+    "summary": {
+      "accountType": "نوع الحساب",
+      "location": "الموقع",
+      "language": "اللغة",
+      "supportNeeded": "الدعم المطلوب",
+      "specificNeeds": "احتياجات محددة",
+      "providerGender": "جنس مقدّم الرعاية",
+      "providerLanguages": "لغات مقدّم الرعاية",
+      "careLocation": "مكان الرعاية",
+      "schedule": "الجدول",
+      "preferredDays": "الأيام المفضلة",
+      "preferredTimes": "الأوقات المفضلة",
+      "startTiming": "توقيت البدء",
+      "address": "العنوان",
+      "ndisPlan": "خطة NDIS"
+    }
+  },
+  "patientDetail": {
+    "home": "الرئيسية",
+    "updated": "تم تحديث ملف الشخص",
+    "personProfile": "ملف الشخص",
+    "careJourneys": "رحلات الرعاية",
+    "noJourneys": "لا توجد رحلات رعاية مرتبطة بعد.",
+    "requestHistory": "سجل الطلبات",
+    "noRequests": "لا توجد طلبات رعاية بعد.",
+    "save": "حفظ التغييرات",
+    "edit": "تعديل الملف",
+    "name": "الاسم",
+    "dateOfBirth": "تاريخ الميلاد",
+    "gender": "الجنس",
+    "relationship": "صلة القرابة",
+    "pointOfContact": "جهة الاتصال",
+    "pocPhone": "هاتف جهة الاتصال",
+    "notes": "ملاحظات",
+    "diagnoses": "التشخيصات",
+    "editHistory": "سجل التعديلات",
+    "noRevisions": "لا توجد مراجعات مسجّلة بعد.",
+    "created": "تاريخ",
+    "by": "بواسطة",
+    "snapshot": "لقطة",
+    "backTo": "العودة إلى {{name}}",
+    "notFound": "لم يُعثر على هذا الشخص في وحدة الرعاية.",
+    "male": "ذكر",
+    "female": "أنثى",
+    "noPreference": "بدون تفضيل"
+  },
+  "onboarding": {
+    "eyebrow": "طلب رعاية",
+    "title": "أخبرونا بما تحتاجون",
+    "subtitle": "خطوات بسيطة قليلة — فريق الرعاية يتولى التفاصيل السريرية.",
+    "stepOf": "الخطوة {{current}} من {{total}}",
+    "steps": {
+      "location": "الموقع",
+      "support": "الدعم",
+      "preferences": "التفضيلات",
+      "schedule": "الجدول",
+      "account": "الحساب",
+      "confirm": "التأكيد"
+    },
+    "stepTitles": {
+      "whoNeedsCare": "من يحتاج إلى رعاية؟",
+      "whatSupport": "ما الدعم الذي تحتاجونه؟",
+      "preferences": "تفضيلات مقدّم الرعاية",
+      "whenCare": "متى تحتاجون إلى الرعاية؟",
+      "account": "إنشاء حسابكم",
+      "review": "مراجعة وتأكيد"
+    },
+    "reviewHint": "راجعوا طلبكم، ثم اقبلوا الشروط للإنهاء.",
+    "requestSummary": "ملخص طلبكم",
+    "accountLabel": "الحساب",
+    "locationLabel": "الموقع",
+    "supportLabel": "الدعم",
+    "scheduleLabel": "الجدول",
+    "afterSubmit": "بعد الإرسال، سيراجع فريق الرعاية طلبكم قبل الاستشارة.",
+    "requestReceived": "تم استلام الطلب",
+    "allSet": "أنتم جاهزون",
+    "successBody": "سيراجع فريق الرعاية طلبكم ويتابع معكم. يمكنكم تتبع التقدم من منزل العائلة.",
+    "goHome": "الانتقال إلى منزل العائلة",
+    "finishSubmit": "إنهاء وإرسال الطلب",
+    "continue": "متابعة",
+    "back": "رجوع",
+    "goBack": "العودة",
+    "clearAll": "مسح الكل",
+    "locationSectionTitle": "الموقع",
+    "locationSectionHint": "يُحدَّد من جهازكم",
+    "languageSectionTitle": "اللغة",
+    "languageSectionHint": "المفضّلة للتواصل",
+    "change": "تغيير",
+    "close": "إغلاق",
+    "detectedFromDevice": "يُحدَّد من جهازكم",
+    "selectAccountType": "اختروا نوع الحساب الذي تريدون إنشاءه.",
+    "accounts": {
+      "myself": {
+        "title": "حساب فردي",
+        "subtitle": "لنفسي",
+        "description": "أبحث عن رعاية أو دعم لاحتياجاتي الشخصية."
+      },
+      "family_member": {
+        "title": "وليّ عائلة",
+        "subtitle": "لعائلتي",
+        "description": "أريد إدارة رعاية والديّ أو أطفالي أو أقاربي.",
+        "details": {
+          "0": "طلب الدعم ورفع المستندات",
+          "1": "متابعة رحلة الرعاية والبقاء على اطلاع",
+          "2": "لا يمكن تعديل السجلات السريرية أو خطط الرعاية بمفردكم"
+        }
+      }
+    },
+    "careNeeds": {
+      "selectAll": "اختروا كل الفئات التي تنطبق."
+    },
+    "categories": {
+      "aged_care": {
+        "label": "رعاية منزلية",
+        "description": "كبار السن والدعم المنزلي"
+      },
+      "disability_support": {
+        "label": "ذوي الإعاقة",
+        "description": "رعاية الاحتياجات الخاصة"
+      },
+      "child_family": {
+        "label": "رعاية أطفال",
+        "description": "الأطفال والعائلات"
+      },
+      "allied_health": {
+        "label": "علاج",
+        "description": "خدمات التأهيل"
+      },
+      "home_support": {
+        "label": "زيارة منزلية",
+        "description": "مهام المنزل"
+      }
+    },
+    "preferencesHint": "خصّصوا مقدّم الرعاية المثالي لكم.",
+    "providerGender": "جنس مقدّم الرعاية",
+    "spokenLanguages": "اللغات المنطوقة",
+    "careLocation": "مكان الرعاية",
+    "required": "مطلوب",
+    "optional": "اختياري",
+    "scheduleHint": "اختاروا الجدول المفضّل لكم.",
+    "howOften": "كم مرة؟",
+    "whichDays": "أي أيام؟",
+    "whatTimes": "أي أوقات؟",
+    "selectedCount": "{{count}} محدد",
+    "specificNeedsFor": "احتياجات محددة لـ {{category}}",
+    "needs": {
+      "personal_care": { "label": "العناية الشخصية", "hint": "الاستحمام والعناية بالمظهر" },
+      "companionship": { "label": "المرافقة", "hint": "التفاعل الاجتماعي" },
+      "mobility_assistance": { "label": "دعم الحركة", "hint": "المشي والانتقالات" },
+      "meal_preparation": { "label": "تحضير الوجبات", "hint": "الطبخ والتغذية" },
+      "medication_reminders": { "label": "الأدوية", "hint": "تذكيرات فقط" },
+      "nursing_aged": { "label": "تمريض", "hint": "دعم سريري" },
+      "support_worker": { "label": "مساعد دعم", "hint": "مساعدة يومية" },
+      "cleaner": { "label": "تنظيف", "hint": "تنظيف المنزل" },
+      "gardener": { "label": "بستنة", "hint": "صيانة الحديقة" },
+      "daily_living": { "label": "المعيشة اليومية", "hint": "المهام اليومية" },
+      "community_access": { "label": "النشاط الاجتماعي", "hint": "الخروج والأنشطة" },
+      "skill_building": { "label": "بناء المهارات", "hint": "تعزيز الاستقلالية" },
+      "nursing_disability": { "label": "تمريض", "hint": "دعم سريري" },
+      "childcare": { "label": "رعاية أطفال", "hint": "الإشراف" },
+      "special_needs_child": { "label": "احتياجات خاصة", "hint": "دعم ذوي الإعاقة" },
+      "newborn_support": { "label": "حديثي الولادة", "hint": "مساعدة الوالدين الجدد" },
+      "school_pickup": { "label": "التوصيل للمدرسة", "hint": "النقل" },
+      "physiotherapy": { "label": "علاج طبيعي", "hint": "التمارين" },
+      "occupational": { "label": "علاج وظيفي", "hint": "الوظائف الحركية" },
+      "speech_therapy": { "label": "علاج نطق", "hint": "التواصل" },
+      "mental_wellness": { "label": "الصحة النفسية", "hint": "الدعم العاطفي" },
+      "cleaning": { "label": "تنظيف", "hint": "أعمال المنزل" },
+      "laundry": { "label": "غسيل", "hint": "الغسيل والكي" },
+      "meal_prep_home": { "label": "طبخ", "hint": "تحضير الوجبات" },
+      "shopping_errands": { "label": "مشتريات ومهام", "hint": "التسوق" }
+    },
+    "streetAddress": "عنوان الشارع / المنطقة",
+    "streetAddressPlaceholder": "مثال: West Bay، الدوحة...",
+    "alreadyLoggedIn": "أنتم مسجّلون الدخول بالفعل.",
+    "saveProfileHint": "احفظوا ملفكم بأمان للتواصل مع مقدّمي الرعاية.",
+    "accountVerified": "تم التحقق من الحساب",
+    "signedInAs": "أنتم مسجّلون الدخول كـ {{role}} وجاهزون للمتابعة.",
+    "loggedInReady": "أنتم مسجّلون الدخول وجاهزون للمتابعة.",
+    "createAccount": "إنشاء حساب",
+    "customHours": "ساعات مخصّصة",
+    "customHoursHint": "اختاروا وقت البدء والانتهاء",
+    "startTime": "وقت البدء",
+    "endTime": "وقت الانتهاء",
+    "am": "ص",
+    "pm": "م",
+    "consent": {
+      "independent": {
+        "title": "مقدّمو خدمات مستقلون",
+        "description": "أفهم أن مقدّمي الرعاية على رِعاية بلس يعملون بشكل مستقل. رِعاية بلس يربطكم بهم ولا يوظّفهم."
+      },
+      "terms": {
+        "title": "الشروط والخصوصية",
+        "description": "أوافق على شروط الخدمة وسياسة الخصوصية."
+      },
+      "marketing": {
+        "title": "تحديثات ونصائح",
+        "description": "أرسلوا لي نصائح رعاية مفيدة وتحديثات عن مقدّمي الخدمة. (اختياري)"
+      },
+      "required": "مطلوب",
+      "dataProtection": "حماية بياناتكم",
+      "encrypted": "مشفّر وآمن",
+      "withdraw": "سحب الموافقة في أي وقت",
+      "pdpl": "متوافق مع قانون حماية البيانات",
+      "controlAccess": "أنتم تتحكمون بالوصول",
+      "termsOfService": "شروط الخدمة",
+      "privacyPolicy": "سياسة الخصوصية"
+    },
+    "languages": {
+      "ENGLISH": "الإنجليزية",
+      "ARABIC": "العربية",
+      "TAGALOG": "التاغالوغ",
+      "HINDI": "الهندية",
+      "URDU": "الأردية",
+      "MALAYALAM": "الماليالام",
+      "BENGALI": "البنغالية"
+    },
+    "countries": {
+      "QAT": "قطر",
+      "SAU": "المملكة العربية السعودية",
+      "EGY": "مصر",
+      "AUS": "أستراليا",
+      "PAK": "باكستان"
+    }
+  },
+  "enums": {
+    "schedule": {
+      "one_time": "مرة واحدة",
+      "weekly": "أسبوعي",
+      "daily": "يومي",
+      "flexible": "حسب الحاجة"
+    },
+    "day": {
+      "sun": "الأحد",
+      "mon": "الإثنين",
+      "tue": "الثلاثاء",
+      "wed": "الأربعاء",
+      "thu": "الخميس",
+      "fri": "الجمعة",
+      "sat": "السبت"
+    },
+    "time": {
+      "morning": "صباحًا",
+      "afternoon": "بعد الظهر",
+      "evening": "مساءً",
+      "overnight": "ليلًا"
+    },
+    "gender": {
+      "female": "أنثى",
+      "male": "ذكر",
+      "no_preference": "بدون تفضيل",
+      "female_only": "أنثى",
+      "male_only": "ذكر"
+    },
+    "genderHint": {
+      "female_only": "مقدّمة رعاية أنثى فقط",
+      "male_only": "مقدّم رعاية ذكر فقط",
+      "no_preference": "أي منهما مناسب"
+    },
+    "careLocation": {
+      "home": "حضوري / في المنزل",
+      "clinic": "العيادة",
+      "telehealth": "افتراضي",
+      "flexible": "مرن",
+      "both": "حضوري وافتراضي"
+    },
+    "careLocationHint": {
+      "home": "رعاية في منزلكم",
+      "clinic": "زيارة عيادة",
+      "telehealth": "مكالمات فيديو عبر الإنترنت",
+      "flexible": "أي مكان يناسبكم"
+    },
+    "scheduleHint": {
+      "one_time": "زيارة أو جلسة واحدة",
+      "weekly": "جدول أسبوعي منتظم",
+      "daily": "كل يوم أو معظم الأيام",
+      "flexible": "حسب الحاجة / مرن"
+    },
+    "support": {
+      "aged_care": "رعاية منزلية",
+      "disability_support": "ذوي الإعاقة",
+      "child_family": "رعاية أطفال",
+      "allied_health": "علاج",
+      "home_support": "زيارة منزلية",
+      "home_care": "رعاية منزلية",
+      "therapy": "علاج",
+      "babysitting": "رعاية أطفال"
+    },
+    "relationship": {
+      "self": "الذات",
+      "myself": "الذات",
+      "parent": "والد/والدة",
+      "child": "ابن/ابنة",
+      "spouse": "زوج/زوجة",
+      "sibling": "أخ/أخت",
+      "relative": "قريب",
+      "other": "أخرى"
+    },
+    "role": {
+      "clinical_staff": "طاقم سريري",
+      "clinician": "أخصائي",
+      "doctor": "طبيب",
+      "nurse": "ممرض/ة",
+      "care_coordinator": "منسق رعاية",
+      "coordinator": "منسق",
+      "support_worker": "عامل دعم",
+      "family": "عائلة"
+    },
+    "sessionType": {
+      "telehealth": "جلسة فيديو",
+      "in_person": "حضوري",
+      "home_visit": "زيارة منزلية",
+      "session": "جلسة"
+    }
+  },
+  "staffCard": {
+    "languages": "اللغات: {{list}}",
+    "areas": "المناطق: {{list}}",
+    "experience": "{{count}} سنوات خبرة",
+    "experience_one": "سنة خبرة واحدة",
+    "moh": "وزارة الصحة: {{number}}"
+  },
+  "assessment": {
+    "title": "المواعيد",
+    "description": "الاستشارات المحجوزة لرحلة رعايتكم.",
+    "loadError": "تعذر تحميل المواعيد",
+    "consultationBooked": "تم حجز الاستشارة",
+    "consultationCompleted": "اكتملت الاستشارة",
+    "appointment": "موعد",
+    "appointments": "مواعيد",
+    "empty": "لا توجد مواعيد بعد.",
+    "careJourney": "رحلة الرعاية",
+    "clinician": "الأخصائي",
+    "visitSummary": "ملخص الزيارة",
+    "visitNotes": "ملاحظات الزيارة"
+  },
+  "status": {
+    "episode": {
+      "intake_submitted": "تم استلام الطلب",
+      "under_review": "فريق الرعاية يراجع",
+      "validated": "بدأت رحلة الرعاية",
+      "active": "رعاية نشطة",
+      "on_hold": "معلّقة",
+      "closed": "مغلقة"
+    },
+    "assessment": {
+      "scheduled": "تم حجز الاستشارة",
+      "completed": "اكتملت الاستشارة",
+      "cancelled": "ملغاة",
+      "no_show": "فائتة"
+    },
+    "intake": {
+      "submitted": "تم استلام الطلب",
+      "under_review": "فريق الرعاية يراجع",
+      "validated": "رحلة الرعاية جاهزة",
+      "episode_created": "بدأت رحلة الرعاية",
+      "withdrawn": "مسحوبة"
+    },
+    "carePlan": {
+      "draft": "مسودة",
+      "submitted_for_approval": "بانتظار موافقة العائلة",
+      "approved": "موافق عليها",
+      "active": "نشطة",
+      "revision_requested": "طُلبت مراجعة",
+      "rejected": "مرفوضة",
+      "completed": "مكتملة"
+    },
+    "invoice": {
+      "draft": "قيد التحضير",
+      "sent": "مستحقة",
+      "overdue": "متأخرة",
+      "paid": "مدفوعة",
+      "cancelled": "ملغاة",
+      "disputed": "متنازع عليها"
+    },
+    "session": {
+      "pending": "قيد الانتظار",
+      "accepted": "مقبولة",
+      "in_progress": "جارٍ",
+      "completed": "مكتملة",
+      "cancelled": "ملغاة",
+      "no_show": "فائتة"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -11,6 +12,7 @@ import {
   type OpenSlot,
   type ScheduleStaffOption,
 } from '@/lib/api/scheduling';
+import { familyDateLocale } from '@/lib/familyLanguage';
 import StaffPersonCard from '@/components/care/StaffPersonCard';
 
 const DURATIONS = [30, 45, 60] as const;
@@ -22,14 +24,14 @@ function localYmd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function nextFourteenDays() {
+function nextFourteenDays(locale: string) {
   const out: { ymd: string; label: string }[] = [];
   const now = new Date();
   for (let i = 0; i < 14; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
     out.push({
       ymd: localYmd(d),
-      label: d.toLocaleDateString(undefined, {
+      label: d.toLocaleDateString(locale, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -39,17 +41,19 @@ function nextFourteenDays() {
   return out;
 }
 
-function slotLabel(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, {
+function slotLabel(iso: string, locale: string) {
+  return new Date(iso).toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });
 }
 
 export default function FamilyBookSessionPage() {
+  const { t } = useTranslation('family');
+  const dateLocale = familyDateLocale();
+  const days = useMemo(() => nextFourteenDays(dateLocale), [dateLocale]);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const days = useMemo(() => nextFourteenDays(), []);
 
   const [episodes, setEpisodes] = useState<CareEpisode[]>([]);
   const [episodeId, setEpisodeId] = useState<string | null>(searchParams.get('episodeId'));
@@ -76,28 +80,31 @@ export default function FamilyBookSessionPage() {
         setEpisodes(open);
         setEpisodeId((prev) => prev ?? open[0]?.id ?? null);
       } catch (error: unknown) {
-        toast.error(isApiError(error) ? error.message : 'Failed to load care journeys');
+        toast.error(isApiError(error) ? error.message : t('bookSession.loadJourneysError'));
       } finally {
         setLoadingEpisodes(false);
       }
     })();
-  }, []);
+  }, [t]);
 
-  const loadClinician = useCallback(async (id: string) => {
-    setLoadingClinician(true);
-    setClinician(null);
-    setClinicianMessage(null);
-    setSlotStart(null);
-    try {
-      const res = await getFamilyAssignedClinician(id);
-      setClinician(res.clinician);
-      setClinicianMessage(res.message ?? null);
-    } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not load clinician');
-    } finally {
-      setLoadingClinician(false);
-    }
-  }, []);
+  const loadClinician = useCallback(
+    async (id: string) => {
+      setLoadingClinician(true);
+      setClinician(null);
+      setClinicianMessage(null);
+      setSlotStart(null);
+      try {
+        const res = await getFamilyAssignedClinician(id);
+        setClinician(res.clinician);
+        setClinicianMessage(res.message ?? null);
+      } catch (error: unknown) {
+        toast.error(isApiError(error) ? error.message : t('bookSession.loadClinicianError'));
+      } finally {
+        setLoadingClinician(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (!effectiveEpisodeId) return;
@@ -128,7 +135,7 @@ export default function FamilyBookSessionPage() {
         if (!cancelled) {
           setSlots([]);
           setSlotsMessage(null);
-          toast.error(isApiError(error) ? error.message : 'Failed to load open slots');
+          toast.error(isApiError(error) ? error.message : t('bookSession.loadSlotsError'));
         }
       })
       .finally(() => {
@@ -137,11 +144,11 @@ export default function FamilyBookSessionPage() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveEpisodeId, clinician, dateYmd, durationMinutes]);
+  }, [effectiveEpisodeId, clinician, dateYmd, durationMinutes, t]);
 
   const handleBook = async () => {
     if (!effectiveEpisodeId || !slotStart) {
-      toast.error('Pick an open time slot');
+      toast.error(t('bookSession.pickSlot'));
       return;
     }
     setBooking(true);
@@ -152,7 +159,7 @@ export default function FamilyBookSessionPage() {
         durationMinutes,
         type: 'telehealth',
       });
-      toast.success('Session booked');
+      toast.success(t('bookSession.booked'));
       const invoiceId =
         data.invoice && typeof data.invoice === 'object' && 'invoiceId' in data.invoice
           ? (data.invoice as { invoiceId?: string }).invoiceId
@@ -165,7 +172,7 @@ export default function FamilyBookSessionPage() {
         navigate('/family/bookings');
       }
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Booking failed');
+      toast.error(isApiError(error) ? error.message : t('bookSession.bookingFailed'));
     } finally {
       setBooking(false);
     }
@@ -180,12 +187,10 @@ export default function FamilyBookSessionPage() {
           to="/family/bookings"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800"
         >
-          <ArrowLeft className="size-4" /> Appointments
+          <ArrowLeft className="size-4" /> {t('bookSession.back')}
         </Link>
-        <h2 className="mt-2 text-2xl font-semibold text-stone-900">Book session</h2>
-        <p className="mt-1 text-stone-600">
-          Your clinician is assigned by your care coordinator. Choose an open time below.
-        </p>
+        <h2 className="mt-2 text-2xl font-semibold text-stone-900">{t('bookSession.title')}</h2>
+        <p className="mt-1 text-stone-600">{t('bookSession.description')}</p>
       </div>
 
       {loadingEpisodes ? (
@@ -194,14 +199,14 @@ export default function FamilyBookSessionPage() {
         </div>
       ) : episodes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-stone-200 bg-white p-10 text-center text-stone-600">
-          No open care journey. Ask your coordinator to open one first.
+          {t('bookSession.noJourneys')}
         </div>
       ) : (
         <div className="space-y-5">
           {episodes.length > 1 ? (
             <section className="rounded-2xl border bg-white p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                Care journey
+                {t('bookSession.careJourney')}
               </p>
               <div className="space-y-2">
                 {episodes.map((ep) => {
@@ -227,16 +232,15 @@ export default function FamilyBookSessionPage() {
 
           <section className="rounded-2xl border bg-white p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-              Assigned clinician
+              {t('bookSession.yourClinician')}
             </p>
             {loadingClinician ? (
               <Loader2 className="size-5 animate-spin text-teal-600" />
             ) : clinician ? (
-              <StaffPersonCard staff={clinician} variant="clinician" />
+              <StaffPersonCard staff={clinician} variant="clinician" localize />
             ) : (
               <p className="text-sm text-amber-800">
-                {clinicianMessage ??
-                  'No clinician assigned yet. Your coordinator will assign one before you can book.'}
+                {clinicianMessage ?? t('bookSession.noClinician')}
               </p>
             )}
           </section>
@@ -245,7 +249,7 @@ export default function FamilyBookSessionPage() {
             <>
               <section className="rounded-2xl border bg-white p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                  Duration
+                  {t('bookSession.duration')}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {DURATIONS.map((d) => (
@@ -259,7 +263,7 @@ export default function FamilyBookSessionPage() {
                           : 'border border-stone-200 text-stone-700'
                       }`}
                     >
-                      {d} min
+                      {t('common.min', { count: d })}
                     </button>
                   ))}
                 </div>
@@ -267,7 +271,7 @@ export default function FamilyBookSessionPage() {
 
               <section className="rounded-2xl border bg-white p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                  Date
+                  {t('bookSession.date')}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {days.map((d) => (
@@ -289,17 +293,14 @@ export default function FamilyBookSessionPage() {
 
               <section className="rounded-2xl border bg-white p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                  Times
+                  {t('bookSession.openSlots')}
                 </p>
-                <p className="text-xs text-stone-500">
-                  Available times are selectable. Booked / too-soon slots stay visible but disabled.
-                </p>
+                <p className="text-xs text-stone-500">{t('bookSession.slotsHint')}</p>
                 {loadingSlots ? (
                   <Loader2 className="size-5 animate-spin text-teal-600" />
                 ) : slots.length === 0 ? (
                   <p className="text-sm text-stone-500">
-                    {slotsMessage ??
-                      'No hours on this weekday. Try another date, or ask your coordinator to set clinician availability.'}
+                    {slotsMessage ?? t('bookSession.noHours')}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -327,14 +328,14 @@ export default function FamilyBookSessionPage() {
                                     : 'border border-teal-200 text-stone-800 hover:bg-teal-50'
                             }`}
                           >
-                            <span className="block">{slotLabel(slot.start)}</span>
+                            <span className="block">{slotLabel(slot.start, dateLocale)}</span>
                             {status === 'booked' ? (
                               <span className="block text-[10px] font-medium uppercase tracking-wide">
-                                Booked
+                                {t('bookSession.taken')}
                               </span>
                             ) : status === 'past' ? (
                               <span className="block text-[10px] font-medium uppercase tracking-wide">
-                                Too soon
+                                {t('bookSession.closed')}
                               </span>
                             ) : null}
                           </button>
@@ -352,7 +353,7 @@ export default function FamilyBookSessionPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
               >
                 {booking && <Loader2 className="size-4 animate-spin" />}
-                Confirm booking
+                {t('bookSession.bookCta')}
               </button>
             </>
           ) : null}

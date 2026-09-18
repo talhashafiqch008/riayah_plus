@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2, RefreshCw, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -16,6 +17,10 @@ export default function CareUnitListPage({
   title = 'Care Units & Patients',
   description = 'Open a care unit to view patients, edit profiles, and see linked episodes.',
 }: Props) {
+  const { t } = useTranslation('family');
+  const isFamily = basePath.startsWith('/family');
+  const pageTitle = isFamily ? t('careUnit.listTitle') : title;
+  const pageDescription = isFamily ? t('careUnit.listDescription') : description;
   const [rows, setRows] = useState<CareUnit[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -32,11 +37,11 @@ export default function CareUnitListPage({
       setTotal(result.total);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load care units');
+      else toast.error(isFamily ? t('careUnit.loadError') : 'Failed to load care units');
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, isFamily, t]);
 
   useEffect(() => {
     void load();
@@ -46,15 +51,15 @@ export default function CareUnitListPage({
     <div className="w-full min-w-0 max-w-5xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">{title}</h2>
-          <p className="mt-1 text-stone-600">{description}</p>
+          <h2 className="text-2xl font-semibold text-stone-900">{pageTitle}</h2>
+          <p className="mt-1 text-stone-600">{pageDescription}</p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
         >
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {isFamily ? t('common.refresh') : 'Refresh'}
         </button>
       </div>
 
@@ -62,10 +67,14 @@ export default function CareUnitListPage({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search care units…"
+          placeholder={isFamily ? t('careUnit.searchPlaceholder') : 'Search care units…'}
           className="rounded-xl border border-stone-300 px-3 py-2 text-sm w-full sm:w-72"
         />
-        <span className="text-sm text-stone-500">{total} unit{total === 1 ? '' : 's'}</span>
+        <span className="text-sm text-stone-500">
+          {isFamily
+            ? t('careUnit.unitCount', { count: total })
+            : `${total} unit${total === 1 ? '' : 's'}`}
+        </span>
       </div>
 
       <div className="rounded-2xl border bg-white shadow-sm overflow-hidden divide-y">
@@ -75,8 +84,8 @@ export default function CareUnitListPage({
           </div>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-stone-500 text-sm">
-            {basePath.startsWith('/family')
-              ? 'No care unit yet. Complete Onboarding to create your household and care request.'
+            {isFamily
+              ? t('careUnit.empty')
               : 'No care units yet. Complete Family Onboarding first.'}
           </p>
         ) : (

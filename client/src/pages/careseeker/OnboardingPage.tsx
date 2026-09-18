@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { m, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle,
@@ -57,13 +58,22 @@ enum OnboardingStep {
   COMPLETE = 7,
 }
 
+const STEP_LABEL_KEYS = [
+  'onboarding.steps.location',
+  'onboarding.steps.support',
+  'onboarding.steps.preferences',
+  'onboarding.steps.schedule',
+  'onboarding.steps.account',
+  'onboarding.steps.confirm',
+] as const;
+
 const STEPS = [
-  { id: 1, label: 'Location', icon: Globe },
-  { id: 2, label: 'Support', icon: Heart },
-  { id: 3, label: 'Preferences', icon: Settings },
-  { id: 4, label: 'Schedule', icon: Calendar },
-  { id: 5, label: 'Account', icon: User },
-  { id: 6, label: 'Confirm', icon: Shield },
+  { id: 1, label: 'Location', labelKey: STEP_LABEL_KEYS[0], icon: Globe },
+  { id: 2, label: 'Support', labelKey: STEP_LABEL_KEYS[1], icon: Heart },
+  { id: 3, label: 'Preferences', labelKey: STEP_LABEL_KEYS[2], icon: Settings },
+  { id: 4, label: 'Schedule', labelKey: STEP_LABEL_KEYS[3], icon: Calendar },
+  { id: 5, label: 'Account', labelKey: STEP_LABEL_KEYS[4], icon: User },
+  { id: 6, label: 'Confirm', labelKey: STEP_LABEL_KEYS[5], icon: Shield },
 ];
 
 const fadeVariants = {
@@ -103,6 +113,7 @@ interface CareOnboardingWizardProps {
 }
 
 export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingWizardProps) {
+  const { t } = useTranslation('family');
   const isFamily = variant === 'family';
   const navigate = useNavigate();
   const { logout, user: authUser, refreshUser, loading: authLoading } = useAuth();
@@ -397,6 +408,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
             onUpdate={updateData}
             onNext={handleNext}
             onBack={handleBack}
+            variant={variant}
           />
         );
       case OnboardingStep.PREFERENCES:
@@ -406,6 +418,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
             onUpdate={updateData}
             onNext={handleNext}
             onBack={handleBack}
+            variant={variant}
           />
         );
       case OnboardingStep.SCHEDULE:
@@ -415,6 +428,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
             onUpdate={updateData}
             onNext={handleNext}
             onBack={handleBack}
+            variant={variant}
           />
         );
       case OnboardingStep.REGISTRATION:
@@ -425,6 +439,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
             onNext={handleNext}
             onBack={handleBack}
             isLoggedIn={isLoggedIn}
+            variant={variant}
             roleLabel={
               isFamily
                 ? formData.careRecipientType === 'family_member'
@@ -503,15 +518,15 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-teal-600 mb-1">
-              Care request
+              {t('onboarding.eyebrow')}
             </p>
-            <h2 className="text-xl font-semibold text-stone-900">Tell us what you need</h2>
+            <h2 className="text-xl font-semibold text-stone-900">{t('onboarding.title')}</h2>
             <p className="text-sm text-stone-500 mt-0.5">
-              A few simple steps — our care team handles the clinical details.
+              {t('onboarding.subtitle')}
             </p>
           </div>
           <div className="text-sm font-medium text-stone-500 bg-white border border-stone-200 px-3 py-1.5 rounded-full w-fit">
-            Step {activeStepIndex + 1} of {STEPS.length}
+            {t('onboarding.stepOf', { current: activeStepIndex + 1, total: STEPS.length })}
           </div>
         </div>
 
@@ -555,7 +570,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
                           : 'text-stone-400'
                     }`}
                   >
-                    {s.label}
+                    {t(s.labelKey)}
                   </span>
                 </div>
               );
@@ -584,7 +599,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
               className="text-stone-400 hover:text-stone-600 text-sm font-medium transition-colors inline-flex items-center gap-1"
             >
               <ArrowLeft className="size-4" />
-              Go Back
+              {isFamily ? t('onboarding.goBack') : 'Go Back'}
             </button>
           </div>
         )}
@@ -707,7 +722,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
               }`}
             >
               <ArrowLeft className="size-4" />
-              Go Back
+              {isFamily ? t('onboarding.goBack') : 'Go Back'}
             </button>
           </div>
         </div>
@@ -750,6 +765,7 @@ function CompletionSuccess({
   embedded?: boolean;
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslation('family');
   const isFamily = variant === 'family';
 
   useEffect(() => {
@@ -789,18 +805,17 @@ function CompletionSuccess({
           <CheckCircle className="size-7 text-teal-700" strokeWidth={2.5} />
         </div>
         <p className="text-xs font-bold tracking-widest text-teal-600 uppercase mb-2">
-          Request received
+          {t('onboarding.requestReceived')}
         </p>
-        <h2 className="text-2xl font-semibold text-stone-900 mb-2">You're all set</h2>
+        <h2 className="text-2xl font-semibold text-stone-900 mb-2">{t('onboarding.allSet')}</h2>
         <p className="text-sm text-stone-500 mb-6 max-w-md mx-auto leading-relaxed">
-          Our care team will review your request before your consultation. You can follow progress
-          from your family home.
+          {t('onboarding.successBody')}
         </p>
         <Link
           to="/family"
           className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-stone-900 text-white text-sm font-bold rounded-xl hover:bg-stone-950 transition-colors"
         >
-          Go to Family Home
+          {t('onboarding.goHome')}
           <ArrowRight className="size-4 opacity-70" />
         </Link>
       </div>
@@ -840,15 +855,15 @@ function CompletionSuccess({
         <div className="flex items-center justify-center gap-2 mb-2">
           <Sparkles className="size-5 text-amber-500" />
           <span className="text-sm font-bold tracking-widest text-amber-600 uppercase">
-            {isFamily ? 'Request received' : 'Success'}
+            {isFamily ? t('onboarding.requestReceived') : 'Success'}
           </span>
         </div>
         <h2 className="text-4xl font-semibold text-stone-900 mb-4 tracking-tight">
-          {isFamily ? "You're all set" : "You're All Set!"}
+          {isFamily ? t('onboarding.allSet') : "You're All Set!"}
         </h2>
         <p className="text-lg text-stone-500 mb-10 leading-relaxed">
           {isFamily
-            ? 'Our care team will review your request before your consultation. You can follow progress from your family home.'
+            ? t('onboarding.successBody')
             : 'Your profile has been created. You can now browse our network of verified care providers.'}
         </p>
       </m.div>
@@ -866,7 +881,7 @@ function CompletionSuccess({
               whileTap={{ scale: 0.98 }}
               className="w-full px-8 py-4 bg-stone-900 text-white font-bold text-lg rounded-2xl shadow-xl shadow-stone-900/20 hover:shadow-2xl hover:bg-stone-950 transition-transform duration-300 flex items-center justify-center gap-3"
             >
-              Go to Family Home
+              {t('onboarding.goHome')}
               <ArrowRight className="size-5 opacity-50" />
             </m.button>
           </Link>

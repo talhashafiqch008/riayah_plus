@@ -7,7 +7,7 @@ import { getUnreadNotificationCount } from './notifications';
 import { listSessions } from './scheduling';
 import { client } from './client';
 
-export type ShellStat = { label: string; value: string };
+export type ShellStat = { label: string; value: string; /** i18n key under family.stats.* when present */ id?: string };
 
 function startOfDay(d = new Date()) {
   const x = new Date(d);
@@ -106,9 +106,9 @@ async function fetchFamilyStats(): Promise<ShellStat[]> {
   ]);
 
   return [
-    { label: 'Active care journeys', value: String(activeEpisodes) },
-    { label: 'Upcoming sessions', value: String(upcomingVisits) },
-    { label: 'Unread alerts', value: String(unread) },
+    { id: 'activeJourneys', label: 'Active care journeys', value: String(activeEpisodes) },
+    { id: 'upcomingSessions', label: 'Upcoming sessions', value: String(upcomingVisits) },
+    { id: 'unreadAlerts', label: 'Unread alerts', value: String(unread) },
   ];
 }
 

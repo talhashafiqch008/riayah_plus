@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { m } from "framer-motion";
 import { User, Mail, Lock, Eye, EyeOff, Phone, CheckCircle, ArrowRight, ArrowLeft, ShieldCheck } from "lucide-react";
 import { login, register } from '../../../lib/api/auth';
@@ -15,6 +16,7 @@ interface StepRegistrationProps {
   isLoggedIn?: boolean;
   onAccountCreated?: () => void;
   roleLabel?: string;
+  variant?: 'careseeker' | 'family';
 }
 
 const fadeIn = {
@@ -22,7 +24,9 @@ const fadeIn = {
   animate: { opacity: 1, y: 0 },
 };
 
-export default function StepRegistration({ data, onUpdate, onNext, onBack, isLoggedIn, onAccountCreated, roleLabel }: StepRegistrationProps) {
+export default function StepRegistration({ data, onUpdate, onNext, onBack, isLoggedIn, onAccountCreated, roleLabel, variant = 'careseeker' }: StepRegistrationProps) {
+  const { t } = useTranslation('family');
+  const isFamily = variant === 'family';
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -44,6 +48,13 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
   };
 
   const isValid = isLoggedIn || registrationFieldsValid();
+
+  const familyRoleTitle =
+    isFamily && data.careRecipientType === 'family_member'
+      ? t('onboarding.accounts.family_member.title')
+      : isFamily && data.careRecipientType === 'myself'
+        ? t('onboarding.accounts.myself.title')
+        : roleLabel;
 
   const handleContinue = async () => {
     if (!isValid || isRegistering) {
@@ -136,11 +147,17 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
             <ShieldCheck className="size-6 text-teal-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-semibold text-stone-900 leading-none">Create Your Account</h2>
+            <h2 className="text-2xl font-semibold text-stone-900 leading-none">
+              {isFamily ? t('onboarding.stepTitles.account') : 'Create Your Account'}
+            </h2>
             <p className="text-stone-500 mt-1">
               {isLoggedIn
-                ? "You're already logged in."
-                : "Securely save your profile to connect with providers."}
+                ? isFamily
+                  ? t('onboarding.alreadyLoggedIn')
+                  : "You're already logged in."
+                : isFamily
+                  ? t('onboarding.saveProfileHint')
+                  : 'Securely save your profile to connect with providers.'}
             </p>
           </div>
         </div>
@@ -155,11 +172,17 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
                 <CheckCircle className="size-5" />
               </div>
               <div>
-                <p className="font-bold text-emerald-800 text-sm">Account Verified</p>
+                <p className="font-bold text-emerald-800 text-sm">
+                  {isFamily ? t('onboarding.accountVerified') : 'Account Verified'}
+                </p>
                 <p className="text-xs text-emerald-600">
-                  {roleLabel
-                    ? `You are signed in as ${roleLabel} and ready to proceed.`
-                    : 'You are logged in and ready to proceed.'}
+                  {familyRoleTitle
+                    ? isFamily
+                      ? t('onboarding.signedInAs', { role: familyRoleTitle })
+                      : `You are signed in as ${familyRoleTitle} and ready to proceed.`
+                    : isFamily
+                      ? t('onboarding.loggedInReady')
+                      : 'You are logged in and ready to proceed.'}
                 </p>
               </div>
             </div>
@@ -282,7 +305,7 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
           className="group flex items-center gap-2 text-stone-500 font-bold hover:text-stone-800 transition-colors px-4 py-2 rounded-xl hover:bg-stone-100"
         >
           <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
-          Back
+          {isFamily ? t('onboarding.back') : 'Back'}
         </button>
         <m.button
           type="button"
@@ -302,8 +325,14 @@ export default function StepRegistration({ data, onUpdate, onNext, onBack, isLog
             </>
           ) : (
             <>
-              {isLoggedIn ? 'Continue' : 'Create Account'}
-              <ArrowRight className="size-5" />
+              {isLoggedIn
+                ? isFamily
+                  ? t('onboarding.continue')
+                  : 'Continue'
+                : isFamily
+                  ? t('onboarding.createAccount')
+                  : 'Create Account'}
+              <ArrowRight className={`size-5${isFamily ? ' rtl-flip' : ''}`} />
             </>
           )}
         </m.button>

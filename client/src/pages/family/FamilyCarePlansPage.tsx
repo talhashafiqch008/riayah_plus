@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -11,6 +12,7 @@ import {
 } from '@/lib/api/carePlans';
 
 export default function FamilyCarePlansPage() {
+  const { t } = useTranslation('family');
   const [plans, setPlans] = useState<CarePlan[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,11 +22,11 @@ export default function FamilyCarePlansPage() {
       const rows = await listCarePlans();
       setPlans(rows.filter((p) => p.isCurrentVersion !== false));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load care plans');
+      toast.error(isApiError(error) ? error.message : t('carePlans.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -53,8 +55,11 @@ export default function FamilyCarePlansPage() {
           <div>
             <h3 className="font-semibold text-stone-900">{plan.title}</h3>
             <p className="mt-1 text-sm text-stone-600">
-              {(plan.goals?.length ?? 0)} goals · {(plan.items?.length ?? 0)} services · v
-              {plan.version}
+              {t('common.goalsServices', {
+                goals: plan.goals?.length ?? 0,
+                services: plan.items?.length ?? 0,
+                version: plan.version,
+              })}
             </p>
           </div>
           <span
@@ -71,17 +76,15 @@ export default function FamilyCarePlansPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">Care Plans</h2>
-          <p className="mt-1 text-stone-600">
-            Review plans from your care team — approve, request changes, or reject.
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900">{t('carePlans.title')}</h2>
+          <p className="mt-1 text-stone-600">{t('carePlans.description')}</p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700"
         >
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {t('common.refresh')}
         </button>
       </div>
 
@@ -92,14 +95,14 @@ export default function FamilyCarePlansPage() {
       ) : plans.length === 0 ? (
         <div className="rounded-xl border border-dashed border-stone-200 bg-white p-10 text-center">
           <BookOpen className="mx-auto size-10 text-stone-300" />
-          <p className="mt-3 text-stone-600">No care plans to review yet.</p>
+          <p className="mt-3 text-stone-600">{t('carePlans.empty')}</p>
         </div>
       ) : (
         <div className="space-y-6">
           {awaiting.length > 0 && (
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-800">
-                Needs your action
+                {t('carePlans.needsAction')}
               </h3>
               {awaiting.map((p) => (
                 <PlanCard key={p.id} plan={p} highlight />
@@ -109,7 +112,7 @@ export default function FamilyCarePlansPage() {
           {others.length > 0 && (
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-                Other plans
+                {t('carePlans.otherPlans')}
               </h3>
               {others.map((p) => (
                 <PlanCard key={p.id} plan={p} />

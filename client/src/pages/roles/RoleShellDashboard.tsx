@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ROLE_SHELLS } from '@/config/proposalRoleShells';
@@ -10,23 +11,33 @@ interface RoleShellDashboardProps {
   shellKey: keyof typeof ROLE_SHELLS;
 }
 
-const FAMILY_PRIMARY_LINKS = [
-  { name: 'Care request', href: '/family/onboarding', hint: 'Start or update a request' },
-  { name: 'Care Journey', href: '/family/episodes', hint: 'See where you are' },
-  { name: 'Appointments', href: '/family/bookings', hint: 'Consultations & bookings' },
-  { name: 'Video sessions', href: '/family/telehealth', hint: 'Join the waiting room' },
-  { name: 'Messages', href: '/family/messages', hint: 'Talk with your care team' },
-  { name: 'Care Plans', href: '/family/care-plans', hint: 'Review and approve plans' },
-  { name: 'Billing', href: '/family/billing', hint: 'Quotations and invoices' },
-  { name: 'Documents', href: '/family/documents', hint: 'Upload or review files' },
+const FAMILY_PRIMARY_LINK_KEYS = [
+  'onboarding',
+  'episodes',
+  'bookings',
+  'telehealth',
+  'messages',
+  'care-plans',
+  'billing',
+  'documents',
 ] as const;
 
-const FAMILY_LATER_LINKS: readonly { name: string; href: string; hint: string }[] = [];
+const FAMILY_PRIMARY_HREFS: Record<(typeof FAMILY_PRIMARY_LINK_KEYS)[number], string> = {
+  onboarding: '/family/onboarding',
+  episodes: '/family/episodes',
+  bookings: '/family/bookings',
+  telehealth: '/family/telehealth',
+  messages: '/family/messages',
+  'care-plans': '/family/care-plans',
+  billing: '/family/billing',
+  documents: '/family/documents',
+};
 
 export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps) {
   const shell = ROLE_SHELLS[shellKey];
   const { dashboard, navigation } = shell;
   const isFamily = shellKey === 'family';
+  const { t } = useTranslation('family');
 
   const [stats, setStats] = useState<ShellStat[]>(dashboard.stats);
   const [loading, setLoading] = useState(true);
@@ -40,11 +51,11 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
       setLoaded(true);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load dashboard stats');
+      else toast.error(isFamily ? t('dashboard.loadError') : 'Failed to load dashboard stats');
     } finally {
       setLoading(false);
     }
-  }, [shellKey]);
+  }, [shellKey, isFamily, t]);
 
   useEffect(() => {
     setStats(ROLE_SHELLS[shellKey].dashboard.stats);
@@ -54,12 +65,21 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
 
   const quickLinks = navigation.filter((item) => item.href !== shell.basePath).slice(0, 3);
 
+  const statLabel = (stat: ShellStat) => {
+    if (isFamily && stat.id) return t(`stats.${stat.id}`);
+    return stat.label;
+  };
+
   return (
     <div className="space-y-8 max-w-5xl">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">{dashboard.title}</h2>
-          <p className="mt-2 text-stone-600">{dashboard.description}</p>
+          <h2 className="text-2xl font-semibold text-stone-900">
+            {isFamily ? t('dashboard.title') : dashboard.title}
+          </h2>
+          <p className="mt-2 text-stone-600">
+            {isFamily ? t('dashboard.description') : dashboard.description}
+          </p>
         </div>
         <button
           type="button"
@@ -68,14 +88,14 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Refresh
+          {isFamily ? t('dashboard.refresh') : 'Refresh'}
         </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl border bg-white p-5 shadow-sm">
-            <p className="text-sm text-stone-500">{stat.label}</p>
+          <div key={stat.id ?? stat.label} className="rounded-xl border bg-white p-5 shadow-sm">
+            <p className="text-sm text-stone-500">{statLabel(stat)}</p>
             <p className="mt-1 text-2xl font-semibold text-stone-900">
               {!loaded && loading ? '…' : stat.value}
             </p>
@@ -84,24 +104,26 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
       </div>
 
       {isFamily ? (
-        <div className={`grid gap-6 ${FAMILY_LATER_LINKS.length > 0 ? 'lg:grid-cols-2' : ''}`}>
+        <div className="grid gap-6">
           <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <h3 className="font-semibold text-stone-900 mb-1">What you can do</h3>
-            <p className="text-sm text-stone-500 mb-4">
-              Request care and stay informed — our care team handles clinical detail.
-            </p>
+            <h3 className="font-semibold text-stone-900 mb-1">{t('dashboard.whatYouCanDo')}</h3>
+            <p className="text-sm text-stone-500 mb-4">{t('dashboard.whatYouCanDoHint')}</p>
             <div className="space-y-2">
-              {FAMILY_PRIMARY_LINKS.map((link) => (
+              {FAMILY_PRIMARY_LINK_KEYS.map((key) => (
                 <Link
-                  key={link.href}
-                  to={link.href}
+                  key={key}
+                  to={FAMILY_PRIMARY_HREFS[key]}
                   className="flex items-center justify-between rounded-lg border border-stone-100 px-4 py-3 hover:border-teal-200 hover:bg-teal-50/50 transition-colors"
                 >
-                  <span>
-                    <span className="block text-sm font-medium text-stone-800">{link.name}</span>
-                    <span className="block text-xs text-stone-500">{link.hint}</span>
+                  <span className="text-start">
+                    <span className="block text-sm font-medium text-stone-800">
+                      {t(`dashboard.links.${key}.name`)}
+                    </span>
+                    <span className="block text-xs text-stone-500">
+                      {t(`dashboard.links.${key}.hint`)}
+                    </span>
                   </span>
-                  <ArrowRight className="size-4 text-teal-600 shrink-0" />
+                  <ArrowRight className="size-4 text-teal-600 shrink-0 rtl-flip" />
                 </Link>
               ))}
             </div>
@@ -110,44 +132,18 @@ export default function RoleShellDashboard({ shellKey }: RoleShellDashboardProps
                 to="/family/onboarding"
                 className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
               >
-                Start care request
-                <ArrowRight className="size-4" />
+                {t('dashboard.startCareRequest')}
+                <ArrowRight className="size-4 rtl-flip" />
               </Link>
               <Link
                 to="/family/care-unit"
                 className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100"
               >
-                View my care unit
-                <ArrowRight className="size-4" />
+                {t('dashboard.viewCareUnit')}
+                <ArrowRight className="size-4 rtl-flip" />
               </Link>
             </div>
           </div>
-
-          {FAMILY_LATER_LINKS.length > 0 && (
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <h3 className="font-semibold text-stone-900 mb-1">Coming later</h3>
-            <p className="text-sm text-stone-500 mb-4">
-              These stay in the menu so you know what is ahead — they are not live tools yet.
-            </p>
-            <div className="space-y-2">
-              {FAMILY_LATER_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className="flex items-center justify-between rounded-lg border border-dashed border-stone-200 px-4 py-3 text-sm text-stone-500 hover:bg-stone-50 transition-colors"
-                >
-                  <span>
-                    <span className="block font-medium text-stone-600">{link.name}</span>
-                    <span className="block text-xs">{link.hint}</span>
-                  </span>
-                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
-                    Soon
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-          )}
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">

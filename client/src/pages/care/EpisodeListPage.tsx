@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2, RefreshCw, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
-import { familyEpisodeStatusLabel } from '@/lib/familyLanguage';
+import { familyDateLocale, familyEpisodeStatusLabel } from '@/lib/familyLanguage';
 import {
   RolePageHeader,
   RolePageShell,
@@ -62,8 +63,12 @@ export default function EpisodeListPage({
   title = 'Care Episodes',
   description = 'Track episode status from intake through active care.',
 }: Props) {
+  const { t } = useTranslation('family');
   const familyFacing = basePath.startsWith('/family');
+  const dateLocale = familyDateLocale();
   const statusFilters = familyFacing ? FAMILY_STATUS_FILTERS : STAFF_STATUS_FILTERS;
+  const pageTitle = familyFacing ? t('episodes.title') : title;
+  const pageDescription = familyFacing ? t('episodes.description') : description;
   const [rows, setRows] = useState<CareEpisode[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -80,11 +85,11 @@ export default function EpisodeListPage({
       setTotal(result.total);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error(familyFacing ? 'Failed to load care journeys' : 'Failed to load episodes');
+      else toast.error(familyFacing ? t('episodes.loadError') : 'Failed to load episodes');
     } finally {
       setLoading(false);
     }
-  }, [status, familyFacing]);
+  }, [status, familyFacing, t]);
 
   useEffect(() => {
     void load();
@@ -93,11 +98,11 @@ export default function EpisodeListPage({
   return (
     <RolePageShell>
       <RolePageHeader
-        title={title}
-        description={description}
+        title={pageTitle}
+        description={pageDescription}
         actions={
           <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
-            <RefreshCw className="size-4" /> Refresh
+            <RefreshCw className="size-4" /> {familyFacing ? t('common.refresh') : 'Refresh'}
           </button>
         }
       />
@@ -110,13 +115,21 @@ export default function EpisodeListPage({
         >
           {statusFilters.map((o) => (
             <option key={o.value || 'all'} value={o.value}>
-              {o.label}
+              {familyFacing
+                ? o.value
+                  ? familyEpisodeStatusLabel(o.value)
+                  : t('episodes.all')
+                : o.label}
             </option>
           ))}
         </select>
         <span className="text-sm text-stone-500">
-          {total} {familyFacing ? 'journey' : 'episode'}
-          {total === 1 ? '' : 's'}
+          {total}{' '}
+          {familyFacing
+            ? total === 1
+              ? t('episodes.journey')
+              : t('episodes.journeys')
+            : `episode${total === 1 ? '' : 's'}`}
         </span>
       </div>
 
@@ -127,9 +140,7 @@ export default function EpisodeListPage({
           </div>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-sm text-stone-500">
-            {familyFacing
-              ? 'No care journeys yet. After you submit a care request, your care team will start one.'
-              : 'No episodes yet. Complete intake review to create one.'}
+            {familyFacing ? t('episodes.empty') : 'No episodes yet. Complete intake review to create one.'}
           </p>
         ) : (
           rows.map((ep) => (
@@ -155,7 +166,9 @@ export default function EpisodeListPage({
                 <p className="mt-0.5 text-sm text-stone-500">
                   {ep.careRecipient?.name || ep.patient?.name || 'Patient'}
                   {!familyFacing && ep.urgencyLevel ? ` · ${ep.urgencyLevel}` : ''}
-                  {ep.createdAt ? ` · ${new Date(ep.createdAt).toLocaleDateString()}` : ''}
+                  {ep.createdAt
+                    ? ` · ${new Date(ep.createdAt).toLocaleDateString(familyFacing ? dateLocale : undefined)}`
+                    : ''}
                 </p>
                 {ep.reasonForCare && (
                   <p className="mt-1 line-clamp-2 text-sm text-stone-600 sm:line-clamp-1">

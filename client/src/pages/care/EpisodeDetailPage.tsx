@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -16,7 +17,9 @@ import {
   type ClinicianOption,
 } from '@/lib/api/assessments';
 import {
+  formatFamilyDateTime,
   familyEpisodeStatusLabel,
+  familySessionStatusLabel,
 } from '@/lib/familyLanguage';
 import { buildFamilyJourneyMilestones } from '@/lib/familyJourneyMilestones';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
@@ -174,6 +177,7 @@ export default function EpisodeDetailPage({
 
   const showAssessmentScheduleForm = canTransition;
   const familyFacing = canSchedule && !canTransition;
+  const { t } = useTranslation('family');
 
   const load = useCallback(async () => {
     if (!episodeId) return;
@@ -183,11 +187,11 @@ export default function EpisodeDetailPage({
       setEpisode(data);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error(familyFacing ? 'Failed to load care journey' : 'Failed to load episode');
+      else toast.error(familyFacing ? t('episodeDetail.loadError') : 'Failed to load episode');
     } finally {
       setLoading(false);
     }
-  }, [episodeId, familyFacing]);
+  }, [episodeId, familyFacing, t]);
 
   useEffect(() => {
     void load();
@@ -258,7 +262,7 @@ export default function EpisodeDetailPage({
   if (!episode) {
     return (
       <p className="text-stone-500">
-        {familyFacing ? 'Care journey not found.' : 'Episode not found.'}
+        {familyFacing ? t('episodeDetail.notFound') : 'Episode not found.'}
       </p>
     );
   }
@@ -272,7 +276,7 @@ export default function EpisodeDetailPage({
       <div>
         <Breadcrumb
           items={[
-            { label: familyFacing ? 'Care Journey' : 'Episodes', href: basePath },
+            { label: familyFacing ? t('episodeDetail.breadcrumb') : 'Episodes', href: basePath },
             { label: episode.title },
           ]}
         />
@@ -281,7 +285,7 @@ export default function EpisodeDetailPage({
           className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
         >
           <ArrowLeft className="size-4" />{' '}
-          {familyFacing ? 'Back to care journey' : 'Back to episodes'}
+          {familyFacing ? t('episodeDetail.back') : 'Back to episodes'}
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -312,10 +316,8 @@ export default function EpisodeDetailPage({
       {/* Family milestones (R5) or staff lifecycle stepper */}
       {familyFacing ? (
         <div className="rounded-2xl border bg-white shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-stone-900 mb-1">Your care journey</h3>
-          <p className="text-sm text-stone-500 mb-4">
-            Simple milestones so you always know what comes next.
-          </p>
+          <h3 className="text-sm font-semibold text-stone-900 mb-1">{t('episodeDetail.milestones')}</h3>
+          <p className="text-sm text-stone-500 mb-4">{t('milestones.hint')}</p>
           <ol className="space-y-3">
             {familyMilestones.map((m, i) => (
               <li key={m.id} className="flex items-start gap-3">
@@ -347,12 +349,12 @@ export default function EpisodeDetailPage({
                     {m.label}
                     {m.locked && (
                       <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
-                        Coming soon
+                        {t('milestones.comingSoon')}
                       </span>
                     )}
                     {m.current && !m.locked && (
                       <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700">
-                        Now
+                        {t('milestones.now')}
                       </span>
                     )}
                   </p>
@@ -467,11 +469,13 @@ export default function EpisodeDetailPage({
       {/* Care / clinical summary */}
       <div className="rounded-2xl border bg-white shadow-sm p-5">
         <h3 className="text-sm font-semibold text-stone-900 mb-3">
-          {familyFacing ? 'Care summary' : 'Clinical summary'}
+          {familyFacing ? t('episodeDetail.careSummary') : 'Clinical summary'}
         </h3>
         <dl className="grid gap-3 sm:grid-cols-2 text-sm">
           <div className="sm:col-span-2">
-            <dt className="text-xs font-semibold text-stone-500">Reason for care</dt>
+            <dt className="text-xs font-semibold text-stone-500">
+              {familyFacing ? t('episodeDetail.reasonForCare') : 'Reason for care'}
+            </dt>
             <dd className="mt-0.5 text-stone-900">{episode.reasonForCare || '—'}</dd>
           </div>
           {!familyFacing && (
@@ -520,25 +524,37 @@ export default function EpisodeDetailPage({
 
       {/* Timeline */}
       <div className="rounded-2xl border bg-white shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-stone-900 mb-3">Timeline</h3>
+        <h3 className="text-sm font-semibold text-stone-900 mb-1">
+          {familyFacing ? t('episodeDetail.timeline') : 'Timeline'}
+        </h3>
+        {familyFacing && (
+          <p className="text-xs text-stone-500 mb-3">{t('episodeDetail.timelineHint')}</p>
+        )}
+        {!familyFacing && <div className="mb-3" />}
         <ol className="relative border-l border-stone-200 ml-3 space-y-4">
           <li className="ml-4">
             <span className="absolute -left-1.5 mt-1.5 size-3 rounded-full bg-amber-400" />
             <p className="text-sm font-medium text-stone-900">
-              {familyFacing ? 'Care request received' : 'Intake / episode created'}
+              {familyFacing ? t('episodeDetail.requestReceived') : 'Intake / episode created'}
             </p>
             <p className="text-xs text-stone-500">
-              {episode.createdAt ? new Date(episode.createdAt).toLocaleString() : '—'}
+              {episode.createdAt
+                ? familyFacing
+                  ? formatFamilyDateTime(episode.createdAt)
+                  : new Date(episode.createdAt).toLocaleString()
+                : '—'}
             </p>
           </li>
           {episode.intakeReviewedAt && (
             <li className="ml-4">
               <span className="absolute -left-1.5 mt-1.5 size-3 rounded-full bg-teal-500" />
               <p className="text-sm font-medium text-stone-900">
-                {familyFacing ? 'Care team reviewed' : 'Intake reviewed'}
+                {familyFacing ? t('episodeDetail.teamReviewed') : 'Intake reviewed'}
               </p>
               <p className="text-xs text-stone-500">
-                {new Date(episode.intakeReviewedAt).toLocaleString()}
+                {familyFacing
+                  ? formatFamilyDateTime(episode.intakeReviewedAt)
+                  : new Date(episode.intakeReviewedAt).toLocaleString()}
               </p>
               {!familyFacing && intakeSummary && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -571,10 +587,18 @@ export default function EpisodeDetailPage({
               }`}
             />
             <p className="text-sm font-medium text-stone-900">
-              Current: {displayEpisodeStatus(episode.status, familyFacing)}
+              {familyFacing
+                ? t('episodeDetail.current', {
+                    status: displayEpisodeStatus(episode.status, familyFacing),
+                  })
+                : `Current: ${displayEpisodeStatus(episode.status, familyFacing)}`}
             </p>
             <p className="text-xs text-stone-500">
-              {episode.updatedAt ? new Date(episode.updatedAt).toLocaleString() : '—'}
+              {episode.updatedAt
+                ? familyFacing
+                  ? formatFamilyDateTime(episode.updatedAt)
+                  : new Date(episode.updatedAt).toLocaleString()
+                : '—'}
             </p>
           </li>
           <li className="ml-4">
@@ -584,13 +608,13 @@ export default function EpisodeDetailPage({
               }`}
             />
             <p className="text-sm font-medium text-stone-900">
-              {familyFacing ? 'Care sessions' : 'Assessments'}
+              {familyFacing ? t('episodeDetail.careSessions') : 'Assessments'}
             </p>
             <p className="text-xs text-stone-500">
               {familyFacing
                 ? (episode.sessions?.length ?? 0) > 0
-                  ? `${episode.sessions!.length} booked`
-                  : 'None booked yet'
+                  ? t('episodeDetail.sessionsBooked', { count: episode.sessions!.length })
+                  : t('episodeDetail.noSessions')
                 : (episode.assessments?.length ?? 0) > 0
                   ? `${episode.assessments!.length} linked`
                   : 'None scheduled yet'}
@@ -626,6 +650,7 @@ export default function EpisodeDetailPage({
                   <StaffPersonCard
                     staff={a.assessor as PublicStaffCard}
                     variant="clinician"
+                    localize={familyFacing}
                   />
                 ) : null}
               </li>
@@ -699,20 +724,25 @@ export default function EpisodeDetailPage({
       {/* Sessions */}
       <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-stone-900">Sessions</h3>
+          <h3 className="text-sm font-semibold text-stone-900">
+            {familyFacing ? t('episodeDetail.careSessions') : 'Sessions'}
+          </h3>
           {familyFacing && episode.status !== 'closed' ? (
             <Link
               to={`/family/bookings/book?episodeId=${episode.id}`}
               className="rounded-xl bg-teal-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-teal-700"
             >
-              Book session
+              {t('episodeDetail.bookSession')}
             </Link>
           ) : null}
         </div>
+        {familyFacing && (
+          <p className="text-xs text-stone-500">{t('episodeDetail.sessionsHint')}</p>
+        )}
         {(episode.sessions?.length ?? 0) === 0 ? (
           <p className="text-sm text-stone-500">
             {familyFacing
-              ? 'No care sessions yet. Book an open slot with your assigned clinician.'
+              ? t('episodeDetail.noSessions')
               : 'No care sessions scheduled for this episode yet.'}
           </p>
         ) : (
@@ -721,15 +751,29 @@ export default function EpisodeDetailPage({
               <li key={s.id} className="rounded-xl bg-stone-50 px-3 py-3 text-sm space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-stone-900">
-                    {s.scheduledAt ? new Date(s.scheduledAt).toLocaleString() : 'Session'}
-                    {s.durationMinutes ? ` · ${s.durationMinutes} min` : ''}
+                    {s.scheduledAt
+                      ? familyFacing
+                        ? formatFamilyDateTime(s.scheduledAt)
+                        : new Date(s.scheduledAt).toLocaleString()
+                      : 'Session'}
+                    {s.durationMinutes && familyFacing
+                      ? ` · ${t('common.min', { count: s.durationMinutes })}`
+                      : s.durationMinutes
+                        ? ` · ${s.durationMinutes} min`
+                        : ''}
                   </span>
                   <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-900 capitalize">
-                    {(s.status || 'scheduled').replace(/_/g, ' ')}
+                    {familyFacing
+                      ? familySessionStatusLabel(s.status || 'pending')
+                      : (s.status || 'scheduled').replace(/_/g, ' ')}
                   </span>
                 </div>
                 {s.provider ? (
-                  <StaffPersonCard staff={s.provider as PublicStaffCard} variant="support" />
+                  <StaffPersonCard
+                    staff={s.provider as PublicStaffCard}
+                    variant="support"
+                    localize={familyFacing}
+                  />
                 ) : null}
               </li>
             ))}

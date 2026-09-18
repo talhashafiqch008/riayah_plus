@@ -3,7 +3,7 @@ import { useI18n } from '@/components/I18nProvider';
 import { fontBody, fontArabic } from './tokens';
 
 interface LanguageSwitcherProps {
-  variant?: 'nav' | 'footer' | 'mobile';
+  variant?: 'nav' | 'footer' | 'mobile' | 'dashboard';
   className?: string;
 }
 
@@ -54,6 +54,21 @@ export function LanguageSwitcher({ variant = 'nav', className = '' }: LanguageSw
         <span className="rounded-md bg-white px-2.5 py-1 text-xs font-bold text-[#0D9488] shadow-sm">
           {language === 'ar' ? 'English' : 'العربية'}
         </span>
+      </button>
+    );
+  }
+
+  // Dashboard header: compact stone/teal pill
+  if (variant === 'dashboard') {
+    return (
+      <button
+        type="button"
+        onClick={toggleLanguage}
+        aria-label={language === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
+        className={`inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800 active:scale-95 ${className}`}
+      >
+        <Globe className="h-3.5 w-3.5 text-teal-600" aria-hidden />
+        <span>{language === 'ar' ? 'English' : 'العربية'}</span>
       </button>
     );
   }

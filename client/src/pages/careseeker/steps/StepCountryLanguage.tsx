@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { m } from "framer-motion";
 import { ArrowRight, MapPin, Languages, Users, User, HeartHandshake, Check, Briefcase } from "lucide-react";
 
@@ -104,7 +105,9 @@ interface StepCountryLanguageProps {
 }
 
 export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 'careseeker' }: StepCountryLanguageProps) {
+ const { t } = useTranslation('family');
  const showRoleDetails = variant === 'family';
+ const isFamily = variant === 'family';
  const isValid = data.country && data.preferredLanguage && data.careRecipientType;
  const [showCountryPicker, setShowCountryPicker] = useState(false);
 
@@ -152,8 +155,12 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  <MapPin className="size-5 text-teal-600" />
  </div>
  <div>
- <h3 className="text-lg font-semibold text-stone-900">Location</h3>
- <p className="text-xs text-stone-500">Detected from your device</p>
+ <h3 className="text-lg font-semibold text-stone-900">
+ {isFamily ? t('onboarding.locationSectionTitle') : 'Location'}
+ </h3>
+ <p className="text-xs text-stone-500">
+ {isFamily ? t('onboarding.locationSectionHint') : 'Detected from your device'}
+ </p>
  </div>
  </div>
 
@@ -163,9 +170,13 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  <span className="text-3xl shrink-0">{selectedCountry.flag}</span>
  <div className="min-w-0">
  <p className="text-sm font-bold text-stone-900 uppercase tracking-wide">
- {selectedCountry.label}
+ {isFamily
+ ? t(`onboarding.countries.${selectedCountry.code}`, { defaultValue: selectedCountry.label })
+ : selectedCountry.label}
  </p>
- <p className="text-xs text-stone-500 mt-0.5">Detected from your device</p>
+ <p className="text-xs text-stone-500 mt-0.5">
+ {isFamily ? t('onboarding.detectedFromDevice') : 'Detected from your device'}
+ </p>
  </div>
  </div>
  <button
@@ -173,7 +184,13 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  onClick={() => setShowCountryPicker((v) => !v)}
  className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline underline-offset-2 shrink-0"
  >
- {showCountryPicker ? 'Close' : 'Change'}
+ {showCountryPicker
+ ? isFamily
+ ? t('onboarding.close')
+ : 'Close'
+ : isFamily
+ ? t('onboarding.change')
+ : 'Change'}
  </button>
  </div>
 
@@ -188,7 +205,9 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  >
  <span className="text-xl block mb-0.5">{country.flag}</span>
  <span className={`text-xs font-bold uppercase tracking-wide ${data.country === country.code ? 'text-white' : 'text-stone-600'}`}>
- {country.label}
+ {isFamily
+ ? t(`onboarding.countries.${country.code}`, { defaultValue: country.label })
+ : country.label}
  </span>
  </button>
  ))}
@@ -204,8 +223,12 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  <Languages className="size-5 text-teal-600" />
  </div>
  <div>
- <h3 className="text-lg font-semibold text-stone-900">Language</h3>
- <p className="text-xs text-stone-500">Preferred for communication</p>
+ <h3 className="text-lg font-semibold text-stone-900">
+ {isFamily ? t('onboarding.languageSectionTitle') : 'Language'}
+ </h3>
+ <p className="text-xs text-stone-500">
+ {isFamily ? t('onboarding.languageSectionHint') : 'Preferred for communication'}
+ </p>
  </div>
  </div>
 
@@ -214,9 +237,18 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  <button
  key={lang.code}
  onClick={() => onUpdate({ preferredLanguage: lang.code })}
- className={`px-4 py-2 rounded-xl border-2 transition-transform duration-300 text-sm font-bold ${data.preferredLanguage === lang.code ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50' }`}
+ className={`px-4 py-2 rounded-xl border-2 transition-transform duration-300 text-sm font-bold flex flex-col items-center ${data.preferredLanguage === lang.code ? 'border-teal-500 bg-teal-600 text-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50' }`}
  >
- {lang.label}
+ <span>
+ {isFamily
+ ? t(`onboarding.languages.${lang.code}`, { defaultValue: lang.label })
+ : lang.label}
+ </span>
+ {isFamily && lang.native ? (
+ <span className="text-[10px] font-normal opacity-80" dir="auto">
+ {lang.native}
+ </span>
+ ) : null}
  </button>
  ))}
  </div>
@@ -232,8 +264,12 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  <HeartHandshake className="size-6 text-teal-600" />
  </div>
  <div>
- <h2 className="text-2xl font-semibold text-stone-900 leading-none">Who needs care?</h2>
- <p className="text-stone-500 mt-1">Select the type of account you'd like to create.</p>
+ <h2 className="text-2xl font-semibold text-stone-900 leading-none">
+ {isFamily ? t('onboarding.stepTitles.whoNeedsCare') : 'Who needs care?'}
+ </h2>
+ <p className="text-stone-500 mt-1">
+ {isFamily ? t('onboarding.selectAccountType') : "Select the type of account you'd like to create."}
+ </p>
  </div>
  </div>
 
@@ -241,6 +277,17 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  {visibleAccountTypes.map((type, index) => {
  const isSelected = data.careRecipientType === type.id;
  const Icon = type.icon;
+
+ const accountKey = type.id === 'myself' || type.id === 'family_member' ? type.id : null;
+ const title = isFamily && accountKey ? t(`onboarding.accounts.${accountKey}.title`) : type.title;
+ const subtitle =
+ isFamily && accountKey ? t(`onboarding.accounts.${accountKey}.subtitle`) : type.subtitle;
+ const description =
+ isFamily && accountKey ? t(`onboarding.accounts.${accountKey}.description`) : type.description;
+ const detailLines =
+ isFamily && type.id === 'family_member'
+ ? ([0, 1, 2] as const).map((i) => t(`onboarding.accounts.family_member.details.${i}`))
+ : type.details;
 
  return (
  <m.button
@@ -260,20 +307,20 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  <div className="flex-1 w-full">
  <div className="flex justify-between items-start w-full">
  <span className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isSelected ? 'text-stone-900' : 'text-stone-400'}`}>
- {type.subtitle}
+ {subtitle}
  </span>
  {isSelected && <Check className="size-5 text-stone-900" />}
  </div>
 
  <h3 className={`text-lg font-semibold mb-2 text-stone-900`}>
- {type.title}
+ {title}
  </h3>
  <p className="text-sm text-stone-500 leading-relaxed">
- {type.description}
+ {description}
  </p>
- {showRoleDetails && type.details.length > 0 && (
+ {showRoleDetails && detailLines.length > 0 && (
  <ul className="mt-3 space-y-1.5">
- {type.details.map((line) => (
+ {detailLines.map((line) => (
  <li key={line} className="text-xs text-stone-500 flex items-start gap-1.5">
  <span className="mt-1 size-1 rounded-full bg-teal-500 shrink-0" />
  <span>{line}</span>
@@ -301,8 +348,8 @@ export default function StepCountryLanguage({ data, onUpdate, onNext, variant = 
  whileTap={isValid ? { scale: 0.98 } : {}}
  className="px-8 py-4 bg-teal-600 text-white hover:bg-teal-700 font-bold rounded-2xl shadow-xl shadow-stone-900/10 hover:shadow-2xl hover:bg-stone-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-transform duration-300 flex items-center gap-2"
  >
- Continue
- <ArrowRight className="size-5" />
+ {isFamily ? t('onboarding.continue') : 'Continue'}
+ <ArrowRight className={`size-5${isFamily ? ' rtl-flip' : ''}`} />
  </m.button>
  </m.div>
  </div>

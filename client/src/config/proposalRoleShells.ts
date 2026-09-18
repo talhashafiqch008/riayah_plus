@@ -37,7 +37,7 @@ export interface RoleShellConfig {
   dashboard: {
     title: string;
     description: string;
-    stats: { label: string; value: string }[];
+    stats: { label: string; value: string; id?: string }[];
     nextSteps: string[];
   };
 }
@@ -66,9 +66,9 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       description:
         'Request care, follow your care journey, and stay informed — our care team handles the clinical details.',
       stats: [
-        { label: 'Active care journeys', value: '—' },
-        { label: 'Upcoming appointments', value: '—' },
-        { label: 'Unread alerts', value: '—' },
+        { id: 'activeJourneys', label: 'Active care journeys', value: '—' },
+        { id: 'upcomingSessions', label: 'Upcoming appointments', value: '—' },
+        { id: 'unreadAlerts', label: 'Unread alerts', value: '—' },
       ],
       nextSteps: [
         'Submit or update a care request',
@@ -262,4 +262,11 @@ export function getShellNavLabel(shell: RoleShellConfig, pathname: string): stri
         : pathname === nav.href || pathname.startsWith(`${nav.href}/`),
   );
   return item?.name ?? shell.portalTitle;
+}
+
+/** Stable i18n key for family nav items (e.g. `/family/care-plans` → `care-plans`). */
+export function familyNavKey(href: string, basePath = '/family'): string {
+  if (href === basePath) return 'dashboard';
+  const rest = href.startsWith(`${basePath}/`) ? href.slice(basePath.length + 1) : href.replace(/^\//, '');
+  return rest.split('/')[0] || 'dashboard';
 }

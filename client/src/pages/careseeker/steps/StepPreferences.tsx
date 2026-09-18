@@ -1,5 +1,6 @@
 
 import { m, LazyMotion, domAnimation } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
  ArrowRight, ArrowLeft, Check,
  User, Users, UserRound,
@@ -48,6 +49,22 @@ const LANGUAGE_OPTIONS = [
  { code: 'Malayalam', label: 'മലയാളം', enLabel: 'Malayalam', flag: '🇮🇳' },
 ];
 
+const PREFERRED_LANG_I18N: Record<string, string> = {
+  Arabic: 'ARABIC',
+  English: 'ENGLISH',
+  Tagalog: 'TAGALOG',
+  Hindi: 'HINDI',
+  Urdu: 'URDU',
+  Bengali: 'BENGALI',
+  Malayalam: 'MALAYALAM',
+};
+
+function careLocationEnumKey(id: string): string {
+  if (id === 'remote') return 'telehealth';
+  if (id === 'both') return 'flexible';
+  return id;
+}
+
 const LOCATION_OPTIONS = [
  {
  id: 'home',
@@ -85,9 +102,12 @@ interface StepPreferencesProps {
  onUpdate: (data: Record<string, unknown>) => void;
  onNext: () => void;
  onBack: () => void;
+ variant?: 'careseeker' | 'family';
 }
 
-export default function StepPreferences({ data, onUpdate, onNext, onBack }: StepPreferencesProps) {
+export default function StepPreferences({ data, onUpdate, onNext, onBack, variant = 'careseeker' }: StepPreferencesProps) {
+ const { t } = useTranslation('family');
+ const isFamily = variant === 'family';
  const selectedLanguages: string[] = (data.languages as string[]) || [];
 
  const toggleLanguage = (lang: string) => {
@@ -108,8 +128,12 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  <Heart className="size-6 text-teal-600" />
  </div>
  <div>
- <h2 className="text-2xl font-semibold text-stone-900 leading-none">Provider Preferences</h2>
- <p className="text-stone-500 mt-1">Customize your ideal care provider.</p>
+ <h2 className="text-2xl font-semibold text-stone-900 leading-none">
+ {isFamily ? t('onboarding.stepTitles.preferences') : 'Provider Preferences'}
+ </h2>
+ <p className="text-stone-500 mt-1">
+ {isFamily ? t('onboarding.preferencesHint') : 'Customize your ideal care provider.'}
+ </p>
  </div>
  </div>
  </m.div>
@@ -118,8 +142,12 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  <m.div {...fadeIn} transition={{ delay: 0.1 }}>
  <div className="flex items-center gap-2 mb-4">
  <User className="size-5 text-teal-600" />
- <h3 className="font-semibold text-stone-900">Provider Gender</h3>
- <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">Required</span>
+ <h3 className="font-semibold text-stone-900">
+ {isFamily ? t('onboarding.providerGender') : 'Provider Gender'}
+ </h3>
+ <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">
+ {isFamily ? t('onboarding.required') : 'Required'}
+ </span>
  </div>
  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
  {GENDER_OPTIONS.map((option, index) => {
@@ -142,9 +170,13 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  <Icon className="size-6" strokeWidth={2.5} />
  </div>
  <span className={`font-bold text-lg mb-1 ${isSelected ? 'text-stone-900' : 'text-stone-700'}`}>
- {option.label}
+ {isFamily ? t(`enums.gender.${option.id}`, { defaultValue: option.label }) : option.label}
  </span>
- <span className="text-xs text-stone-400">{option.description}</span>
+ <span className="text-xs text-stone-400">
+ {isFamily
+ ? t(`enums.genderHint.${option.id}`, { defaultValue: option.description })
+ : option.description}
+ </span>
 
  {isSelected && (
  <div className="absolute top-4 right-4 text-stone-900">
@@ -161,12 +193,21 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  <m.div {...fadeIn} transition={{ delay: 0.15 }}>
  <div className="flex items-center gap-2 mb-4">
  <Languages className="size-5 text-teal-600" />
- <h3 className="font-semibold text-stone-900">Spoken Languages</h3>
- <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-500 rounded-full uppercase tracking-wide">Optional</span>
+ <h3 className="font-semibold text-stone-900">
+ {isFamily ? t('onboarding.spokenLanguages') : 'Spoken Languages'}
+ </h3>
+ <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-500 rounded-full uppercase tracking-wide">
+ {isFamily ? t('onboarding.optional') : 'Optional'}
+ </span>
  </div>
  <div className="flex flex-wrap gap-3">
- {LANGUAGE_OPTIONS.map((lang, index) => {
+ {LANGUAGE_OPTIONS.map((lang) => {
  const isSelected = selectedLanguages.includes(lang.code);
+ const langKey = PREFERRED_LANG_I18N[lang.code];
+ const chipLabel =
+ isFamily && langKey
+ ? t(`onboarding.languages.${langKey}`, { defaultValue: lang.enLabel })
+ : lang.label;
  return (
  <m.button
  key={lang.code}
@@ -177,10 +218,10 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  >
  <span className="text-xl leading-none grayscale group-hover:grayscale-0 transition-transform duration-300">{lang.flag}</span>
  <div className="flex flex-col items-start -gap-0.5">
- <span>{lang.label}</span>
+ <span>{chipLabel}</span>
  {lang.label !== lang.enLabel && (
- <span className={`text-[10px] ${isSelected ? 'text-stone-400' : 'text-stone-400'}`}>
- {lang.enLabel}
+ <span className={`text-[10px] ${isSelected ? 'text-stone-400' : 'text-stone-400'}`} dir="auto">
+ {lang.label}
  </span>
  )}
  </div>
@@ -195,8 +236,12 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  <m.div {...fadeIn} transition={{ delay: 0.2 }}>
  <div className="flex items-center gap-2 mb-4">
  <MapPin className="size-5 text-teal-600" />
- <h3 className="font-semibold text-stone-900">Care Location</h3>
- <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">Required</span>
+ <h3 className="font-semibold text-stone-900">
+ {isFamily ? t('onboarding.careLocation') : 'Care Location'}
+ </h3>
+ <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">
+ {isFamily ? t('onboarding.required') : 'Required'}
+ </span>
  </div>
  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
  {LOCATION_OPTIONS.map((option, index) => {
@@ -216,9 +261,17 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  </div>
 
  <span className={`font-bold text-lg block mb-1 ${isSelected ? 'text-stone-900' : 'text-stone-800'}`}>
- {option.label}
+ {isFamily
+ ? t(`enums.careLocation.${careLocationEnumKey(option.id)}`, { defaultValue: option.label })
+ : option.label}
  </span>
- <span className="text-xs text-stone-500">{option.description}</span>
+ <span className="text-xs text-stone-500">
+ {isFamily
+ ? t(`enums.careLocationHint.${careLocationEnumKey(option.id)}`, {
+ defaultValue: option.description,
+ })
+ : option.description}
+ </span>
 
  {isSelected && (
  <div className="absolute top-5 right-5 text-stone-900">
@@ -240,14 +293,18 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  className="overflow-hidden"
  >
  <div className="pt-2">
- <label htmlFor="street-address---area" className="block text-sm font-bold text-stone-700 mb-2 ml-1">Street Address / Area</label>
+ <label htmlFor="street-address---area" className="block text-sm font-bold text-stone-700 mb-2 ml-1">
+ {isFamily ? t('onboarding.streetAddress') : 'Street Address / Area'}
+ </label>
  <div className="relative">
  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-stone-400" />
  <input id="street-address---area"
  type="text"
  value={(data.address as string) || ''}
  onChange={(e) => onUpdate({ address: e.target.value })}
- placeholder="e.g. West Bay, Doha..."
+ placeholder={
+ isFamily ? t('onboarding.streetAddressPlaceholder') : 'e.g. West Bay, Doha...'
+ }
  className="w-full p-4 pl-12 border-2 border-stone-200 rounded-2xl focus:border-stone-900 focus:outline-none focus:ring-4 focus:ring-stone-100 transition-transform duration-300 bg-white"
  />
  </div>
@@ -267,7 +324,7 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  className="group flex items-center gap-2 text-stone-500 font-bold hover:text-stone-800 transition-colors px-4 py-2 rounded-xl hover:bg-stone-100"
  >
  <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
- Back
+ {isFamily ? t('onboarding.back') : 'Back'}
  </button>
  <m.button
  onClick={onNext}
@@ -276,8 +333,8 @@ export default function StepPreferences({ data, onUpdate, onNext, onBack }: Step
  whileTap={isValid ? { scale: 0.98 } : {}}
  className="px-8 py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-xl shadow-stone-900/20 hover:shadow-2xl hover:bg-stone-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-transform duration-300 flex items-center gap-2"
  >
- Continue
- <ArrowRight className="size-5" />
+ {isFamily ? t('onboarding.continue') : 'Continue'}
+ <ArrowRight className={`size-5${isFamily ? ' rtl-flip' : ''}`} />
  </m.button>
  </m.div>
  </div>

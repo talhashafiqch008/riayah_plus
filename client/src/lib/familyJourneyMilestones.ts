@@ -1,4 +1,5 @@
 import type { CareEpisode } from '@/lib/api/episodes';
+import i18n from '@/i18n/config';
 
 export type FamilyMilestone = {
   id: string;
@@ -26,6 +27,18 @@ function episodeProgressRank(status: string): number {
   }
 }
 
+function milestoneCopy(id: string, fallbackLabel: string, fallbackDescription: string) {
+  const label = i18n.t(`milestones.items.${id}.label`, {
+    ns: 'family',
+    defaultValue: fallbackLabel,
+  });
+  const description = i18n.t(`milestones.items.${id}.description`, {
+    ns: 'family',
+    defaultValue: fallbackDescription,
+  });
+  return { label, description };
+}
+
 /** Family-facing care journey milestones (R5). */
 export function buildFamilyJourneyMilestones(episode: CareEpisode): FamilyMilestone[] {
   const rank = episodeProgressRank(episode.status);
@@ -36,38 +49,40 @@ export function buildFamilyJourneyMilestones(episode: CareEpisode): FamilyMilest
   const raw: Omit<FamilyMilestone, 'current'>[] = [
     {
       id: 'received',
-      label: 'Request received',
-      description: 'Your care request is with our team.',
+      ...milestoneCopy('received', 'Request received', 'Your care request is with our team.'),
       done: true,
     },
     {
       id: 'reviewing',
-      label: 'Care team reviewing',
-      description: 'A coordinator is reviewing your request.',
+      ...milestoneCopy(
+        'reviewing',
+        'Care team reviewing',
+        'A coordinator is reviewing your request.',
+      ),
       done: rank >= 1,
     },
     {
       id: 'started',
-      label: 'Care journey started',
-      description: 'Your care journey is underway.',
+      ...milestoneCopy('started', 'Care journey started', 'Your care journey is underway.'),
       done: rank >= 2,
     },
     {
       id: 'booked',
-      label: 'Session booked',
-      description: 'A care session has been scheduled.',
+      ...milestoneCopy('booked', 'Session booked', 'A care session has been scheduled.'),
       done: sessionBooked,
     },
     {
       id: 'completed',
-      label: 'Session completed',
-      description: 'Your clinician has finished a care session.',
+      ...milestoneCopy(
+        'completed',
+        'Session completed',
+        'Your clinician has finished a care session.',
+      ),
       done: sessionCompleted,
     },
     {
       id: 'careplan',
-      label: 'Care plan ready',
-      description: 'Coming in a later release.',
+      ...milestoneCopy('careplan', 'Care plan ready', 'Coming in a later release.'),
       done: false,
       locked: true,
     },

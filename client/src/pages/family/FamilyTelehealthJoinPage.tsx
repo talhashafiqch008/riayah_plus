@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { ArrowLeft, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { getSession, type CareSession } from '@/lib/api/scheduling';
+import { familyDateLocale } from '@/lib/familyLanguage';
 import {
   grantTelehealthConsent,
   isLiveKitUrlReady,
@@ -23,6 +25,8 @@ export function FamilyAppointmentJoinRedirect() {
 }
 
 export default function FamilyTelehealthJoinPage() {
+  const { t } = useTranslation('family');
+  const dateLocale = familyDateLocale();
   const { sessionId = '' } = useParams();
   const [session, setSession] = useState<CareSession | null>(null);
   const [join, setJoin] = useState<TelehealthJoin | null>(null);
@@ -50,7 +54,7 @@ export default function FamilyTelehealthJoinPage() {
           setPaymentInvoiceId(telehealthPaymentInvoiceId(err));
           setNeedsConsent(false);
           setJoin(null);
-          setError(isApiError(err) ? err.message : 'Payment required before joining');
+          setError(isApiError(err) ? err.message : t('telehealthJoin.paymentRequired'));
           return null;
         }
         if (isTelehealthConsentRequired(err)) {
@@ -60,11 +64,11 @@ export default function FamilyTelehealthJoinPage() {
           setJoin(null);
           return null;
         }
-        setError(isApiError(err) ? err.message : 'Could not join the session');
+        setError(isApiError(err) ? err.message : t('telehealthJoin.joinFailed'));
         return null;
       }
     },
-    [],
+    [t],
   );
 
   const load = useCallback(async () => {
@@ -75,11 +79,11 @@ export default function FamilyTelehealthJoinPage() {
       setSession(row);
       await requestJoin(sessionJoinRoomName(row));
     } catch (err: unknown) {
-      toast.error(isApiError(err) ? err.message : 'Failed to open session');
+      toast.error(isApiError(err) ? err.message : t('telehealthJoin.openFailed'));
     } finally {
       setLoading(false);
     }
-  }, [requestJoin, sessionId]);
+  }, [requestJoin, sessionId, t]);
 
   useEffect(() => {
     void load();
@@ -100,9 +104,9 @@ export default function FamilyTelehealthJoinPage() {
     try {
       await grantTelehealthConsent();
       await requestJoin(sessionJoinRoomName(session));
-      toast.success('Consent saved');
+      toast.success(t('telehealthJoin.consentSaved'));
     } catch (err: unknown) {
-      toast.error(isApiError(err) ? err.message : 'Could not save consent');
+      toast.error(isApiError(err) ? err.message : t('telehealthJoin.consentFailed'));
     } finally {
       setBusy(false);
     }
@@ -145,7 +149,7 @@ export default function FamilyTelehealthJoinPage() {
         to="/family/telehealth"
         className="inline-flex items-center gap-1 text-sm font-semibold text-stone-600 hover:text-stone-900"
       >
-        <ArrowLeft className="size-4" /> Video sessions
+        <ArrowLeft className="size-4" /> {t('telehealthJoin.back')}
       </Link>
 
       <div className="rounded-xl border border-stone-100 bg-white p-6 shadow-sm">
@@ -155,11 +159,11 @@ export default function FamilyTelehealthJoinPage() {
           </div>
           <div>
             <h2 className="text-xl font-semibold text-stone-900">
-              {session?.provider?.name ?? 'Video session'}
+              {session?.provider?.name ?? t('telehealthJoin.title')}
             </h2>
             {session && (
               <p className="mt-1 text-sm text-stone-600">
-                {new Date(session.scheduledAt).toLocaleString('en-QA')}
+                {new Date(session.scheduledAt).toLocaleString(dateLocale)}
               </p>
             )}
           </div>
@@ -167,10 +171,7 @@ export default function FamilyTelehealthJoinPage() {
 
         {needsPayment && (
           <div className="mt-6 space-y-4">
-            <p className="text-sm text-stone-700">
-              Payment is required before you can join this video visit. Pay the invoice, then return
-              here to continue.
-            </p>
+            <p className="text-sm text-stone-700">{t('telehealthJoin.paymentRequired')}</p>
             {error && <p className="text-sm text-rose-700">{error}</p>}
             <div className="flex flex-wrap gap-3">
               {paymentInvoiceId ? (
@@ -178,14 +179,14 @@ export default function FamilyTelehealthJoinPage() {
                   to={`/family/billing/${paymentInvoiceId}`}
                   className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
                 >
-                  Pay invoice
+                  {t('telehealthJoin.payToJoin')}
                 </Link>
               ) : (
                 <Link
                   to="/family/billing"
                   className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
                 >
-                  Open billing
+                  {t('telehealthJoin.payToJoin')}
                 </Link>
               )}
               <button
@@ -193,7 +194,7 @@ export default function FamilyTelehealthJoinPage() {
                 onClick={() => void load()}
                 className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-800 hover:bg-stone-50"
               >
-                I&apos;ve paid — try again
+                {t('telehealthJoin.tryAgainPaid')}
               </button>
             </div>
           </div>
@@ -201,18 +202,17 @@ export default function FamilyTelehealthJoinPage() {
 
         {!needsPayment && needsConsent && (
           <div className="mt-6 space-y-4">
-            <p className="text-sm text-stone-700">
-              Before you join a video session, confirm you agree to receive care over a live video
-              call. Clinical details stay in the app — not on this screen.
-            </p>
+            <p className="text-sm font-medium text-stone-900">{t('telehealthJoin.consentTitle')}</p>
+            <p className="text-sm text-stone-700">{t('telehealthJoin.consentBody')}</p>
             <label className="flex items-start gap-2 text-sm text-stone-700">
               <input
                 type="checkbox"
                 className="mt-1"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
+                aria-label={t('telehealthJoin.consentCta')}
               />
-              I agree to join this telehealth session.
+              <span>{t('telehealthJoin.consentCta')}</span>
             </label>
             <button
               type="button"
@@ -220,17 +220,15 @@ export default function FamilyTelehealthJoinPage() {
               onClick={() => void onGrantConsent()}
               className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
             >
-              Save and continue
+              {busy ? t('telehealthJoin.joining') : t('telehealthJoin.consentCta')}
             </button>
           </div>
         )}
 
         {!needsPayment && !needsConsent && join?.phase === 'waiting' && (
           <div className="mt-6 space-y-3">
-            <p className="text-stone-800 font-medium">You are in the waiting room.</p>
-            <p className="text-sm text-stone-600">
-              Your clinician will admit you when they are ready. Keep this page open.
-            </p>
+            <p className="text-stone-800 font-medium">{t('telehealthJoin.waitingTitle')}</p>
+            <p className="text-sm text-stone-600">{t('telehealthJoin.waitingHint')}</p>
             <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
               <div className="h-full w-1/3 animate-pulse rounded-full bg-teal-500" />
             </div>
@@ -239,10 +237,9 @@ export default function FamilyTelehealthJoinPage() {
 
         {!needsPayment && !needsConsent && join?.phase === 'in_call' && (
           <div className="mt-6 space-y-2">
-            <p className="font-medium text-stone-800">You have been admitted.</p>
+            <p className="font-medium text-stone-800">{t('telehealthJoin.admittedTitle')}</p>
             <p className="text-sm text-stone-600">
-              Video will start here when the clinic call server is configured. You can stay on this
-              page — you are already in the session.
+              {t('telehealthJoin.admittedBody')}
             </p>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { m } from "framer-motion";
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Shield, Loader2, ArrowLeft, Sparkles, CheckSquare, Square } from "lucide-react";
 
 interface StepConsentProps {
@@ -17,21 +18,56 @@ const fadeIn = {
   animate: { opacity: 1, y: 0 },
 };
 
+const CONSENT_META = [
+  {
+    id: 'independentProviderAcknowledged',
+    i18nKey: 'independent' as const,
+    required: true,
+    icon: '🤝',
+  },
+  {
+    id: 'termsAccepted',
+    i18nKey: 'terms' as const,
+    required: true,
+    icon: '📋',
+  },
+  {
+    id: 'marketingConsentGranted',
+    i18nKey: 'marketing' as const,
+    required: false,
+    icon: '💌',
+  },
+];
+
+const DATA_BADGES = [
+  { i18nKey: 'encrypted' as const, icon: '🔐' },
+  { i18nKey: 'withdraw' as const, icon: '✓' },
+  { i18nKey: 'controlAccess' as const, icon: '👁️' },
+  { i18nKey: 'pdpl' as const, icon: '🛡️' },
+];
+
 export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmitting, isLoggedIn, variant = 'careseeker' }: StepConsentProps) {
+  const { t } = useTranslation('family');
   const isValid = data.independentProviderAcknowledged && data.termsAccepted;
   const isFamily = variant === 'family';
 
-  const categoryLabels: Record<string, string> = {
+  const categoryLabelsEn: Record<string, string> = {
     aged_care: 'Home Care',
     disability_support: 'Disability',
     child_family: 'Babysitting',
     allied_health: 'Therapy',
     home_support: 'Home Visit',
   };
+
   const categories = Array.isArray(data.careCategories)
-    ? (data.careCategories as string[]).map((c) => categoryLabels[c] ?? c)
+    ? (data.careCategories as string[]).map((c) =>
+        isFamily
+          ? t(`onboarding.categories.${c}.label`, { defaultValue: categoryLabelsEn[c] ?? c })
+          : categoryLabelsEn[c] ?? c,
+      )
     : [];
-  const roleLabel =
+
+  const roleLabelEn =
     data.careRecipientType === 'family_member'
       ? 'Family Guardian'
       : data.careRecipientType === 'myself'
@@ -40,29 +76,46 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
           ? 'Support Coordinator'
           : null;
 
-  const consents = [
-    {
-      id: 'independentProviderAcknowledged',
-      title: 'Independent Providers',
-      description: 'I understand providers on Raiyah Plus operate independently. Raiyah Plus connects you with providers but does not employ them.',
-      required: true,
-      icon: '🤝',
-    },
-    {
-      id: 'termsAccepted',
-      title: 'Terms & Privacy',
-      description: 'I agree to the Terms of Service and Privacy Policy.',
-      required: true,
-      icon: '📋',
-    },
-    {
-      id: 'marketingConsentGranted',
-      title: 'Updates & Tips',
-      description: 'Send me helpful care tips and provider updates. (Optional)',
-      required: false,
-      icon: '💌',
-    },
-  ];
+  const roleLabel =
+    isFamily && data.careRecipientType === 'family_member'
+      ? t('onboarding.accounts.family_member.title')
+      : isFamily && data.careRecipientType === 'myself'
+        ? t('onboarding.accounts.myself.title')
+        : roleLabelEn;
+
+  const scheduleLabel =
+    typeof data.scheduleType === 'string' && data.scheduleType
+      ? isFamily
+        ? t(`enums.schedule.${data.scheduleType}`, {
+            defaultValue: String(data.scheduleType).replace(/_/g, ' '),
+          })
+        : String(data.scheduleType).replace(/_/g, ' ')
+      : null;
+
+  const countryDisplay =
+    typeof data.country === 'string' && data.country
+      ? isFamily
+        ? t(`onboarding.countries.${data.country}`, { defaultValue: String(data.country) })
+        : String(data.country)
+      : null;
+
+  const consents = CONSENT_META.map((meta) => ({
+    ...meta,
+    title: isFamily
+      ? t(`onboarding.consent.${meta.i18nKey}.title`)
+      : meta.i18nKey === 'independent'
+        ? 'Independent Providers'
+        : meta.i18nKey === 'terms'
+          ? 'Terms & Privacy'
+          : 'Updates & Tips',
+    description: isFamily
+      ? t(`onboarding.consent.${meta.i18nKey}.description`)
+      : meta.i18nKey === 'independent'
+        ? 'I understand providers on Raiyah Plus operate independently. Raiyah Plus connects you with providers but does not employ them.'
+        : meta.i18nKey === 'terms'
+          ? 'I agree to the Terms of Service and Privacy Policy.'
+          : 'Send me helpful care tips and provider updates. (Optional)',
+  }));
 
   return (
     <div className="space-y-8">
@@ -73,10 +126,12 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
             <Sparkles className="size-6 text-teal-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-semibold text-stone-900 leading-none">Review & Confirm</h2>
+            <h2 className="text-2xl font-semibold text-stone-900 leading-none">
+              {isFamily ? t('onboarding.stepTitles.review') : 'Review & Confirm'}
+            </h2>
             <p className="text-stone-500 mt-1">
               {isFamily
-                ? 'Review your request, then accept the terms to finish.'
+                ? t('onboarding.reviewHint')
                 : 'Please review and accept the terms to finish.'}
             </p>
           </div>
@@ -85,22 +140,35 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
 
       {isFamily && (
         <m.div {...fadeIn} transition={{ delay: 0.05 }} className="p-5 rounded-[24px] bg-teal-50/80 border border-teal-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-2">Your request summary</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-2">
+            {t('onboarding.requestSummary')}
+          </p>
           <ul className="text-sm text-stone-700 space-y-1">
-            {roleLabel && <li>Account: <span className="font-semibold">{roleLabel}</span></li>}
-            {typeof data.country === 'string' && data.country && (
-              <li>Location: <span className="font-semibold">{String(data.country)}</span></li>
+            {roleLabel && (
+              <li>
+                {t('onboarding.accountLabel')}: <span className="font-semibold">{roleLabel}</span>
+              </li>
+            )}
+            {countryDisplay && (
+              <li>
+                {t('onboarding.locationLabel')}:{' '}
+                <span className="font-semibold">{countryDisplay}</span>
+              </li>
             )}
             {categories.length > 0 && (
-              <li>Support: <span className="font-semibold">{categories.join(', ')}</span></li>
+              <li>
+                {t('onboarding.supportLabel')}:{' '}
+                <span className="font-semibold">{categories.join(', ')}</span>
+              </li>
             )}
-            {typeof data.scheduleType === 'string' && data.scheduleType && (
-              <li>Schedule: <span className="font-semibold">{String(data.scheduleType).replace(/_/g, ' ')}</span></li>
+            {scheduleLabel && (
+              <li>
+                {t('onboarding.scheduleLabel')}:{' '}
+                <span className="font-semibold">{scheduleLabel}</span>
+              </li>
             )}
           </ul>
-          <p className="text-xs text-teal-800 mt-3">
-            After you submit, our care team will review your request before your consultation.
-          </p>
+          <p className="text-xs text-teal-800 mt-3">{t('onboarding.afterSubmit')}</p>
         </m.div>
       )}
 
@@ -130,7 +198,9 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
                   {consent.title}
                 </h3>
                 {consent.required && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">Required</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase tracking-wide">
+                    {isFamily ? t('onboarding.consent.required') : 'Required'}
+                  </span>
                 )}
               </div>
               <p className="text-sm text-stone-500 leading-relaxed">{consent.description}</p>
@@ -144,20 +214,28 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
         <div className="p-5 bg-stone-50 rounded-[24px] ring-1 ring-stone-200/50">
           <div className="flex items-center gap-2 mb-3">
             <Shield className="size-5 text-teal-600" />
-            <h3 className="font-semibold text-stone-900">Your Data Protection</h3>
+            <h3 className="font-semibold text-stone-900">
+              {isFamily ? t('onboarding.consent.dataProtection') : 'Your Data Protection'}
+            </h3>
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs text-stone-600 font-medium">
-            {[
-              { text: 'Encrypted & secure', icon: '🔐' },
-              { text: 'Withdraw anytime', icon: '✓' },
-              { text: 'You control access', icon: '👁️' },
-              { text: 'PDPL compliant', icon: '🛡️' },
-            ].map((item) => (
-              <div key={item.text} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-stone-200">
-                <span>{item.icon}</span>
-                <span>{item.text}</span>
-              </div>
-            ))}
+            {DATA_BADGES.map((item) => {
+              const textEn =
+                item.i18nKey === 'encrypted'
+                  ? 'Encrypted & secure'
+                  : item.i18nKey === 'withdraw'
+                    ? 'Withdraw anytime'
+                    : item.i18nKey === 'controlAccess'
+                      ? 'You control access'
+                      : 'PDPL compliant';
+              const text = isFamily ? t(`onboarding.consent.${item.i18nKey}`) : textEn;
+              return (
+                <div key={item.i18nKey} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-stone-200">
+                  <span>{item.icon}</span>
+                  <span dir={!isFamily ? 'auto' : undefined}>{text}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </m.div>
@@ -165,10 +243,10 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
       {/* Terms Links */}
       <div className="flex justify-center gap-6 text-xs font-medium text-stone-400">
         <Link to="/terms" target="_blank" className="hover:text-stone-900 hover:underline transition-colors flex items-center gap-1">
-          Terms of Service
+          {isFamily ? t('onboarding.consent.termsOfService') : 'Terms of Service'}
         </Link>
         <Link to="/privacy" target="_blank" className="hover:text-stone-900 hover:underline transition-colors flex items-center gap-1">
-          Privacy Policy
+          {isFamily ? t('onboarding.consent.privacyPolicy') : 'Privacy Policy'}
         </Link>
       </div>
 
@@ -184,7 +262,7 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
           className="group flex items-center gap-2 text-stone-500 font-bold hover:text-stone-800 transition-colors px-4 py-2 rounded-xl hover:bg-stone-100 disabled:opacity-50"
         >
           <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
-          Back
+          {isFamily ? t('onboarding.back') : 'Back'}
         </button>
         <m.button
           onClick={onSubmit}
@@ -201,7 +279,7 @@ export default function StepConsent({ data, onUpdate, onSubmit, onBack, isSubmit
           ) : (
             <>
               <CheckCircle className="size-5" />
-              {isFamily ? 'Finish & Submit Request' : 'Finish & Submit'}
+              {isFamily ? t('onboarding.finishSubmit') : 'Finish & Submit'}
             </>
           )}
         </m.button>

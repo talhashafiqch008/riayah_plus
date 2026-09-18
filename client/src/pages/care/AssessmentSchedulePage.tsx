@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, RefreshCw, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/lib/errors';
@@ -7,7 +8,7 @@ import {
   updateAssessment,
   type Assessment,
 } from '@/lib/api/assessments';
-import { familyAssessmentStatusLabel } from '@/lib/familyLanguage';
+import { familyAssessmentStatusLabel, familyDateLocale } from '@/lib/familyLanguage';
 import {
   RolePageHeader,
   RolePageShell,
@@ -40,6 +41,8 @@ export default function AssessmentSchedulePage({
   mode?: Mode;
 }) {
   const isFamily = mode === 'family';
+  const { t } = useTranslation('family');
+  const dateLocale = familyDateLocale();
   const [rows, setRows] = useState<Assessment[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -54,9 +57,9 @@ export default function AssessmentSchedulePage({
   const [reportUrl, setReportUrl] = useState('');
   const detailRef = useRef<HTMLDivElement>(null);
 
-  const title = isFamily ? 'Appointments' : 'Assessment Schedule';
+  const title = isFamily ? t('assessment.title') : 'Assessment Schedule';
   const description = isFamily
-    ? 'Consultations booked for your care journeys.'
+    ? t('assessment.description')
     : 'Assessments assigned to you — complete with findings and report.';
 
   const statusLabel = (value: string) =>
@@ -74,12 +77,12 @@ export default function AssessmentSchedulePage({
     } catch (error: unknown) {
       toast.error(
         extractApiError(error).message ||
-          (isFamily ? 'Failed to load appointments' : 'Failed to load assessments'),
+          (isFamily ? t('assessment.loadError') : 'Failed to load assessments'),
       );
     } finally {
       setLoading(false);
     }
-  }, [status, isFamily]);
+  }, [status, isFamily, t]);
 
   useEffect(() => {
     void load();
@@ -154,7 +157,7 @@ export default function AssessmentSchedulePage({
         description={description}
         actions={
           <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
-            <RefreshCw className="size-4" /> Refresh
+            <RefreshCw className="size-4" /> {isFamily ? t('common.refresh') : 'Refresh'}
           </button>
         }
       />
@@ -165,14 +168,22 @@ export default function AssessmentSchedulePage({
           onChange={(e) => setStatus(e.target.value)}
           className={`${fieldClass} sm:max-w-xs`}
         >
-          <option value="">All statuses</option>
-          <option value="scheduled">{isFamily ? 'Consultation booked' : 'Scheduled'}</option>
-          <option value="completed">{isFamily ? 'Consultation completed' : 'Completed'}</option>
+          <option value="">{isFamily ? t('episodes.all') : 'All statuses'}</option>
+          <option value="scheduled">
+            {isFamily ? t('assessment.consultationBooked') : 'Scheduled'}
+          </option>
+          <option value="completed">
+            {isFamily ? t('assessment.consultationCompleted') : 'Completed'}
+          </option>
           <option value="cancelled">Cancelled</option>
         </select>
         <span className="text-sm text-stone-500">
-          {total} {isFamily ? 'appointment' : 'result'}
-          {total === 1 ? '' : 's'}
+          {total}{' '}
+          {isFamily
+            ? total === 1
+              ? t('assessment.appointment')
+              : t('assessment.appointments')
+            : `result${total === 1 ? '' : 's'}`}
         </span>
       </div>
 
@@ -188,9 +199,7 @@ export default function AssessmentSchedulePage({
             </div>
           ) : rows.length === 0 ? (
             <p className="p-8 text-center text-sm text-stone-500">
-              {isFamily
-                ? 'No appointments yet. Book a consultation from your care journey.'
-                : 'No assessments match these filters.'}
+              {isFamily ? t('assessment.empty') : 'No assessments match these filters.'}
             </p>
           ) : (
             rows.map((row) => (
@@ -216,10 +225,10 @@ export default function AssessmentSchedulePage({
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-sm text-stone-500">
-                      {row.episode?.title || (isFamily ? 'Care journey' : 'Episode')}
+                      {row.episode?.title || (isFamily ? t('assessment.careJourney') : 'Episode')}
                     </p>
                     <p className="mt-0.5 text-xs text-stone-400">
-                      {new Date(row.scheduledAt).toLocaleString()}
+                      {new Date(row.scheduledAt).toLocaleString(isFamily ? dateLocale : undefined)}
                       {row.assessor?.name ? ` · ${row.assessor.name}` : ''}
                     </p>
                   </div>
@@ -361,7 +370,7 @@ export default function AssessmentSchedulePage({
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">
-                    {isFamily ? 'Care journey' : 'Episode'}
+                    {isFamily ? t('assessment.careJourney') : 'Episode'}
                   </dt>
                   <dd className="mt-0.5 break-words text-stone-900">
                     {selected.episode?.title || '—'}
@@ -370,18 +379,18 @@ export default function AssessmentSchedulePage({
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">Scheduled</dt>
                   <dd className="mt-0.5 text-stone-900">
-                    {new Date(selected.scheduledAt).toLocaleString()}
+                    {new Date(selected.scheduledAt).toLocaleString(isFamily ? dateLocale : undefined)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">
-                    {isFamily ? 'Clinician' : 'Assessor'}
+                    {isFamily ? t('assessment.clinician') : 'Assessor'}
                   </dt>
                   <dd className="mt-0.5 text-stone-900">{selected.assessor?.name || '—'}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold text-stone-500">
-                    {isFamily ? 'Visit summary' : 'Report'}
+                    {isFamily ? t('assessment.visitSummary') : 'Report'}
                   </dt>
                   <dd className="mt-0.5 text-stone-900">
                     {selected.reportUrl ? (
@@ -402,7 +411,7 @@ export default function AssessmentSchedulePage({
               {selected.findings && (
                 <div>
                   <p className="mb-2 text-xs font-semibold text-stone-500">
-                    {isFamily ? 'Visit notes' : 'Findings'}
+                    {isFamily ? t('assessment.visitNotes') : 'Findings'}
                   </p>
                   <dl className="grid gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-2">
                     {Object.entries(selected.findings)

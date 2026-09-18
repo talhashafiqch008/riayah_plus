@@ -1,15 +1,13 @@
 import { User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { PublicStaffCard } from '@/lib/api/staffProfile';
 import { resolveMediaUrl } from '@/lib/api/staffProfile';
+import { familyStaffRoleLabel } from '@/lib/familyLanguage';
 
-function roleLabel(role: string): string {
-  return role.replace(/_/g, ' ');
-}
-
-function specialtyLine(staff: PublicStaffCard): string {
+function specialtyLine(staff: PublicStaffCard, roleText: string): string {
   const specialty = staff.specialties?.[0];
-  if (specialty) return `${roleLabel(staff.role)} — ${specialty}`;
-  return roleLabel(staff.role);
+  if (specialty) return `${roleText} — ${specialty}`;
+  return roleText;
 }
 
 interface StaffPersonCardProps {
@@ -17,13 +15,17 @@ interface StaffPersonCardProps {
   /** clinician = assessments; support = sessions */
   variant?: 'clinician' | 'support' | 'compact';
   className?: string;
+  /** Translate chrome labels (Languages, Areas, role slug) via family i18n. */
+  localize?: boolean;
 }
 
 export default function StaffPersonCard({
   staff,
   variant = 'compact',
   className = '',
+  localize = false,
 }: StaffPersonCardProps) {
+  const { t } = useTranslation('family');
   const languages = (staff.languages ?? []).slice(0, 4).join(', ');
   const bio = staff.bio?.trim();
   const bioLine = bio
@@ -31,6 +33,10 @@ export default function StaffPersonCard({
       ? `${bio.slice(0, 97)}…`
       : bio
     : null;
+
+  const roleText = localize
+    ? familyStaffRoleLabel(staff.role)
+    : staff.role.replace(/_/g, ' ');
 
   return (
     <div
@@ -49,19 +55,29 @@ export default function StaffPersonCard({
       </div>
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="font-semibold text-stone-900 truncate">{staff.name}</p>
-        <p className="text-xs font-medium text-teal-700 capitalize">{specialtyLine(staff)}</p>
+        <p className="text-xs font-medium text-teal-700 capitalize">
+          {specialtyLine(staff, roleText)}
+        </p>
         {variant === 'clinician' && (
           <>
             {languages ? (
-              <p className="text-xs text-stone-500">Languages: {languages}</p>
+              <p className="text-xs text-stone-500">
+                {localize ? t('staffCard.languages', { list: languages }) : `Languages: ${languages}`}
+              </p>
             ) : null}
             {staff.yearsExperience != null ? (
               <p className="text-xs text-stone-500">
-                {staff.yearsExperience} yr{staff.yearsExperience === 1 ? '' : 's'} experience
+                {localize
+                  ? t('staffCard.experience', { count: staff.yearsExperience })
+                  : `${staff.yearsExperience} yr${staff.yearsExperience === 1 ? '' : 's'} experience`}
               </p>
             ) : null}
             {staff.mohLicenseNumber ? (
-              <p className="text-xs text-stone-500">MOH: {staff.mohLicenseNumber}</p>
+              <p className="text-xs text-stone-500">
+                {localize
+                  ? t('staffCard.moh', { number: staff.mohLicenseNumber })
+                  : `MOH: ${staff.mohLicenseNumber}`}
+              </p>
             ) : null}
             {bioLine ? <p className="text-xs text-stone-500 line-clamp-1">{bioLine}</p> : null}
           </>
@@ -69,11 +85,17 @@ export default function StaffPersonCard({
         {variant === 'support' && (
           <>
             {languages ? (
-              <p className="text-xs text-stone-500">Languages: {languages}</p>
+              <p className="text-xs text-stone-500">
+                {localize ? t('staffCard.languages', { list: languages }) : `Languages: ${languages}`}
+              </p>
             ) : null}
             {(staff.serviceAreas ?? []).length > 0 ? (
               <p className="text-xs text-stone-500">
-                Areas: {(staff.serviceAreas ?? []).slice(0, 3).join(', ')}
+                {localize
+                  ? t('staffCard.areas', {
+                      list: (staff.serviceAreas ?? []).slice(0, 3).join(', '),
+                    })
+                  : `Areas: ${(staff.serviceAreas ?? []).slice(0, 3).join(', ')}`}
               </p>
             ) : null}
             {bioLine ? <p className="text-xs text-stone-500 line-clamp-1">{bioLine}</p> : null}

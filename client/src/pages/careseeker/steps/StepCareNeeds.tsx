@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
 import {
  ArrowRight, ArrowLeft, Check,
@@ -91,9 +92,12 @@ interface StepCareNeedsProps {
  onUpdate: (data: Record<string, unknown>) => void;
  onNext: () => void;
  onBack: () => void;
+ variant?: 'careseeker' | 'family';
 }
 
-export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCareNeedsProps) {
+export default function StepCareNeeds({ data, onUpdate, onNext, onBack, variant = 'careseeker' }: StepCareNeedsProps) {
+ const { t } = useTranslation('family');
+ const isFamily = variant === 'family';
  // Determine active category for detail view (last selected or manually toggled)
  const [activeDetailId, setActiveDetailId] = useState<string | null>(
  (data.careCategories as string[])?.[0] || null
@@ -152,8 +156,12 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  <Activity className="size-6 text-teal-600" />
  </div>
  <div>
- <h2 className="text-2xl font-semibold text-stone-900 leading-none">What support do you need?</h2>
- <p className="text-stone-500 mt-1">Select all categories that apply.</p>
+ <h2 className="text-2xl font-semibold text-stone-900 leading-none">
+ {isFamily ? t('onboarding.stepTitles.whatSupport') : 'What support do you need?'}
+ </h2>
+ <p className="text-stone-500 mt-1">
+ {isFamily ? t('onboarding.careNeeds.selectAll') : 'Select all categories that apply.'}
+ </p>
  </div>
  </div>
 
@@ -171,7 +179,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-800 hover:text-red-600 bg-stone-100 hover:bg-red-50 rounded-lg transition-colors"
  >
  <Trash2 className="size-4" />
- Clear All
+ {isFamily ? t('onboarding.clearAll') : 'Clear All'}
  </m.button>
  )}
  </AnimatePresence>
@@ -209,10 +217,14 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  </div>
 
  <h3 className={`font-semibold text-stone-900 mb-1 ${isSelected ? 'text-stone-900' : ''}`}>
- {category.label}
+ {isFamily
+ ? t(`onboarding.categories.${category.id}.label`)
+ : category.label}
  </h3>
  <p className="text-xs text-stone-500 leading-tight">
- {category.description}
+ {isFamily
+ ? t(`onboarding.categories.${category.id}.description`)
+ : category.description}
  </p>
 
  {/* Remove Button (X) */}
@@ -236,7 +248,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  {/* Badge for selected needs count */}
  {needsCount > 0 && (
  <div className="absolute top-3 left-3 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
- {needsCount} selected
+ {isFamily ? t('onboarding.selectedCount', { count: needsCount }) : `${needsCount} selected`}
  </div>
  )}
  </m.div>
@@ -260,7 +272,11 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  <div className="flex items-center gap-2 mb-4">
  <Sparkles className="size-4 text-stone-600" />
  <h3 className="font-semibold text-stone-900">
- Specific needs for {CARE_CATEGORIES.find(c => c.id === activeDetailId)?.label}
+ {isFamily
+ ? t('onboarding.specificNeedsFor', {
+ category: t(`onboarding.categories.${activeDetailId}.label`),
+ })
+ : `Specific needs for ${CARE_CATEGORIES.find(c => c.id === activeDetailId)?.label}`}
  </h3>
  </div>
 
@@ -280,10 +296,14 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  )}
  <div className="pl-2">
  <span className={`block text-sm font-bold ${isNeedSelected ? 'text-stone-900' : 'text-stone-700'}`}>
- {option.label}
+ {isFamily
+ ? t(`onboarding.needs.${option.id}.label`, { defaultValue: option.label })
+ : option.label}
  </span>
  <span className="text-[10px] text-stone-400">
- {option.hint}
+ {isFamily
+ ? t(`onboarding.needs.${option.id}.hint`, { defaultValue: option.hint })
+ : option.hint}
  </span>
  </div>
  {isNeedSelected && (
@@ -308,7 +328,7 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  className="flex items-center gap-2 text-stone-500 font-bold hover:text-stone-800 transition-colors px-4 py-2 rounded-xl hover:bg-stone-100"
  >
  <ArrowLeft className="size-4" />
- Back
+ {isFamily ? t('onboarding.back') : 'Back'}
  </button>
  <m.button
  onClick={onNext}
@@ -317,8 +337,8 @@ export default function StepCareNeeds({ data, onUpdate, onNext, onBack }: StepCa
  whileTap={isValid ? { scale: 0.98 } : {}}
  className="px-8 py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-xl shadow-stone-900/10 hover:shadow-2xl hover:bg-stone-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-transform duration-300 flex items-center gap-2"
  >
- Continue
- <ArrowRight className="size-5" />
+ {isFamily ? t('onboarding.continue') : 'Continue'}
+ <ArrowRight className={`size-5${isFamily ? ' rtl-flip' : ''}`} />
  </m.button>
  </m.div>
  </div>

@@ -1,4 +1,5 @@
 import type { ServiceCategory } from '@/lib/api/intake';
+import i18n from '@/i18n/config';
 
 /** Placeholder diagnosis so staff can complete clinical coding in intake review. */
 export const PENDING_DIAGNOSIS = 'PENDING_CLINICAL_REVIEW';
@@ -90,7 +91,11 @@ const PLAN_TYPE_LABELS: Record<string, string> = {
 };
 
 export function labelCareCategory(id: string): string {
-  return CATEGORY_LABELS[id] ?? id.replace(/_/g, ' ');
+  const fallback = CATEGORY_LABELS[id] ?? id.replace(/_/g, ' ');
+  const key = `enums.support.${id}`;
+  const translated = i18n.t(key, { ns: 'family', defaultValue: '' });
+  if (translated && translated !== key) return translated;
+  return fallback;
 }
 
 export type FamilyWizardSummary = {
