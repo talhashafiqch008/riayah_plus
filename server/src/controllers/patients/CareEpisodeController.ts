@@ -14,6 +14,8 @@ import {
   resolveEpisodePartyIds,
 } from '../../utils/careAccess';
 import { staffPublicUserSelect, toPublicStaffCard } from '../../utils/staffProfile';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const createEpisodeSchema = z.object({
   patientId: z.string().optional(),
@@ -39,8 +41,8 @@ const assignCoordinatorSchema = z.object({
 
 export class CareEpisodeController {
   static async index(req: Request, res: Response): Promise<void> {
-    const { page = '1', limit = '20', status } = req.query as Record<string, string>;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+          const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
@@ -64,12 +66,12 @@ export class CareEpisodeController {
         },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: parseInt(limit),
+        take,
       }),
       prisma.careEpisode.count({ where }),
     ]);
 
-    res.json({ data: episodes, total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ data: episodes, total, page, limit });
   }
 
   static async store(req: Request, res: Response): Promise<void> {

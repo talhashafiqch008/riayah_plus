@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { EmailService } from './EmailService';
 import { NotificationService } from './NotificationService';
 import { canSendEmailToUser } from '../utils/communicationConsent';
+import { escapeHtml } from '../utils/sanitize';
 import {
   reminderRecipientIds,
   reminderWindow,
@@ -76,7 +77,7 @@ async function remindUser(opts: {
       await EmailService.send({
         to: user.email,
         subject: TITLE,
-        html: `<p>Hello ${user.name ?? ''},</p><p>${BODY}</p><p><a href="${joinUrl}">Open Riayah Plus</a></p>`,
+        html: `<p>Hello ${escapeHtml(user.name ?? '')},</p><p>${escapeHtml(BODY)}</p><p><a href="${escapeHtml(joinUrl)}">Open Riayah Plus</a></p>`,
         text: BODY,
       });
     }

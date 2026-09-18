@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { z } from 'zod';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const reportSchema = z.object({
   clientId: z.string().optional(),
@@ -17,8 +19,8 @@ export class ProviderReportController {
   async list(req: Request, res: Response, next: NextFunction) {
     try {
       const providerId = req.user!.userId;
-      const { page = '1', limit = '20', type } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+            const { page, limit, skip, take } = parsePagination(req.query);
+      const type = queryString(req.query.type);
       const where: Record<string, unknown> = { providerId };
       if (type) where.type = type;
 
@@ -26,13 +28,13 @@ export class ProviderReportController {
         prisma.clientReport.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: { client: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.clientReport.count({ where }),
       ]);
-      res.json({ data: reports, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: reports, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

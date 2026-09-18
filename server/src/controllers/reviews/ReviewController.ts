@@ -55,7 +55,7 @@ export class ReviewController {
     try {
       const { providerId } = req.params;
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 15;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 100);
 
       const [reviews, total, agg] = await Promise.all([
         prisma.review.findMany({

@@ -87,13 +87,21 @@ export function s3KeyFromRecordingUrl(url: string): string | null {
       return decodeURIComponent(without.slice(slash + 1));
     }
     const parsed = new URL(value);
-    if (!parsed.hostname.includes('amazonaws.com') && !parsed.hostname.includes('.s3.')) {
-      return null;
-    }
+    // INJ-12: anchored suffix / exact S3 virtual-hosted style — not substring includes()
+    if (!isAwsS3Hostname(parsed.hostname)) return null;
     return decodeURIComponent(parsed.pathname.replace(/^\//, '')) || null;
   } catch {
     return null;
   }
+}
+
+/** True for *.amazonaws.com and *.s3.*.amazonaws.com / s3.amazonaws.com hosts. */
+function isAwsS3Hostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === 's3.amazonaws.com' || host.endsWith('.s3.amazonaws.com')) return true;
+  if (host.endsWith('.amazonaws.com') && host.includes('.s3.')) return true;
+  // Dualstack / regional: bucket.s3.eu-west-1.amazonaws.com already covered by .s3. + .amazonaws.com
+  return false;
 }
 
 export function canStartRecording(

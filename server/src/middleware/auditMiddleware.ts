@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuditService } from '../services/AuditService';
 import { logger } from '../config/logger';
+import { sanitizeAuditEntity, sanitizeAuditEntityId } from '../utils/csvSafe';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -22,14 +23,14 @@ function shouldSkipAudit(req: Request): boolean {
 
 function resolveEntityId(req: Request): string | undefined {
   const params = req.params as Record<string, string | undefined>;
-  return (
+  const raw =
     params.id ??
     params.userId ??
     params.orgId ??
     params.clinicId ??
     params.bookingId ??
-    params.episodeId
-  );
+    params.episodeId;
+  return sanitizeAuditEntityId(raw);
 }
 
 function resolveEntity(req: Request): string | undefined {
@@ -37,11 +38,7 @@ function resolveEntity(req: Request): string | undefined {
   if (segments.length === 0) return undefined;
   // e.g. /admin/organizations/:id → Organization
   const resource = segments.find((s) => !s.startsWith(':') && s !== 'admin' && s !== 'api');
-  if (!resource) return segments[0];
-  return resource
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
+  return sanitizeAuditEntity(resource ?? segments[0]);
 }
 
 export function auditMiddleware(req: Request, res: Response, next: NextFunction): void {

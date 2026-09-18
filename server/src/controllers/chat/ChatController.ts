@@ -129,7 +129,9 @@ export class ChatController {
   }
 
   static async editMessage(req: Request, res: Response): Promise<void> {
-    const { content } = z.object({ content: z.string() }).parse(req.body);
+    const { content } = z
+      .object({ content: sanitizedString(z.string().min(1).max(20000)) })
+      .parse(req.body);
     const message = await prisma.message.findUnique({ where: { id: req.params.id } });
     if (!message) throw new AppError('Message not found.', 404);
     if (!message.conversationId) throw new AppError('Message is not part of a conversation.', 400);

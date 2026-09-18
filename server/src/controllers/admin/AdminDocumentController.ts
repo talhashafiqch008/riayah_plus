@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 export class AdminDocumentController {
   // GET /admin/documents/pending
   async listPending(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '20', type } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+            const { page, limit, skip, take } = parsePagination(req.query);
+      const type = queryString(req.query.type);
       const where: Record<string, unknown> = { status: 'pending' };
       if (type) where.type = type;
 
@@ -15,13 +17,13 @@ export class AdminDocumentController {
         prisma.document.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: { user: { select: { id: true, name: true, email: true, role: true } } },
           orderBy: { createdAt: 'asc' },
         }),
         prisma.document.count({ where }),
       ]);
-      res.json({ data: docs, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: docs, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }
@@ -99,8 +101,8 @@ export class AdminDocumentController {
   // GET /admin/document-requests
   async listDocumentRequests(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '20', status } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+            const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
       const where: Record<string, unknown> = {};
       if (status) where.status = status;
 
@@ -108,7 +110,7 @@ export class AdminDocumentController {
         prisma.documentRequest.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: {
             requestedBy: { select: { id: true, name: true, email: true } },
             targetUser: { select: { id: true, name: true, email: true, role: true } },
@@ -117,7 +119,7 @@ export class AdminDocumentController {
         }),
         prisma.documentRequest.count({ where }),
       ]);
-      res.json({ data: requests, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: requests, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

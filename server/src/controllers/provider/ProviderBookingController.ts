@@ -4,26 +4,27 @@ import { AppError } from '../../middleware/errorHandler';
 import { RefundService } from '../../services/RefundService';
 import { AuditService } from '../../services/AuditService';
 import { CacheInvalidationService } from '../../services/CacheInvalidationService';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 export class ProviderBookingController {
   // GET /provider/bookings/requests — incoming booking requests for provider
   async listRequests(req: Request, res: Response, next: NextFunction) {
     try {
       const providerId = req.user!.userId;
-      const { page = '1', limit = '20' } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { page, limit, skip, take } = parsePagination(req.query);
 
       const [bookings, total] = await Promise.all([
         prisma.booking.findMany({
           where: { providerId, status: 'pending' },
           skip,
-          take: parseInt(limit),
+          take,
           include: { client: { select: { id: true, name: true, phone: true, avatar: true } } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.booking.count({ where: { providerId, status: 'pending' } }),
       ]);
-      res.json({ data: bookings, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: bookings, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }
@@ -79,7 +80,7 @@ export class ProviderBookingController {
   async listClients(req: Request, res: Response, next: NextFunction) {
     try {
       const providerId = req.user!.userId;
-      const { page = '1', limit = '20' } = req.query as Record<string, string>;
+      const { page, limit, skip, take } = parsePagination(req.query);
 
       const bookings = await prisma.booking.findMany({
         where: { providerId },
@@ -87,12 +88,11 @@ export class ProviderBookingController {
         distinct: ['clientId'],
       });
       const clientIds = bookings.map((b) => b.clientId);
-      const skip = (parseInt(page) - 1) * parseInt(limit);
 
       const clients = await prisma.user.findMany({
         where: { id: { in: clientIds }, deletedAt: null },
         skip,
-        take: parseInt(limit),
+        take,
         select: { id: true, name: true, email: true, phone: true, avatar: true, createdAt: true },
       });
       res.json({ data: clients, meta: { total: clientIds.length } });

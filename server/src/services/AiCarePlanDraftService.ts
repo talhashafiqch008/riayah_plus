@@ -11,6 +11,11 @@ import {
 } from './RiayahAiClient';
 import { assertAiCarePlanConsent } from '../utils/aiCarePlanConsent';
 import { AuditService } from './AuditService';
+import {
+  nullableSanitizedString,
+  sanitizedString,
+  sanitizePlainText,
+} from '../utils/sanitize';
 
 /** Marker stored in CarePlan.notes so AI drafts can be found for idempotent upserts. */
 export const AI_DRAFT_MARKER = '[riayah-ai-draft]';
@@ -26,30 +31,37 @@ const URGENCY_TO_AI: Record<string, string> = {
 };
 
 const smartGoalSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().nullable().optional(),
+  title: sanitizedString(z.string().min(1)),
+  description: nullableSanitizedString(),
   targetDate: z.string().nullable().optional(),
-  measurementCriteria: z.string().nullable().optional(),
+  measurementCriteria: nullableSanitizedString(),
   status: z.string().optional(),
 });
 
 const plannedServiceSchema = z.object({
-  serviceType: z.string().min(1),
-  category: z.string().optional(),
-  frequency: z.string().nullable().optional(),
+  serviceType: sanitizedString(z.string().min(1)),
+  category: optionalSanitizedOrPlain(),
+  frequency: nullableSanitizedString(),
   durationMinutes: z.number().nullable().optional(),
   unitCost: z.number().nullable().optional(),
-  assignedStaffRole: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
+  assignedStaffRole: nullableSanitizedString(),
+  notes: nullableSanitizedString(),
   status: z.string().optional(),
 });
 
 const riskFlagSchema = z.object({
-  factor: z.string(),
-  severity: z.string(),
-  evidence: z.string(),
-  recommendedAction: z.string().nullable().optional(),
+  factor: sanitizedString(z.string()),
+  severity: sanitizedString(z.string()),
+  evidence: sanitizedString(z.string()),
+  recommendedAction: nullableSanitizedString(),
 });
+
+function optionalSanitizedOrPlain() {
+  return z.preprocess(
+    (val) => (typeof val === 'string' ? sanitizePlainText(val) : val),
+    z.string().optional(),
+  );
+}
 
 const draftSchema = z
   .object({
@@ -59,8 +71,8 @@ const draftSchema = z
     plannedServices: z.array(plannedServiceSchema).optional(),
     items: z.array(plannedServiceSchema).optional(),
     riskFlags: z.array(riskFlagSchema).optional(),
-    reviewCycle: z.string().nullable().optional(),
-    clinicalNotes: z.string().nullable().optional(),
+    reviewCycle: nullableSanitizedString(),
+    clinicalNotes: nullableSanitizedString(),
     estimatedTotalCost: z.number().nullable().optional(),
     currency: z.string().optional(),
   })

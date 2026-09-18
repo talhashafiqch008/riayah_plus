@@ -3,13 +3,16 @@ import { z } from 'zod';
 import { prisma } from '../config/database';
 import { authenticate, optionalAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { parsePagination } from '../utils/pagination';
+import { queryString } from '../utils/queryScalar';
 
 const router = Router();
 
 // Public: list providers/doctors
 router.get('/doctors', optionalAuth, async (req: Request, res: Response) => {
-  const { page = '1', limit = '20', search, serviceType } = req.query as Record<string, string>;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+        const { page, limit, skip, take } = parsePagination(req.query);
+      const search = queryString(req.query.search);
+      const serviceType = queryString(req.query.serviceType);
 
   const where: Record<string, unknown> = {
     isActive: true,
@@ -30,7 +33,7 @@ router.get('/doctors', optionalAuth, async (req: Request, res: Response) => {
       where,
       include: { providerProfile: true },
       skip,
-      take: parseInt(limit),
+      take,
     }),
     prisma.user.count({ where }),
   ]);
@@ -60,8 +63,7 @@ router.use(authenticate);
 
 // Matched providers
 router.get('/matched', async (req: Request, res: Response) => {
-  const { serviceType, page = '1', limit = '20' } = req.query as Record<string, string>;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const { page, limit, skip, take } = parsePagination(req.query);
 
   const where: Record<string, unknown> = {
     isActive: true,
@@ -70,11 +72,11 @@ router.get('/matched', async (req: Request, res: Response) => {
   };
 
   const [providers, total] = await Promise.all([
-    prisma.user.findMany({ where, include: { providerProfile: true }, skip, take: parseInt(limit) }),
+    prisma.user.findMany({ where, include: { providerProfile: true }, skip, take }),
     prisma.user.count({ where }),
   ]);
 
-  res.json({ data: providers, total });
+  res.json({ data: providers, total, page, limit });
 });
 
 // Provider profile (self)

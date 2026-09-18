@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 export class AdminPayoutController {
   // GET /admin/payouts/:id
@@ -121,20 +123,19 @@ export class AdminPayoutController {
   // GET /admin/payment-audits
   async listPaymentAudits(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '50' } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
 
       const [logs, total] = await Promise.all([
         prisma.auditLog.findMany({
           where: { entity: 'payment' },
           skip,
-          take: parseInt(limit),
+          take,
           include: { user: { select: { id: true, name: true, email: true } } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.auditLog.count({ where: { entity: 'payment' } }),
       ]);
-      res.json({ data: logs, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: logs, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

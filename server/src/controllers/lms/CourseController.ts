@@ -51,7 +51,7 @@ export class CourseController {
   static async list(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
       const category = req.query.category as string | undefined;
       const search = req.query.search as string | undefined;
 

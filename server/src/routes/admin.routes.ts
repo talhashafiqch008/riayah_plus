@@ -22,6 +22,9 @@ import adminPayoutController from '../controllers/admin/AdminPayoutController';
 import adminProviderController from '../controllers/admin/AdminProviderController';
 import { OrganizationController } from '../controllers/admin/OrganizationController';
 import { AdminFamilyController } from '../controllers/admin/AdminFamilyController';
+import { csvQuotedField } from '../utils/csvSafe';
+import { parsePagination } from '../utils/pagination';
+import { queryString } from '../utils/queryScalar';
 
 const router = Router();
 router.use(authenticate, requireAdmin, adminLimiter);
@@ -43,8 +46,9 @@ router.get('/dashboard', requireView('user'), async (_req: Request, res: Respons
 
 // Users
 router.get('/users', requireView('user'), async (req: Request, res: Response) => {
-  const { page = '1', limit = '20', role, search } = req.query as Record<string, string>;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+        const { page, limit, skip, take } = parsePagination(req.query);
+      const role = queryString(req.query.role);
+      const search = queryString(req.query.search);
 
   const where: Record<string, unknown> = { deletedAt: null };
   if (role) where.role = role;
@@ -58,7 +62,7 @@ router.get('/users', requireView('user'), async (req: Request, res: Response) =>
     prisma.user.findMany({
       where,
       skip,
-      take: parseInt(limit),
+      take,
       orderBy: { createdAt: 'desc' },
       select: ADMIN_USER_SELECT,
     }),
@@ -127,10 +131,9 @@ router.patch('/users/:id', requireEdit('user'), async (req: Request, res: Respon
 
 // Bookings
 router.get('/bookings', requireView('booking'), async (req: Request, res: Response) => {
-  const { page = '1', limit = '20' } = req.query as Record<string, string>;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const { skip, take } = parsePagination(req.query);
   const [bookings, total] = await Promise.all([
-    prisma.booking.findMany({ include: { client: { select: { id: true, name: true } }, provider: { select: { id: true, name: true } } }, skip, take: parseInt(limit), orderBy: { createdAt: 'desc' } }),
+    prisma.booking.findMany({ include: { client: { select: { id: true, name: true } }, provider: { select: { id: true, name: true } } }, skip, take, orderBy: { createdAt: 'desc' } }),
     prisma.booking.count(),
   ]);
   res.json({ data: bookings, total });
@@ -162,38 +165,44 @@ router.patch('/payouts/:id/reject', requireApprove('booking'), async (req: Reque
 
 // Documents
 router.get('/documents', requireView('document'), async (req: Request, res: Response) => {
-  const { status } = req.query as { status?: string };
-  const docs = await prisma.document.findMany({ where: status ? { status: status as any } : {}, include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } });
+  const status = queryString(req.query.status);
+  const docs = await prisma.document.findMany({
+    where: status ? { status: status as 'pending' | 'approved' | 'rejected' | 'expired' } : {},
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
   res.json({ data: docs });
 });
 
 // Audit logs
 router.get('/audit-logs', requireView('user'), async (req: Request, res: Response) => {
-  const { page = '1', limit = '50', entity, action, userId, from, to } = req.query as Record<string, string>;
+  const { page, limit } = parsePagination(req.query, { defaultLimit: 50 });
   const data = await AuditService.getAll({
-    entity,
-    action,
-    userId,
-    from,
-    to,
-    page: parseInt(page),
-    limit: parseInt(limit),
+    entity: queryString(req.query.entity),
+    action: queryString(req.query.action),
+    userId: queryString(req.query.userId),
+    from: queryString(req.query.from),
+    to: queryString(req.query.to),
+    page,
+    limit,
   });
   res.json(data);
 });
 
 router.get('/audit-logs/export', requireView('user'), async (req: Request, res: Response) => {
-  const { entity, action, userId, from, to } = req.query as Record<string, string>;
   const { logs } = await AuditService.getAll({
-    entity,
-    action,
-    userId,
-    from,
-    to,
+    entity: queryString(req.query.entity),
+    action: queryString(req.query.action),
+    userId: queryString(req.query.userId),
+    from: queryString(req.query.from),
+    to: queryString(req.query.to),
     page: 1,
     limit: 10000,
+    maxTake: 10000,
   });
 
+  // INJ-01/03: formula-encode every cell before quoting
   const header = 'id,userId,action,entity,entityId,ipAddress,createdAt\n';
   const rows = logs.map((log) =>
     [
@@ -205,7 +214,7 @@ router.get('/audit-logs/export', requireView('user'), async (req: Request, res: 
       log.ipAddress ?? '',
       log.createdAt.toISOString(),
     ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .map((v) => csvQuotedField(v))
       .join(','),
   );
 
@@ -331,7 +340,7 @@ router.delete('/reviews/:id', requireDelete('user'), async (req: Request, res: R
 router.get('/reviews', requireView('user'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const [reviews, total] = await Promise.all([
       prisma.review.findMany({
         include: {
@@ -487,7 +496,7 @@ router.post('/bookings/:id/force-cancel', requireEdit('booking'), async (req: Re
 router.get('/users/:userId/payments', requireView('booking'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const [payments, total] = await Promise.all([
       prisma.payment.findMany({ where: { userId: req.params.userId }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
       prisma.payment.count({ where: { userId: req.params.userId } }),

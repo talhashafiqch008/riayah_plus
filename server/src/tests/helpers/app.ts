@@ -16,6 +16,8 @@ export function getTestApp(): express.Application {
   if (app) return app;
 
   app = express();
+  // Match production INJ-04 control
+  app.set('query parser', 'simple');
   app.use(helmet());
   app.use(cors());
   app.use(json());

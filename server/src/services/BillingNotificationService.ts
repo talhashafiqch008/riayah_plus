@@ -2,6 +2,8 @@ import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { EmailService } from './EmailService';
+import { escapeHtml } from '../utils/sanitize';
+
 import { NotificationService } from './NotificationService';
 import { assertProcessingAllowed } from '../middleware/processingRestriction';
 
@@ -91,7 +93,7 @@ export async function notifyBillingEvent(opts: {
     await EmailService.send({
       to: user.email,
       subject: billingEmailSubject(opts.type, opts.invoiceNumber),
-      html: `<p>Hello ${user.name ?? ''},</p><p>${opts.body}</p><p><a href="${billingUrl}">Open billing</a></p>`,
+      html: `<p>Hello ${escapeHtml(user.name ?? '')},</p><p>${escapeHtml(opts.body)}</p><p><a href="${escapeHtml(billingUrl)}">Open billing</a></p>`,
       text: `${opts.body}\n\n${billingUrl}`,
     });
   } catch (err) {

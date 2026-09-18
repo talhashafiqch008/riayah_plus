@@ -5,6 +5,8 @@ import { prisma } from '../../config/database';
 import { PricingEngine } from '../../services/PricingEngine';
 import { NotificationService } from '../../services/NotificationService';
 import { AppError } from '../../middleware/errorHandler';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const createCareNeedSchema = z.object({
   title: z.string().min(5),
@@ -74,10 +76,9 @@ export class CareNeedController {
     try {
       const userId = req.user!.userId;
       const role = req.user!.role;
-      const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
-      const serviceType = req.query.serviceType as string | undefined;
-      const isUrgent = req.query.isUrgent === 'true' ? true : undefined;
+      const { page, limit, skip, take } = parsePagination(req.query);
+      const serviceType = queryString(req.query.serviceType);
+      const isUrgent = queryString(req.query.isUrgent) === 'true' ? true : undefined;
 
       const providerRoles = ['provider', 'doctor', 'nurse', 'physiotherapist', 'occupational_therapist',
         'speech_therapist', 'psychologist', 'dietitian', 'support_worker', 'caregiver',
@@ -92,7 +93,8 @@ export class CareNeedController {
         if (isUrgent !== undefined) where.isUrgent = isUrgent;
       } else {
         where.clientId = userId;
-        if (req.query.status) where.status = req.query.status;
+        const status = queryString(req.query.status);
+        if (status) where.status = status;
       }
 
       const [careNeeds, total] = await Promise.all([
@@ -100,8 +102,8 @@ export class CareNeedController {
           where,
           include: { client: { select: { id: true, name: true, avatar: true } }, _count: { select: { bids: true } } },
           orderBy: [{ isUrgent: 'desc' }, { createdAt: 'desc' }],
-          skip: (page - 1) * limit,
-          take: limit,
+          skip,
+          take,
         }),
         prisma.careNeed.count({ where }),
       ]);

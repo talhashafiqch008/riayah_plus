@@ -74,7 +74,7 @@ router.get('/history', async (req: Request, res: Response, next: NextFunction) =
   try {
     const providerId = req.user!.userId;
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const status = req.query.status as string | undefined;
 
     const where: Record<string, unknown> = { providerId };

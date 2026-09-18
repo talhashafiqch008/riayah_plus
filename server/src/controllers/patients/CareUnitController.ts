@@ -8,6 +8,8 @@ import { tenantWhere } from '../../middleware/tenantScope';
 import { mergeTenantOrg } from '../../middleware/tenantAccess';
 import { sanitizedString, optionalSanitizedString } from '../../utils/sanitize';
 import { redactForAudit } from '../../utils/auditRedact';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -107,8 +109,8 @@ function patientSnapshot(row: {
 
 export class CareUnitController {
   static async index(req: Request, res: Response): Promise<void> {
-    const { page = '1', limit = '20', search } = req.query as Record<string, string>;
-    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+          const { page, limit, skip, take } = parsePagination(req.query);
+      const search = queryString(req.query.search);
     const role = req.user!.role;
 
     const where: Prisma.CareUnitWhereInput = { deletedAt: null };
@@ -138,12 +140,12 @@ export class CareUnitController {
         },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: parseInt(limit, 10),
+        take,
       }),
       prisma.careUnit.count({ where }),
     ]);
 
-    res.json({ data, total, page: parseInt(page, 10), limit: parseInt(limit, 10) });
+    res.json({ data, total, page, limit });
   }
 
   static async store(req: Request, res: Response): Promise<void> {

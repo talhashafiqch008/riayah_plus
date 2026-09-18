@@ -17,6 +17,7 @@
     "test:unit": "jest --testPathPattern=tests/unit --coverage",
     "test:integration": "jest --testPathPattern=tests/integration --runInBand --coverage",
     "test:watch": "jest --watch",
+    "secrets:generate": "node scripts/generate-secrets.mjs",
     "db:migrate:test": "DATABASE_URL=$DATABASE_TEST_URL prisma migrate deploy",
     "db:reset:test": "DATABASE_URL=$DATABASE_TEST_URL prisma migrate reset --force"
   },

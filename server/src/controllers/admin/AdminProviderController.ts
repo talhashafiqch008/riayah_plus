@@ -2,13 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 export class AdminProviderController {
   // GET /admin/providers/pending
   async listPending(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '20' } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { page, limit, skip, take } = parsePagination(req.query);
 
       const providerRoles: UserRole[] = ['provider', 'doctor', 'nurse', 'physiotherapist',
         'occupational_therapist', 'speech_therapist', 'psychologist', 'dietitian',
@@ -18,13 +19,13 @@ export class AdminProviderController {
         prisma.user.findMany({
           where: { role: { in: providerRoles }, verificationStatus: 'pending', deletedAt: null },
           skip,
-          take: parseInt(limit),
+          take,
           select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true, verificationStatus: true },
           orderBy: { createdAt: 'asc' },
         }),
         prisma.user.count({ where: { role: { in: providerRoles as UserRole[] }, verificationStatus: 'pending', deletedAt: null } }),
       ]);
-      res.json({ data: providers, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: providers, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }
@@ -169,19 +170,18 @@ export class AdminProviderController {
   // GET /admin/wallets
   async listWallets(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '50' } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
 
       const [wallets, total] = await Promise.all([
         prisma.walletBalance.findMany({
           skip,
-          take: parseInt(limit),
+          take,
           include: { user: { select: { id: true, name: true, email: true, role: true } } },
           orderBy: { balance: 'desc' },
         }),
         prisma.walletBalance.count(),
       ]);
-      res.json({ data: wallets, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: wallets, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }
@@ -190,21 +190,21 @@ export class AdminProviderController {
   // GET /admin/credit-transactions
   async listCreditTransactions(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '50', userId } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
+      const userId = queryString(req.query.userId);
       const where = userId ? { userId } : {};
 
       const [txs, total] = await Promise.all([
         prisma.creditTransaction.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: { user: { select: { id: true, name: true, email: true } } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.creditTransaction.count({ where }),
       ]);
-      res.json({ data: txs, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: txs, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }
@@ -234,8 +234,8 @@ export class AdminProviderController {
   // GET /admin/reports — provider-submitted reports
   async listProviderReports(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '20', status } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+            const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
       const where: Record<string, unknown> = {};
       if (status) where.status = status;
 
@@ -243,7 +243,7 @@ export class AdminProviderController {
         prisma.clientReport.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: {
             provider: { select: { id: true, name: true } },
             client: { select: { id: true, name: true } },
@@ -252,7 +252,7 @@ export class AdminProviderController {
         }),
         prisma.clientReport.count({ where }),
       ]);
-      res.json({ data: reports, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: reports, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

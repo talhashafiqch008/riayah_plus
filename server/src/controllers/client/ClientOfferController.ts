@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 export class ClientOfferController {
   // GET /client/offers — list provider offers visible to client
   async listOffers(req: Request, res: Response, next: NextFunction) {
     try {
-      const { serviceType, page = '1', limit = '20' } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { page, limit, skip, take } = parsePagination(req.query);
+      const serviceType = queryString(req.query.serviceType);
       const where: Record<string, unknown> = { status: 'active' };
       if (serviceType) where.serviceType = serviceType;
 
@@ -15,7 +17,7 @@ export class ClientOfferController {
         prisma.providerOffer.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: {
             provider: { select: { id: true, name: true, role: true, providerProfileExt: true } },
           },
@@ -23,7 +25,7 @@ export class ClientOfferController {
         }),
         prisma.providerOffer.count({ where }),
       ]);
-      res.json({ data: offers, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: offers, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

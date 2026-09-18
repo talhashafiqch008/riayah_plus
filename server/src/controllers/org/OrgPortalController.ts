@@ -11,6 +11,8 @@ import {
   INVITE_PASSWORD_PLACEHOLDER,
   sendInviteSetPassword,
 } from '../../utils/inviteUser';
+import { parsePagination } from '../../utils/pagination';
+import { sanitizedString, optionalSanitizedString } from '../../utils/sanitize';
 
 async function revokeCredentialsOnDeactivate(userId: string): Promise<void> {
   // AUTH-12: suspension / deactivate must kill refresh + access watermark + sockets
@@ -53,21 +55,14 @@ function requireOrgId(req: Request): string {
   return orgId;
 }
 
-/** Page/limit for org list endpoints — hard cap 100. */
-function listPagination(req: Request): { page: number; limit: number; skip: number; take: number } {
-  const page = Math.max(Number(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
-  return { page, limit, skip: (page - 1) * limit, take: limit };
-}
-
 const createCoordinatorSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: sanitizedString(z.string().min(2).max(120)),
   email: z.string().email(),
   phone: z.string().max(40).optional(),
 });
 
 const createStaffSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: sanitizedString(z.string().min(2).max(120)),
   email: z.string().email(),
   phone: z.string().max(40).optional(),
   role: z.enum(ORG_STAFF_ROLES),
@@ -112,7 +107,7 @@ export class OrgPortalController {
   static async listCoordinators(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const organizationId = requireOrgId(req);
-      const { page, limit, skip, take } = listPagination(req);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
       const where = { organizationId, role: 'care_coordinator' as const, deletedAt: null };
       const [data, total] = await Promise.all([
         prisma.user.findMany({
@@ -199,7 +194,7 @@ export class OrgPortalController {
       const organizationId = requireOrgId(req);
       const body = z
         .object({
-          name: z.string().min(2).optional(),
+          name: sanitizedString(z.string().min(2)).optional(),
           phone: z.string().max(40).optional().nullable(),
           isActive: z.boolean().optional(),
         })
@@ -292,7 +287,7 @@ export class OrgPortalController {
   static async listFamilies(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const organizationId = requireOrgId(req);
-      const { page, limit, skip, take } = listPagination(req);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
       const where = {
         organizationId,
         role: { in: [...FAMILY_ROLES] },
@@ -465,7 +460,7 @@ export class OrgPortalController {
   static async listStaff(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const organizationId = requireOrgId(req);
-      const { page, limit, skip, take } = listPagination(req);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
       const where = {
         organizationId,
         role: { in: [...ORG_STAFF_ROLES] },
@@ -558,7 +553,7 @@ export class OrgPortalController {
       const organizationId = requireOrgId(req);
       const body = z
         .object({
-          name: z.string().min(2).optional(),
+          name: sanitizedString(z.string().min(2)).optional(),
           phone: z.string().max(40).optional().nullable(),
           isActive: z.boolean().optional(),
         })
@@ -653,7 +648,7 @@ export class OrgPortalController {
   static async pendingIntakes(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const organizationId = requireOrgId(req);
-      const { page, limit, skip, take } = listPagination(req);
+      const { page, limit, skip, take } = parsePagination(req.query, { defaultLimit: 50 });
 
       const where = {
         organizationId,

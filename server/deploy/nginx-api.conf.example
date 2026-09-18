@@ -1,0 +1,31 @@
+# Example reverse-proxy snippet for the Express API (D-02 / INJ-03).
+# Use $remote_addr (overwrite) — do NOT use $proxy_add_x_forwarded_for at the public edge.
+#
+# Pair with:
+#   TRUST_PROXY=true
+#   TRUST_PROXY_HOPS=1
+
+upstream raiyah_api {
+    server 127.0.0.1:5000;
+    keepalive 32;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+
+    # ssl_certificate     /etc/ssl/certs/api.example.com.crt;
+    # ssl_certificate_key /etc/ssl/private/api.example.com.key;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://raiyah_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }
+}
