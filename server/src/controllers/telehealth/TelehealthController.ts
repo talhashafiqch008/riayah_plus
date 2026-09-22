@@ -263,11 +263,12 @@ export class TelehealthController {
   }
 
   static async sessionCheckin(req: Request, res: Response): Promise<void> {
-    const { sessionId, latitude, longitude } = z
+    const { sessionId, latitude, longitude, accuracy } = z
       .object({
         sessionId: z.string(),
         latitude: z.number().gte(-90).lte(90),
         longitude: z.number().gte(-180).lte(180),
+        accuracy: z.number().positive().max(50_000).optional(),
       })
       .parse(req.body);
 
@@ -279,6 +280,7 @@ export class TelehealthController {
       session,
       userId: req.user!.userId,
       coords: { lat: latitude, lng: longitude },
+      accuracy: accuracy ?? null,
     });
 
     if (!result.geofence.isWithinRadius && result.geofence.status === 'out_of_radius') {

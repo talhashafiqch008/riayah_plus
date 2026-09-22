@@ -8,6 +8,8 @@ import {
   assertBookingClient,
   loadBookingOrThrow,
 } from '../../utils/bookingAccess';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const updateBookingSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
@@ -79,7 +81,7 @@ export class BookingExtrasController {
     try {
       const userId = req.user!.userId;
       const role = req.user!.role;
-      const { limit = '10' } = req.query as Record<string, string>;
+      const { take } = parsePagination(req.query, { defaultLimit: 10 });
 
       const isProvider = ['provider', 'doctor', 'nurse', 'physiotherapist',
         'occupational_therapist', 'speech_therapist', 'psychologist', 'dietitian',
@@ -91,7 +93,7 @@ export class BookingExtrasController {
           status: { in: ['pending', 'accepted', 'in_progress'] },
           scheduledAt: { gte: new Date() },
         },
-        take: parseInt(limit),
+        take,
         orderBy: { scheduledAt: 'asc' },
         include: {
           client: { select: { id: true, name: true, phone: true } },

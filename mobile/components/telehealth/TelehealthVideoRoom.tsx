@@ -4,6 +4,8 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { LiveKitRoomWebView } from './LiveKitRoomWebView';
+import { registerTelehealthSession } from '../../lib/telehealthSession';
+import { AppSwitcherPrivacyOverlay, useScreenProtection } from '../../hooks/useScreenProtection';
 
 type Props = {
   token: string;
@@ -23,6 +25,14 @@ export function TelehealthVideoRoom({ token, serverUrl, onDisconnected }: Props)
   const [ready, setReady] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
   const useNative = useMemo(() => canUseNativeLiveKit(), []);
+
+  useScreenProtection(true);
+
+  useEffect(() => {
+    return registerTelehealthSession(() => {
+      onDisconnected?.();
+    });
+  }, [onDisconnected]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +85,12 @@ export function TelehealthVideoRoom({ token, serverUrl, onDisconnected }: Props)
     // Lazy require so Expo Go does not evaluate native modules at import time.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { LiveKitCallRoom } = require('./LiveKitCallRoom') as typeof import('./LiveKitCallRoom');
-    return <LiveKitCallRoom token={token} serverUrl={serverUrl} onDisconnected={onDisconnected} />;
+    return (
+      <View style={{ flex: 1 }}>
+        <LiveKitCallRoom token={token} serverUrl={serverUrl} onDisconnected={onDisconnected} />
+        <AppSwitcherPrivacyOverlay />
+      </View>
+    );
   }
 
   return (
@@ -96,6 +111,7 @@ export function TelehealthVideoRoom({ token, serverUrl, onDisconnected }: Props)
         </Text>
       ) : null}
       <LiveKitRoomWebView token={token} serverUrl={serverUrl} onDisconnected={onDisconnected} />
+      <AppSwitcherPrivacyOverlay />
     </View>
   );
 }

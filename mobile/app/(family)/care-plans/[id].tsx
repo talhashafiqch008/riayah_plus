@@ -33,6 +33,7 @@ import {
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
 import { toastError } from '../../../lib/toast';
+import { AppSwitcherPrivacyOverlay, useScreenProtection } from '../../../hooks/useScreenProtection';
 
 type Decision = 'approve' | 'revision' | 'reject';
 
@@ -50,6 +51,7 @@ function hadPriorRevision(plan: CarePlan): boolean {
 }
 
 export default function FamilyCarePlanReviewScreen() {
+  useScreenProtection(true);
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [notes, setNotes] = useState('');
@@ -127,6 +129,7 @@ export default function FamilyCarePlanReviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
+      <AppSwitcherPrivacyOverlay />
       <FamilyTabHero title={plan.title} subtitle={`Version ${plan.version}`} showBack />
 
       <KeyboardAvoidingView

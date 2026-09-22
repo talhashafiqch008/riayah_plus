@@ -10,6 +10,8 @@ import { assertInvoiceTransition } from '../../utils/stateMachine';
 import { QatariPaymentService } from '../../services/QatariPaymentService';
 import { env } from '../../config/env';
 import { isAllowedFrontendOrigin } from '../../utils/frontendOrigins';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const lineItemSchema = z.object({
   description: z.string(),
@@ -101,8 +103,10 @@ async function assertCanBillClient(req: Request, clientId: string): Promise<void
 
 export class InvoiceController {
   static async index(req: Request, res: Response): Promise<void> {
-    const { page = '1', limit = '20', status, clientId, type } = req.query as Record<string, string>;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+          const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
+      const clientId = queryString(req.query.clientId);
+      const type = queryString(req.query.type);
     const role = req.user!.role;
     const userId = req.user!.userId;
 
@@ -132,12 +136,12 @@ export class InvoiceController {
         include: { client: { select: { id: true, name: true, email: true } } },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: parseInt(limit),
+        take,
       }),
       prisma.invoice.count({ where }),
     ]);
 
-    res.json({ data: invoices, total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ data: invoices, total, page, limit });
   }
 
   static async store(req: Request, res: Response): Promise<void> {

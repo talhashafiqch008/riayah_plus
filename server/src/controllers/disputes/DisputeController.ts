@@ -47,7 +47,7 @@ export class DisputeController {
     try {
       const userId = req.user!.userId;
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 15;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 100);
 
       const bookings = await prisma.booking.findMany({
         where: { OR: [{ clientId: userId }, { providerId: userId }] },
@@ -102,7 +102,7 @@ export class DisputeController {
   static async adminList(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
       const status = req.query.status as string | undefined;
 
       const where = status ? { status: status as DisputeStatus } : {};

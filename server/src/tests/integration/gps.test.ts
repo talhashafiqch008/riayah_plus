@@ -124,17 +124,20 @@ describe('GPS visit check-in / check-out', () => {
     expect(res.body.pinged).toBe(true);
   });
 
-  it('allows an out-of-radius check-in and flags it', async () => {
+  it('rejects an out-of-radius check-in (MOB-06)', async () => {
     const { session, workerToken } = await seedVisit();
     const res = await request
       .post(`/api/gps/sessions/${session.id}/checkin`)
       .set('Authorization', `Bearer ${workerToken}`)
       .send(FAR);
 
-    expect(res.status).toBe(200);
-    expect(res.body.geofence.status).toBe('out_of_radius');
-    expect(res.body.geofence.isWithinRadius).toBe(false);
-    expect(res.body.geofence.distanceMeters).toBeGreaterThan(300);
+    expect(res.status).toBe(422);
+    expect(res.body.details?.code).toBe('gps_out_of_radius');
+    expect(res.body.details?.geofence?.status).toBe('out_of_radius');
+    expect(res.body.details?.geofence?.isWithinRadius).toBe(false);
+
+    const stored = await testPrisma.session.findUnique({ where: { id: session.id } });
+    expect(stored?.checkInAt).toBeNull();
   });
 
   it('forbids another worker from checking in', async () => {

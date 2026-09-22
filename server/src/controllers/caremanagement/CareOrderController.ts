@@ -65,7 +65,7 @@ export class CareOrderController {
       const userId = req.user!.userId;
       const isAdmin = ['admin', 'super_admin', 'care_coordinator'].includes(req.user!.role);
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
 
       const where = isAdmin ? {} : { clientId: userId };
 

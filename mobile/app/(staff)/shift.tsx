@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import * as Location from 'expo-location';
 import { useToast } from 'react-native-toast-notifications';
 import { Button, Card, EmptyState, ScreenHeader, StatusBadge } from '../../components/ui';
 import { ShiftTimer } from '../../components/shift/ShiftTimer';
@@ -19,6 +18,7 @@ import {
   formatDateTime,
   haversineMetres,
 } from '../../lib/format';
+import { getForegroundPosition } from '../../lib/location';
 import { queryClient } from '../../lib/query/client';
 import { useShiftStore } from '../../stores/shiftStore';
 import { toastError } from '../../lib/toast';
@@ -129,21 +129,11 @@ export default function ShiftScreen() {
       setGeoSkipped(false);
       setLocating(true);
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          if (!cancelled) {
-            setDistanceM(null);
-            toast.show('Location permission is required for check-in.', { type: 'warning' });
-          }
-          return;
-        }
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
+        const pos = await getForegroundPosition();
         if (cancelled) return;
         const dist = haversineMetres(
-          pos.coords.latitude,
-          pos.coords.longitude,
+          pos.latitude,
+          pos.longitude,
           target.lat,
           target.lng,
         );
@@ -168,15 +158,8 @@ export default function ShiftScreen() {
     mutationFn: async () => {
       if (!nextSession) throw new Error('No session available to check in.');
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error('Location permission is required to check in.');
-      }
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      const { latitude, longitude } = location.coords;
+      const position = await getForegroundPosition();
+      const { latitude, longitude, accuracy } = position;
       const coords = sessionCoords(nextSession);
 
       if (coords) {
@@ -197,6 +180,7 @@ export default function ShiftScreen() {
         sessionId: nextSession.id,
         latitude,
         longitude,
+        accuracy: accuracy ?? undefined,
       });
 
       return { sessionId: nextSession.id, latitude, longitude };
@@ -216,19 +200,13 @@ export default function ShiftScreen() {
       const activeId = sessionId ?? nextSession?.id;
       if (!activeId) throw new Error('No active session to check out.');
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error('Location permission is required to check out.');
-      }
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      const position = await getForegroundPosition();
 
       await apiClient.post('/api/telehealth/checkout', {
         sessionId: activeId,
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy ?? undefined,
       });
 
       return activeId;

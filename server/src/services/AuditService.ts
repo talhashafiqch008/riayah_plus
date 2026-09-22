@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { buildDeviceInfo } from '../utils/deviceInfo';
 import { redactForAudit } from '../utils/auditRedact';
+import { sanitizeClientIp } from '../utils/csvSafe';
 
 interface AuditOptions {
   userId?: string;
@@ -31,7 +32,8 @@ function markExplicitAudit(req?: Request): void {
 function auditContextFromRequest(req?: Request) {
   const deviceInfo = req ? buildDeviceInfo(req) : undefined;
   return {
-    ipAddress: req?.ip,
+    // INJ-03: never persist attacker-shaped XFF / formula strings as IP
+    ipAddress: sanitizeClientIp(req?.ip) ?? undefined,
     userAgent: deviceInfo?.userAgent ?? req?.headers['user-agent'],
     deviceInfo: deviceInfo as object | undefined,
   };
@@ -69,7 +71,7 @@ export class AuditService {
         action,
         entity,
         entityId,
-        ipAddress: req.ip,
+        ipAddress: sanitizeClientIp(req.ip) ?? undefined,
         userAgent: req.headers['user-agent'],
         deviceInfo: buildDeviceInfo(req) as object,
         metadata: {
@@ -92,9 +94,13 @@ export class AuditService {
     to?: string;
     page?: number;
     limit?: number;
+    /** Raise the hard take cap (e.g. CSV export). Default 100. */
+    maxTake?: number;
   }) {
-    const { page = 1, limit = 50, from, to, userId, entity, action } = filters;
-    const skip = (page - 1) * limit;
+    const { page = 1, limit = 50, from, to, userId, entity, action, maxTake = 100 } = filters;
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), maxTake);
+    const skip = (safePage - 1) * safeLimit;
 
     const where: {
       userId?: string;
@@ -121,11 +127,11 @@ export class AuditService {
         where,
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit,
+        take: safeLimit,
       }),
       prisma.auditLog.count({ where }),
     ]);
 
-    return { logs, total, page, limit };
+    return { logs, total, page: safePage, limit: safeLimit };
   }
 }

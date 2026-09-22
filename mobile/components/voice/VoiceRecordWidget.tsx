@@ -11,6 +11,7 @@ import {
   uploadVoiceRecording,
   type VoiceRecordingPatient,
 } from '../../lib/api/voiceRecordings';
+import { deleteTempFile } from '../../lib/sessionCleanup';
 
 const TEAL = '#0D9488';
 const STONE_200 = '#E7E5E4';
@@ -161,6 +162,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         careRecipientId: patient.careRecipientId,
         episodeId: patient.episodeId,
       });
+      await deleteTempFile(uri);
       toast.show('Voice recording saved', { type: 'success' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: unknown) {
@@ -180,7 +182,10 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
     setElapsed(0);
     elapsedRef.current = 0;
     try {
-      if (recording) await recording.stopAndUnloadAsync();
+      if (recording) {
+        await recording.stopAndUnloadAsync();
+        await deleteTempFile(recording.getURI());
+      }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
     } catch {
       /* ignore */

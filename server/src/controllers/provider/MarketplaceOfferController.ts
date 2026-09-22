@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { z } from 'zod';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const offerSchema = z.object({
   title: z.string().min(1),
@@ -17,8 +19,10 @@ export class MarketplaceOfferController {
   // GET /marketplace/offers — public browse
   async listPublic(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = '1', limit = '20', serviceType, minPrice, maxPrice } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+            const { page, limit, skip, take } = parsePagination(req.query);
+      const serviceType = queryString(req.query.serviceType);
+      const minPrice = queryString(req.query.minPrice);
+      const maxPrice = queryString(req.query.maxPrice);
       const where: Record<string, unknown> = { status: 'active' };
       if (serviceType) where.serviceType = serviceType;
       if (minPrice || maxPrice) {
@@ -32,7 +36,7 @@ export class MarketplaceOfferController {
         prisma.providerMarketplaceOffer.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           include: {
             provider: {
               select: { id: true, name: true, providerProfileExt: { select: { averageRating: true, bio: true } } },
@@ -42,7 +46,7 @@ export class MarketplaceOfferController {
         }),
         prisma.providerMarketplaceOffer.count({ where }),
       ]);
-      res.json({ data: offers, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: offers, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

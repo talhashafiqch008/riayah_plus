@@ -7,6 +7,7 @@ import {
   INVITE_PASSWORD_PLACEHOLDER,
   sendInviteSetPassword,
 } from '../../utils/inviteUser';
+import { httpUrl, sanitizedString, optionalSanitizedString } from '../../utils/sanitize';
 
 function slugify(value: string): string {
   return value
@@ -28,14 +29,14 @@ async function uniqueOrgSlug(base: string, excludeId?: string): Promise<string> 
 }
 
 const organizationCreateSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: sanitizedString(z.string().min(2).max(120)),
   slug: z.string().min(2).max(120).optional(),
-  logoUrl: z.string().url().optional().nullable(),
-  address: z.string().max(500).optional().nullable(),
+  logoUrl: httpUrl.optional().nullable(),
+  address: optionalSanitizedString(z.string().max(500)),
   phone: z.string().max(40).optional().nullable(),
   email: z.string().email(),
-  adminName: z.string().min(2).max(120).optional(),
-  website: z.string().url().optional().nullable(),
+  adminName: sanitizedString(z.string().min(2).max(120)).optional(),
+  website: httpUrl.optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -47,8 +48,8 @@ const organizationUpdateSchema = organizationCreateSchema
   });
 
 const clinicCreateSchema = z.object({
-  name: z.string().min(2).max(120),
-  address: z.string().max(500).optional().nullable(),
+  name: sanitizedString(z.string().min(2).max(120)),
+  address: optionalSanitizedString(z.string().max(500)),
   phone: z.string().max(40).optional().nullable(),
   isActive: z.boolean().optional(),
 });
@@ -56,7 +57,7 @@ const clinicCreateSchema = z.object({
 const clinicUpdateSchema = clinicCreateSchema.partial();
 
 const departmentCreateSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: sanitizedString(z.string().min(2).max(120)),
   isActive: z.boolean().optional(),
 });
 

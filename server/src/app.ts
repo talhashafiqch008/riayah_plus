@@ -22,6 +22,7 @@ import { startScheduler } from './cron/scheduler';
 import { verifySmtpTlsAtStartup } from './services/EmailService';
 import { beforeSendScrub, scrubSentryEvent } from './utils/sentryScrub';
 import apiRouter from './routes/index';
+import { sanitizeForwardedForHeader } from './middleware/clientIp';
 
 // ─── Process-level safety net ────────────────────────────────────────────────
 // express-async-errors handles rejections thrown inside route handlers, but this
@@ -50,9 +51,18 @@ if (env.SENTRY_DSN) {
 // ─── Express app ─────────────────────────────────────────────────────────────
 const app = express();
 
+// INJ-04: reject qs bracket/object syntax (`?status[not]=…`) so query values stay scalars.
+app.set('query parser', 'simple');
+
 // Behind Nginx/ALB in deployed environments — required for per-client IP rate limits.
-if (env.isProd || process.env.TRUST_PROXY === 'true') {
-  app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS || '1', 10));
+// TRUST_PROXY_HOPS must match reverse-proxy hops. Edge must overwrite client XFF
+// (see mern/client/nginx.conf + docx/ops/TRUST_PROXY_TOPOLOGY.md). App also strips
+// non-IP XFF entries and validates req.ip before audit/rate-limit use (D-02 / INJ-03).
+if (env.TRUST_PROXY) {
+  const hops = Number.isFinite(env.TRUST_PROXY_HOPS) && env.TRUST_PROXY_HOPS > 0
+    ? env.TRUST_PROXY_HOPS
+    : 1;
+  app.set('trust proxy', hops);
 }
 
 const server = http.createServer(app);
@@ -92,6 +102,8 @@ app.use(
   }),
 );
 app.use(cookieParser());
+// D-02: drop formula / non-IP XFF hops before trust-proxy + rate limits read them
+app.use(sanitizeForwardedForHeader);
 app.use(
   cors({
     origin: corsOriginDelegate,
@@ -101,11 +113,12 @@ app.use(
   })
 );
 
-// Raw body for Stripe webhooks
+// Raw body for Stripe / PayTabs / LiveKit / WhatsApp signature verification
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/paytabs/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/wallet/paytabs/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/livekit/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/webhook/whatsapp', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

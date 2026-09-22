@@ -9,6 +9,7 @@ import { NotificationService } from '../../services/NotificationService';
 import { ReconciliationService } from '../../services/ReconciliationService';
 import { AppError } from '../../middleware/errorHandler';
 import { createObjectCsvStringifier } from 'csv-writer';
+import { encodeCsvRecord } from '../../utils/csvSafe';
 
 export class AdvancedAdminController {
   // GET /api/admin/dashboard
@@ -30,7 +31,7 @@ export class AdvancedAdminController {
   static async verificationQueue(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
 
       const [providers, total] = await Promise.all([
         prisma.user.findMany({
@@ -210,7 +211,7 @@ export class AdvancedAdminController {
   static async listIncidents(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
       const severity = req.query.severity as string | undefined;
       const status = req.query.status as string | undefined;
 
@@ -278,7 +279,7 @@ export class AdvancedAdminController {
         take,
       });
 
-      const records = bookings.map(b => ({
+      const records = bookings.map(b => encodeCsvRecord({
         id: b.id,
         client_name: b.client?.name ?? '',
         client_email: b.client?.email ?? '',
@@ -332,12 +333,16 @@ export class AdvancedAdminController {
         take,
       });
 
+      const records = users.map((u) =>
+        encodeCsvRecord({
+          ...u,
+          createdAt: u.createdAt.toISOString(),
+        }),
+      );
       const csvStringifier = createObjectCsvStringifier({
-        header: Object.keys(users[0] ?? {}).map(k => ({ id: k, title: k.toUpperCase() })),
+        header: Object.keys(records[0] ?? {}).map(k => ({ id: k, title: k.toUpperCase() })),
       });
-      const csv = csvStringifier.getHeaderString()! + csvStringifier.stringifyRecords(users.map(u => ({
-        ...u, createdAt: u.createdAt.toISOString(),
-      })));
+      const csv = csvStringifier.getHeaderString()! + csvStringifier.stringifyRecords(records);
 
       // AUTHZ-15
       await AuditService.log({

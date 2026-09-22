@@ -24,6 +24,8 @@ import {
   type VoiceRecording,
   type VoiceRecordingPatient,
 } from '../../lib/api/voiceRecordings';
+import { deleteTempFile } from '../../lib/sessionCleanup';
+import { AppSwitcherPrivacyOverlay, useScreenProtection } from '../../hooks/useScreenProtection';
 
 function formatDuration(seconds?: number | null): string {
   const total = Math.max(0, Math.round(seconds ?? 0));
@@ -48,6 +50,7 @@ type Props = {
 export function VoiceRecordingsScreen({
   subtitle = 'Choose an assigned patient, then record. Title and notes are optional.',
 }: Props) {
+  useScreenProtection(true);
   const toast = useToast();
   const [rows, setRows] = useState<VoiceRecording[]>([]);
   const [patients, setPatients] = useState<VoiceRecordingPatient[]>([]);
@@ -167,6 +170,7 @@ export function VoiceRecordingsScreen({
         careRecipientId: patient.careRecipientId,
         episodeId: patient.episodeId,
       });
+      await deleteTempFile(uri);
       setTitleDraft('');
       setNotesDraft('');
       toast.show('Voice recording saved', { type: 'success' });
@@ -188,7 +192,10 @@ export function VoiceRecordingsScreen({
     setElapsed(0);
     elapsedRef.current = 0;
     try {
-      if (recording) await recording.stopAndUnloadAsync();
+      if (recording) {
+        await recording.stopAndUnloadAsync();
+        await deleteTempFile(recording.getURI());
+      }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
     } catch {
       /* ignore */
@@ -240,6 +247,7 @@ export function VoiceRecordingsScreen({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+      <AppSwitcherPrivacyOverlay />
       <FamilyTabHero title="Voice recordings" subtitle={subtitle} showBack />
       <FlatList
         data={rows}

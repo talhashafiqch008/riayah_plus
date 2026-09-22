@@ -8,6 +8,8 @@ import {
   persistAuthTokensFromResponse,
   setApiAuthToken,
 } from '../lib/api/client';
+import { revokePushToken } from '../lib/notifications';
+import { purgeLocalSession } from '../lib/sessionCleanup';
 import { router } from 'expo-router';
 
 export type UserRole =
@@ -223,12 +225,19 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   logout: async () => {
+    // Revoke push binding while the access token is still valid (MOB-09)
+    try {
+      await revokePushToken();
+    } catch {
+      /* ignore */
+    }
     try {
       await apiClient.post('/api/auth/logout');
     } catch {
       // ignore — local clear still required
     }
     await clearAuthTokens();
+    await purgeLocalSession();
     set({ token: null, user: null });
     router.replace('/(auth)/login');
   },

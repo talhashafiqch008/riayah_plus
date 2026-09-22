@@ -7,6 +7,13 @@ import { WhatsAppBookingFlowService } from '../services/WhatsAppBookingFlowServi
 import { webhookLimiter } from '../middleware/rateLimiter';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/rbac';
+import {
+  parseWhatsAppRawBody,
+  verifyWhatsAppSignature,
+} from '../middleware/whatsappSignature';
+import { sanitizePlainText } from '../utils/sanitize';
+import { parsePagination } from '../utils/pagination';
+import { logger } from '../config/logger';
 
 const router = Router();
 
@@ -23,36 +30,56 @@ router.get('/', webhookLimiter, (req: Request, res: Response) => {
   }
 });
 
-// Webhook handler (POST)
-router.post('/', webhookLimiter, async (req: Request, res: Response) => {
-  const body = req.body;
-  res.sendStatus(200); // Always respond 200 immediately
+// Webhook handler (POST) — INJ-10: require Meta X-Hub-Signature-256 over raw body
+router.post('/', webhookLimiter, verifyWhatsAppSignature, async (req: Request, res: Response) => {
+  let body: {
+    entry?: Array<{
+      changes?: Array<{
+        value?: { messages?: Array<Record<string, unknown>> };
+      }>;
+    }>;
+  };
+  try {
+    body = parseWhatsAppRawBody(req) as typeof body;
+  } catch {
+    res.sendStatus(400);
+    return;
+  }
+
+  res.sendStatus(200); // Always respond 200 immediately after auth
 
   try {
     const entry = body?.entry?.[0];
     const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+    const message = changes?.value?.messages?.[0] as
+      | {
+          from?: string;
+          id?: string;
+          type?: string;
+          text?: { body?: string };
+        }
+      | undefined;
 
-    if (!message) return;
+    if (!message?.from || !message.id || !message.type) return;
 
-    const phone = message.from;
-    const text = message.type === 'text' ? message.text?.body : null;
+    const phone = String(message.from).slice(0, 32);
+    const rawText = message.type === 'text' ? message.text?.body : null;
+    const text =
+      typeof rawText === 'string' ? sanitizePlainText(rawText).slice(0, 4000) : null;
 
-    // Store message
     await prisma.whatsAppMessage.create({
       data: {
         phone,
         direction: 'inbound',
-        messageId: message.id,
-        type: message.type,
+        messageId: String(message.id).slice(0, 128),
+        type: String(message.type).slice(0, 64),
         content: text,
         status: 'received',
         metadata: message as object,
       },
     });
 
-    // Simple conversational booking flow
-    const conv = await prisma.whatsAppConversation.upsert({
+    await prisma.whatsAppConversation.upsert({
       where: { phone },
       create: { phone, state: 'idle', context: {} },
       update: {},
@@ -60,7 +87,9 @@ router.post('/', webhookLimiter, async (req: Request, res: Response) => {
 
     await WhatsAppBookingFlowService.handleInbound(phone, text ?? message.type, message.type);
   } catch (err) {
-    console.error('WhatsApp webhook error', err);
+    logger.error('WhatsApp webhook error', {
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 });
 
@@ -117,7 +146,7 @@ router.post('/send-template', authenticate, async (req: Request, res: Response, 
 router.get('/admin/conversations', authenticate, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const [conversations, total] = await Promise.all([
       prisma.whatsAppConversation.findMany({ orderBy: { updatedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
       prisma.whatsAppConversation.count(),

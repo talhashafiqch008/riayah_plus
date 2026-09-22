@@ -60,7 +60,7 @@ export class StaffController {
     try {
       const agencyId = req.user!.userId;
       const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 20;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
 
       const [staff, total] = await Promise.all([
         prisma.agencyStaff.findMany({

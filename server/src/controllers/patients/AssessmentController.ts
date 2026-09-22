@@ -12,6 +12,8 @@ import {
   familyAssessmentWhere,
 } from '../../utils/careAccess';
 import { staffPublicUserSelect, toPublicStaffCard } from '../../utils/staffProfile';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -190,13 +192,9 @@ export class AssessmentController {
   }
 
   static async index(req: Request, res: Response): Promise<void> {
-    const {
-      page = '1',
-      limit = '20',
-      status,
-      episodeId,
-    } = req.query as Record<string, string>;
-    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+          const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
+      const episodeId = queryString(req.query.episodeId);
     const role = req.user!.role;
 
     const where: Prisma.AssessmentWhereInput = {};
@@ -232,7 +230,7 @@ export class AssessmentController {
         include: ASSESSMENT_INCLUDE,
         orderBy: { scheduledAt: 'asc' },
         skip,
-        take: parseInt(limit, 10),
+        take,
       }),
       prisma.assessment.count({ where }),
     ]);
@@ -240,8 +238,8 @@ export class AssessmentController {
     res.json({
       data: data.map((row) => mapAssessment(row)),
       total,
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
+      page,
+      limit,
     });
   }
 

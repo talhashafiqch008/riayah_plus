@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import { Linking, Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { deleteTempFile } from '../sessionCleanup';
 
 export type ConversationUser = {
   id: string;
@@ -126,7 +127,7 @@ export async function downloadConversationAttachment(
   if (!dir) throw new Error('File storage is unavailable on this device.');
 
   const safeName = displayName.replace(/[^\w.\-() ]+/g, '_');
-  const target = `${dir}${safeName}`;
+  const target = `${dir}attachment-${Date.now()}-${safeName}`;
   const baseURL = String(apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
   const authHeader = apiClient.defaults.headers.common.Authorization;
   const mimeType = attachmentMimeType(displayName);
@@ -135,22 +136,30 @@ export async function downloadConversationAttachment(
     headers: authHeader ? { Authorization: String(authHeader) } : undefined,
   });
   if (result.status < 200 || result.status >= 300) {
+    await deleteTempFile(result.uri);
     throw new Error('Could not download attachment');
   }
 
-  if (Platform.OS === 'android') {
-    const contentUri = await FileSystem.getContentUriAsync(result.uri);
-    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-      data: contentUri,
-      flags: 1,
-      type: mimeType,
-    });
-  } else {
-    const canOpen = await Linking.canOpenURL(result.uri);
-    if (!canOpen) {
-      throw new Error('No app available to open this file.');
+  try {
+    if (Platform.OS === 'android') {
+      const contentUri = await FileSystem.getContentUriAsync(result.uri);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: 1,
+        type: mimeType,
+      });
+    } else {
+      const canOpen = await Linking.canOpenURL(result.uri);
+      if (!canOpen) {
+        throw new Error('No app available to open this file.');
+      }
+      await Linking.openURL(result.uri);
     }
-    await Linking.openURL(result.uri);
+  } finally {
+    // MOB-08: schedule cleanup after the external viewer has a chance to open the file
+    setTimeout(() => {
+      void deleteTempFile(result.uri);
+    }, 60_000);
   }
 
   return result.uri;

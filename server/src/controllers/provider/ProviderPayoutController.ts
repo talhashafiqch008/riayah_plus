@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { z } from 'zod';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const createPayoutSchema = z.object({
   amount: z.number().positive(),
@@ -36,8 +38,8 @@ export class ProviderPayoutController {
   async listPayouts(req: Request, res: Response, next: NextFunction) {
     try {
       const providerId = req.user!.userId;
-      const { page = '1', limit = '20', status } = req.query as Record<string, string>;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+            const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
       const where: Record<string, unknown> = { providerId };
       if (status) where.status = status;
 
@@ -45,12 +47,12 @@ export class ProviderPayoutController {
         prisma.payoutRequest.findMany({
           where,
           skip,
-          take: parseInt(limit),
+          take,
           orderBy: { createdAt: 'desc' },
         }),
         prisma.payoutRequest.count({ where }),
       ]);
-      res.json({ data: payouts, meta: { total, page: parseInt(page), limit: parseInt(limit) } });
+      res.json({ data: payouts, meta: { total, page, limit } });
     } catch (err) {
       next(err);
     }

@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { RedisStore, type RedisReply } from 'rate-limit-redis';
 import { redis } from '../config/redis';
 import { env } from '../config/env';
+import { resolveTrustedClientIp } from './clientIp';
 
 /** Looser caps in local dev to avoid blocking manual/E2E flows; production uses audit baselines. */
 function scaleMax(max: number): number {
@@ -12,7 +13,7 @@ function scaleMax(max: number): number {
 }
 
 function clientKey(req: Request): string {
-  return req.ip || req.socket.remoteAddress || 'unknown';
+  return resolveTrustedClientIp(req);
 }
 
 /** AUTH-17: composite key — IP + identifier (email/phone) when present. */

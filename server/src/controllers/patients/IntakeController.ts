@@ -17,6 +17,8 @@ import { NotificationService } from '../../services/NotificationService';
 import { assertTenantOrgAccess } from '../../middleware/tenantAccess';
 import { resolveEpisodePartyIds } from '../../utils/careAccess';
 import { AiIntakeSummaryService } from '../../services/AiIntakeSummaryService';
+import { parsePagination } from '../../utils/pagination';
+import { queryString } from '../../utils/queryScalar';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -564,13 +566,9 @@ export class IntakeController {
       throw new AppError('Care coordinator access required.', 403);
     }
 
-    const {
-      page = '1',
-      limit = '20',
-      status,
-      urgency,
-    } = req.query as Record<string, string>;
-    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+          const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
+      const urgency = queryString(req.query.urgency);
 
     const tw = tenantWhere(req);
     const where: Prisma.IntakeRecordWhereInput = {};
@@ -620,12 +618,12 @@ export class IntakeController {
         },
         orderBy: [{ urgencyLevel: 'desc' }, { submittedAt: 'asc' }],
         skip,
-        take: parseInt(limit, 10),
+        take,
       }),
       prisma.intakeRecord.count({ where }),
     ]);
 
-    res.json({ data, total, page: parseInt(page, 10), limit: parseInt(limit, 10) });
+    res.json({ data, total, page, limit });
   }
 
   /** Move intake along status machine (e.g. start review / withdraw / send back). */

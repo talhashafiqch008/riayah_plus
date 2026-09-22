@@ -19,6 +19,8 @@ import {
   loadBookingOrThrow,
 } from '../utils/bookingAccess';
 import { InvoiceService } from '../services/InvoiceService';
+import { parsePagination } from '../utils/pagination';
+import { queryString } from '../utils/queryScalar';
 
 const router = Router();
 router.use(authenticate);
@@ -58,8 +60,8 @@ router.post('/', bookingLimiter, async (req: Request, res: Response) => {
 
 // Get user bookings
 router.get('/', async (req: Request, res: Response) => {
-  const { page = '1', limit = '20', status } = req.query as Record<string, string>;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+        const { page, limit, skip, take } = parsePagination(req.query);
+      const status = queryString(req.query.status);
   const userId = req.user!.userId;
   const role = req.user!.role;
 
@@ -74,7 +76,7 @@ router.get('/', async (req: Request, res: Response) => {
   else where.clientId = userId;
 
   const [bookings, total] = await Promise.all([
-    prisma.booking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip, take: parseInt(limit) }),
+    prisma.booking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip, take }),
     prisma.booking.count({ where }),
   ]);
 

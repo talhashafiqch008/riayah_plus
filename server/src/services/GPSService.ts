@@ -252,6 +252,20 @@ export class GPSService {
 
     const { geofence, target } = await GPSService.validateSessionCheckin(coords, session);
 
+    // MOB-06: treat client coordinates as untrusted evidence — reject out-of-radius
+    // unless explicitly allowed (ops escape hatch for staging drills).
+    const allowOutOfRadius = process.env.GPS_ALLOW_OUT_OF_RADIUS === 'true';
+    if (!geofence.isWithinRadius && !allowOutOfRadius) {
+      throw new AppError(
+        `Check-in rejected: you are ${geofence.distanceMeters}m outside the allowed ${geofence.radiusMeters}m radius.`,
+        422,
+        {
+          code: 'gps_out_of_radius',
+          geofence,
+        },
+      );
+    }
+
     const persistTarget = !pairFromLatLng(session.latitude, session.longitude) && target.coords;
 
     const updated = await prisma.session.update({

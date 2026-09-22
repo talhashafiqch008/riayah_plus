@@ -12,6 +12,11 @@ import { recordLogoutAll } from '../../middleware/auth';
 import { disconnectUserSockets } from '../../services/RealtimeService';
 import { clearAuthCookies } from '../../utils/authCookies';
 import { verifyTotpNoReplay } from '../../utils/totpReplay';
+import {
+  avatarUrlSchema,
+  optionalSanitizedString,
+  sanitizedString,
+} from '../../utils/sanitize';
 
 const updatePasswordSchema = z.object({
   current_password: z.string(),
@@ -35,19 +40,19 @@ const MIGRATE_ROLE_ALLOWLIST = [
 ] as const;
 
 const updateProfileSchema = z.object({
-  name: z.string().min(2).optional(),
-  phone: z.string().optional(),
-  avatar: z.string().url().optional(),
+  name: sanitizedString(z.string().min(2)).optional(),
+  phone: optionalSanitizedString(z.string()),
+  avatar: avatarUrlSchema.optional(),
   dateOfBirth: z.string().optional(),
-  gender: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
-  emergencyName: z.string().optional(),
-  emergencyPhone: z.string().optional(),
-  bio: z.string().optional(),
-  specializations: z.array(z.string()).optional(),
-  languages: z.array(z.string()).optional(),
+  gender: optionalSanitizedString(z.string()),
+  address: optionalSanitizedString(z.string()),
+  city: optionalSanitizedString(z.string()),
+  country: optionalSanitizedString(z.string()),
+  emergencyName: optionalSanitizedString(z.string()),
+  emergencyPhone: optionalSanitizedString(z.string()),
+  bio: optionalSanitizedString(z.string()),
+  specializations: z.array(sanitizedString(z.string())).optional(),
+  languages: z.array(sanitizedString(z.string())).optional(),
   hourlyRate: z.number().optional(),
 });
 

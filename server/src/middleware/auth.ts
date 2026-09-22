@@ -39,6 +39,35 @@ const REFRESH_VERIFY_OPTS: jwt.VerifyOptions = {
   audience: env.JWT_AUDIENCE,
 };
 
+function accessVerifySecrets(): string[] {
+  const secrets = [env.JWT_ACCESS_SECRET];
+  if (env.JWT_ACCESS_SECRET_PREVIOUS.trim()) secrets.push(env.JWT_ACCESS_SECRET_PREVIOUS.trim());
+  return secrets;
+}
+
+function refreshVerifySecrets(): string[] {
+  const secrets = [env.JWT_REFRESH_SECRET];
+  if (env.JWT_REFRESH_SECRET_PREVIOUS.trim()) secrets.push(env.JWT_REFRESH_SECRET_PREVIOUS.trim());
+  return secrets;
+}
+
+/** Verify with current secret, then previous (zero-downtime rotation window). */
+function verifyJwtWithSecrets<T>(
+  token: string,
+  secrets: string[],
+  opts: jwt.VerifyOptions,
+): T {
+  let lastError: unknown;
+  for (const secret of secrets) {
+    try {
+      return jwt.verify(token, secret, opts) as T;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
 export async function recordLogoutAll(userId: string): Promise<void> {
   const now = new Date();
   // AUTH-07: DB is source of truth; Redis is a fast cache
@@ -138,11 +167,11 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
 
   void (async () => {
     try {
-      const payload = jwt.verify(
+      const payload = verifyJwtWithSecrets<AuthPayload & { iat: number }>(
         token,
-        env.JWT_ACCESS_SECRET,
+        accessVerifySecrets(),
         ACCESS_VERIFY_OPTS,
-      ) as AuthPayload & { iat: number };
+      );
       const [claims, terminated] = await Promise.all([
         getFreshUserClaims(payload.userId),
         wasLoggedOutAll(payload.userId, payload.iat),
@@ -217,11 +246,11 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
 
   void (async () => {
     try {
-      const payload = jwt.verify(
+      const payload = verifyJwtWithSecrets<AuthPayload & { iat: number }>(
         token,
-        env.JWT_ACCESS_SECRET,
+        accessVerifySecrets(),
         ACCESS_VERIFY_OPTS,
-      ) as AuthPayload & { iat: number };
+      );
 
       const [active, terminated] = await Promise.all([
         assertUserActive(payload.userId),
@@ -272,10 +301,11 @@ export function generateRefreshToken(payload: Pick<AuthPayload, 'userId'>): stri
 }
 
 export function verifyAccessToken(token: string): AuthPayload & { iat: number } {
-  const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET, ACCESS_VERIFY_OPTS) as AuthPayload & {
-    iat: number;
-    typ?: string;
-  };
+  const decoded = verifyJwtWithSecrets<AuthPayload & { iat: number; typ?: string }>(
+    token,
+    accessVerifySecrets(),
+    ACCESS_VERIFY_OPTS,
+  );
   if (decoded.typ && decoded.typ !== 'access') {
     throw new jwt.JsonWebTokenError('Invalid token type');
   }
@@ -283,10 +313,9 @@ export function verifyAccessToken(token: string): AuthPayload & { iat: number } 
 }
 
 export function verifyRefreshToken(token: string): Pick<AuthPayload, 'userId'> {
-  const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET, REFRESH_VERIFY_OPTS) as Pick<
-    AuthPayload,
-    'userId'
-  > & { typ?: string };
+  const decoded = verifyJwtWithSecrets<
+    Pick<AuthPayload, 'userId'> & { typ?: string }
+  >(token, refreshVerifySecrets(), REFRESH_VERIFY_OPTS);
   if (decoded.typ && decoded.typ !== 'refresh') {
     throw new jwt.JsonWebTokenError('Invalid token type');
   }

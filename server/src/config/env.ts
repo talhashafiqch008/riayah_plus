@@ -19,6 +19,9 @@ export const env = {
 
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'change-me-access-secret',
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'change-me-refresh-secret',
+  /** Previous secrets accepted during rotation window (verify only; never used to sign). */
+  JWT_ACCESS_SECRET_PREVIOUS: process.env.JWT_ACCESS_SECRET_PREVIOUS || '',
+  JWT_REFRESH_SECRET_PREVIOUS: process.env.JWT_REFRESH_SECRET_PREVIOUS || '',
   // A-3: validated below
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
@@ -28,6 +31,13 @@ export const env = {
   BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
   /** AUTH-15: when break-glass is enabled, bind to this admin user id (not client-supplied email) */
   ADMIN_BREAK_GLASS_USER_ID: process.env.ADMIN_BREAK_GLASS_USER_ID || '',
+  ALLOW_ADMIN_SECRET_LOGIN: process.env.ALLOW_ADMIN_SECRET_LOGIN === 'true',
+
+  /** Reverse-proxy IP trust (D-02). Prod defaults on; set TRUST_PROXY=false to disable. */
+  TRUST_PROXY:
+    process.env.TRUST_PROXY === 'true' ||
+    (process.env.NODE_ENV === 'production' && process.env.TRUST_PROXY !== 'false'),
+  TRUST_PROXY_HOPS: parseInt(process.env.TRUST_PROXY_HOPS || '1', 10),
 
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
@@ -113,8 +123,15 @@ export const env = {
 };
 
 // A-3: refuse to start in deployed environments with default JWT secrets (M11)
-const DEFAULT_JWT_SECRETS = ['change-me-access-secret', 'change-me-refresh-secret'];
+const DEFAULT_JWT_SECRETS = [
+  'change-me-access-secret',
+  'change-me-refresh-secret',
+  'your-access-secret-min-32-chars',
+  'your-refresh-secret-min-32-chars',
+];
+const WEAK_ADMIN_SECRETS = ['', 'your-admin-secret-here', 'change-me', 'admin', 'secret'];
 const isLocalDev = (process.env.NODE_ENV || 'development') === 'development';
+const MIN_JWT_SECRET_LEN = 32;
 
 if (!isLocalDev) {
   if (
@@ -126,10 +143,38 @@ if (!isLocalDev) {
         'Generate secure random secrets and set them in your environment before running outside local development.',
     );
   }
+  if (
+    env.JWT_ACCESS_SECRET.length < MIN_JWT_SECRET_LEN ||
+    env.JWT_REFRESH_SECRET.length < MIN_JWT_SECRET_LEN
+  ) {
+    throw new Error(
+      `FATAL: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be at least ${MIN_JWT_SECRET_LEN} characters outside local development.`,
+    );
+  }
+  if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
+    throw new Error('FATAL: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be distinct.');
+  }
 }
 
-// Production-only encryption / KMS guards
+// Production-only encryption / KMS / break-glass guards
 if (process.env.NODE_ENV === 'production') {
+  if (env.ALLOW_ADMIN_SECRET_LOGIN) {
+    if (
+      WEAK_ADMIN_SECRETS.includes(env.ADMIN_SECRET.trim()) ||
+      env.ADMIN_SECRET.trim().length < MIN_JWT_SECRET_LEN
+    ) {
+      throw new Error(
+        'FATAL: ALLOW_ADMIN_SECRET_LOGIN is enabled but ADMIN_SECRET is missing/weak. ' +
+          'Use a ≥32-char secret or disable break-glass login.',
+      );
+    }
+    if (!env.ADMIN_BREAK_GLASS_USER_ID.trim()) {
+      throw new Error(
+        'FATAL: ALLOW_ADMIN_SECRET_LOGIN requires ADMIN_BREAK_GLASS_USER_ID.',
+      );
+    }
+  }
+
   if (!env.DATA_EXPORT_ENCRYPTION_KEY?.trim()) {
     throw new Error(
       'FATAL: DATA_EXPORT_ENCRYPTION_KEY must be set in production. ' +
