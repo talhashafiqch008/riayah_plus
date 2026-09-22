@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Plus, Sparkles, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -11,11 +12,13 @@ import {
   type AiIntakeSummary,
 } from '@/lib/api/clinicalNotes';
 import { getEpisode, type CareEpisode } from '@/lib/api/episodes';
+import { localizeChip, localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
 
 const emptyGoal = (): GoalInput => ({ title: '', description: '', measurement: '' });
 const emptyItem = (): ItemInput => ({ serviceType: '', frequency: '', duration: '' });
 
 export default function CoordinatorCarePlanBuilderPage() {
+  const { t } = useTranslation('coordinator');
   const { episodeId = '' } = useParams();
   const navigate = useNavigate();
   const [episode, setEpisode] = useState<CareEpisode | null>(null);
@@ -35,12 +38,16 @@ export default function CoordinatorCarePlanBuilderPage() {
         getAiIntakeSummary(episodeId).catch(() => null),
       ]);
       setEpisode(ep);
-      setTitle(ep.title ? `Care plan — ${ep.title}` : 'Care plan');
+      setTitle(
+        ep.title
+          ? t('plans.builder.carePlanPrefix', { title: localizeGeneratedLabel(ep.title) })
+          : t('plans.builder.carePlanDefault'),
+      );
       setSummary(ai);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load episode');
+      toast.error(isApiError(error) ? error.message : t('plans.builder.loadFailed'));
     }
-  }, [episodeId]);
+  }, [episodeId, t]);
 
   useEffect(() => {
     void load();
@@ -48,7 +55,7 @@ export default function CoordinatorCarePlanBuilderPage() {
 
   async function onCreate() {
     if (!title.trim()) {
-      toast.error('Title is required');
+      toast.error(t('plans.builder.titleRequired'));
       return;
     }
     setSaving(true);
@@ -60,10 +67,10 @@ export default function CoordinatorCarePlanBuilderPage() {
         goals: goals.filter((g) => g.title.trim()),
         items: items.filter((i) => i.serviceType.trim()),
       });
-      toast.success('Care plan created');
+      toast.success(t('plans.builder.created'));
       navigate(`/coordinator/plans/${plan.id}`);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to create plan');
+      toast.error(isApiError(error) ? error.message : t('plans.builder.createFailed'));
     } finally {
       setSaving(false);
     }
@@ -73,13 +80,13 @@ export default function CoordinatorCarePlanBuilderPage() {
     setAiBusy(true);
     try {
       await triggerAiCarePlanDraft(episodeId);
-      toast.success('AI draft requested — loading plans…');
+      toast.success(t('plans.builder.aiRequested'));
       const plans = await listCarePlans({ episodeId });
       const draft = plans.find((p) => p.status === 'draft' && p.isCurrentVersion);
       if (draft) navigate(`/coordinator/plans/${draft.id}`);
-      else toast('Draft may still be processing — check Care Plans list');
+      else toast(t('plans.builder.aiProcessing'));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'AI draft failed');
+      toast.error(isApiError(error) ? error.message : t('plans.builder.aiFailed'));
     } finally {
       setAiBusy(false);
     }
@@ -87,11 +94,11 @@ export default function CoordinatorCarePlanBuilderPage() {
 
   async function onApproveSummary() {
     try {
-      const updated = await approveAiIntakeSummary(episodeId);
-      setSummary(updated);
-      toast.success('AI intake summary approved');
+      await approveAiIntakeSummary(episodeId);
+      toast.success(t('plans.builder.summaryApproved'));
+      await load();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Approve failed');
+      toast.error(isApiError(error) ? error.message : t('plans.builder.approveFailed'));
     }
   }
 
@@ -101,29 +108,33 @@ export default function CoordinatorCarePlanBuilderPage() {
         to="/coordinator/plans"
         className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
       >
-        <ArrowLeft className="size-4" /> Back to plans
+        <ArrowLeft className="size-4 rtl-flip" /> {t('plans.builder.back')}
       </Link>
 
       <div>
-        <h2 className="text-2xl font-semibold text-stone-900">New care plan</h2>
+        <h2 className="text-2xl font-semibold text-stone-900">{t('plans.builder.title')}</h2>
         <p className="mt-1 text-stone-600">
-          {episode ? episode.title : `Episode ${episodeId}`}
+          {episode
+            ? localizeGeneratedLabel(episode.title)
+            : t('plans.builder.episodeFallback', { id: episodeId.slice(0, 8) })}
         </p>
       </div>
 
       {summary && (
         <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-stone-900">AI intake summary</h3>
-            <span className="text-xs font-semibold uppercase text-teal-800">{summary.status}</span>
+            <h3 className="font-semibold text-stone-900">{t('plans.builder.aiSummary')}</h3>
+            <span className="text-xs font-semibold uppercase text-teal-800">
+              {t(`plans.status.${summary.status}`, { defaultValue: summary.status })}
+            </span>
           </div>
           {summary.clinicalImpressions && (
             <p className="text-sm text-stone-700">{summary.clinicalImpressions}</p>
           )}
           {(summary.keyConcerns?.length ?? 0) > 0 && (
-            <ul className="text-sm text-stone-600 list-disc pl-5">
+            <ul className="text-sm text-stone-600 list-disc ps-5">
               {summary.keyConcerns!.map((c) => (
-                <li key={c}>{c}</li>
+                <li key={c}>{localizeChip(c)}</li>
               ))}
             </ul>
           )}
@@ -133,7 +144,7 @@ export default function CoordinatorCarePlanBuilderPage() {
               onClick={() => void onApproveSummary()}
               className="rounded-xl bg-teal-600 px-3 py-1.5 text-sm font-semibold text-white"
             >
-              Approve summary
+              {t('plans.builder.approveSummary')}
             </button>
           )}
         </div>
@@ -141,7 +152,7 @@ export default function CoordinatorCarePlanBuilderPage() {
 
       <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-stone-700">Title</span>
+          <span className="text-sm font-medium text-stone-700">{t('plans.builder.fieldTitle')}</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -149,7 +160,7 @@ export default function CoordinatorCarePlanBuilderPage() {
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-stone-700">Notes</span>
+          <span className="text-sm font-medium text-stone-700">{t('plans.builder.fieldNotes')}</span>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -160,19 +171,19 @@ export default function CoordinatorCarePlanBuilderPage() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-stone-900">Goals</h3>
+            <h3 className="font-semibold text-stone-900">{t('plans.builder.goals')}</h3>
             <button
               type="button"
               onClick={() => setGoals((g) => [...g, emptyGoal()])}
               className="inline-flex items-center gap-1 text-sm text-teal-700"
             >
-              <Plus className="size-4" /> Add
+              <Plus className="size-4" /> {t('plans.builder.add')}
             </button>
           </div>
           {goals.map((g, i) => (
             <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] border border-stone-100 rounded-xl p-3">
               <input
-                placeholder="Goal title"
+                placeholder={t('plans.builder.goalTitle')}
                 value={g.title}
                 onChange={(e) =>
                   setGoals((rows) => rows.map((r, j) => (j === i ? { ...r, title: e.target.value } : r)))
@@ -180,7 +191,7 @@ export default function CoordinatorCarePlanBuilderPage() {
                 className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
               />
               <input
-                placeholder="Measurement"
+                placeholder={t('plans.builder.measurement')}
                 value={g.measurement ?? ''}
                 onChange={(e) =>
                   setGoals((rows) =>
@@ -197,7 +208,7 @@ export default function CoordinatorCarePlanBuilderPage() {
                 <Trash2 className="size-4" />
               </button>
               <input
-                placeholder="Description"
+                placeholder={t('plans.builder.description')}
                 value={g.description ?? ''}
                 onChange={(e) =>
                   setGoals((rows) =>
@@ -212,19 +223,19 @@ export default function CoordinatorCarePlanBuilderPage() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-stone-900">Services</h3>
+            <h3 className="font-semibold text-stone-900">{t('plans.builder.services')}</h3>
             <button
               type="button"
               onClick={() => setItems((rows) => [...rows, emptyItem()])}
               className="inline-flex items-center gap-1 text-sm text-teal-700"
             >
-              <Plus className="size-4" /> Add
+              <Plus className="size-4" /> {t('plans.builder.add')}
             </button>
           </div>
           {items.map((item, i) => (
             <div key={i} className="grid gap-2 sm:grid-cols-4 border border-stone-100 rounded-xl p-3">
               <input
-                placeholder="Service type"
+                placeholder={t('plans.builder.serviceType')}
                 value={item.serviceType}
                 onChange={(e) =>
                   setItems((rows) =>
@@ -234,7 +245,7 @@ export default function CoordinatorCarePlanBuilderPage() {
                 className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
               />
               <input
-                placeholder="Frequency"
+                placeholder={t('plans.builder.frequency')}
                 value={item.frequency ?? ''}
                 onChange={(e) =>
                   setItems((rows) =>
@@ -244,7 +255,7 @@ export default function CoordinatorCarePlanBuilderPage() {
                 className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
               />
               <input
-                placeholder="Duration"
+                placeholder={t('plans.builder.duration')}
                 value={item.duration ?? ''}
                 onChange={(e) =>
                   setItems((rows) =>
@@ -256,7 +267,7 @@ export default function CoordinatorCarePlanBuilderPage() {
               <div className="flex gap-2">
                 <input
                   type="number"
-                  placeholder="Unit cost"
+                  placeholder={t('plans.builder.unitCost')}
                   value={item.unitCost ?? ''}
                   onChange={(e) =>
                     setItems((rows) =>
@@ -288,7 +299,7 @@ export default function CoordinatorCarePlanBuilderPage() {
             onClick={() => void onCreate()}
             className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Create draft'}
+            {saving ? t('plans.builder.saving') : t('plans.builder.createDraft')}
           </button>
           <button
             type="button"
@@ -297,7 +308,7 @@ export default function CoordinatorCarePlanBuilderPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50"
           >
             <Sparkles className="size-4" />
-            {aiBusy ? 'Generating…' : 'Generate AI Draft'}
+            {aiBusy ? t('plans.builder.generating') : t('plans.builder.generateAi')}
           </button>
         </div>
       </div>

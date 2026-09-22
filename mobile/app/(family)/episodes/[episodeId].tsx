@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -18,11 +19,15 @@ import {
 } from '../../../components/ui';
 import { FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { getEpisode } from '../../../lib/api/care';
-import { apiErrorMessage, formatDateTime } from '../../../lib/format';
-import { familyEpisodeStatusLabel } from '../../../lib/familyLanguage';
+import { apiErrorMessage } from '../../../lib/format';
+import {
+  familyEpisodeStatusLabel,
+  formatFamilyDateTime,
+} from '../../../lib/familyLanguage';
 import { buildFamilyJourneyMilestones } from '../../../lib/familyJourneyMilestones';
 
 export default function FamilyEpisodeDetailScreen() {
+  const { t } = useTranslation('family');
   const { episodeId } = useLocalSearchParams<{ episodeId: string }>();
 
   const query = useQuery({
@@ -37,7 +42,7 @@ export default function FamilyEpisodeDetailScreen() {
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Care journey" showBack />
+        <FamilyTabHero title={t('episodes.title')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -46,12 +51,12 @@ export default function FamilyEpisodeDetailScreen() {
   if (query.isError || !episode) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Care journey" showBack />
+        <FamilyTabHero title={t('episodes.title')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Care journey not found"
+          title={t('episodeDetail.notFound')}
           subtitle={query.error ? apiErrorMessage(query.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
@@ -63,7 +68,7 @@ export default function FamilyEpisodeDetailScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <FamilyTabHero
-        title={episode.title ?? 'Care journey'}
+        title={episode.title ?? t('episodes.untitled')}
         subtitle={episode.careRecipient?.name ?? episode.patient?.name ?? undefined}
         showBack
       />
@@ -94,16 +99,16 @@ export default function FamilyEpisodeDetailScreen() {
                 router.push(`/(family)/book-session?episodeId=${episode.id}` as never)
               }
             >
-              Book session
+              {t('appointments.bookSession')}
             </Button>
           ) : null}
         </View>
 
         <Card className="mt-3" shadow>
-          <Text className="text-sm font-semibold text-stone-900">Your care journey</Text>
-          <Text className="mt-0.5 text-sm text-stone-500">
-            Simple milestones so you always know what comes next.
+          <Text className="text-sm font-semibold text-stone-900">
+            {t('episodeDetail.milestones')}
           </Text>
+          <Text className="mt-0.5 text-sm text-stone-500">{t('milestones.hint')}</Text>
           <View className="mt-4 gap-3">
             {milestones.map((m, i) => (
               <View key={m.id} className="flex-row items-start gap-3">
@@ -147,8 +152,10 @@ export default function FamilyEpisodeDetailScreen() {
                     >
                       {m.label}
                     </Text>
-                    {m.locked ? <Chip label="Coming soon" /> : null}
-                    {m.current && !m.locked ? <Chip label="Now" tone="teal" /> : null}
+                    {m.locked ? <Chip label={t('milestones.comingSoon')} /> : null}
+                    {m.current && !m.locked ? (
+                      <Chip label={t('milestones.now')} tone="teal" />
+                    ) : null}
                   </View>
                   {m.description ? (
                     <Text
@@ -166,10 +173,12 @@ export default function FamilyEpisodeDetailScreen() {
         </Card>
 
         <Card className="mt-4" shadow>
-          <Text className="text-sm font-semibold text-stone-900">Care summary</Text>
+          <Text className="text-sm font-semibold text-stone-900">
+            {t('episodeDetail.careSummary')}
+          </Text>
           <View className="mt-3">
             <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Reason for care
+              {t('episodeDetail.reasonForCare')}
             </Text>
             <Text className="mt-0.5 text-base text-stone-900">
               {episode.reasonForCare || '—'}
@@ -178,18 +187,22 @@ export default function FamilyEpisodeDetailScreen() {
         </Card>
 
         <Card className="mt-4" shadow>
-          <Text className="text-sm font-semibold text-stone-900">Timeline</Text>
+          <Text className="text-sm font-semibold text-stone-900">
+            {t('episodeDetail.timeline')}
+          </Text>
           <View className="mt-3 gap-3">
             <TimelineRow
               color="bg-amber-400"
-              title="Care request received"
-              subtitle={episode.createdAt ? formatDateTime(episode.createdAt) : '—'}
+              title={t('episodeDetail.requestReceived')}
+              subtitle={
+                episode.createdAt ? formatFamilyDateTime(episode.createdAt) : '—'
+              }
             />
             {episode.intakeReviewedAt ? (
               <TimelineRow
                 color="bg-teal-500"
-                title="Care team reviewed"
-                subtitle={formatDateTime(episode.intakeReviewedAt)}
+                title={t('episodeDetail.teamReviewed')}
+                subtitle={formatFamilyDateTime(episode.intakeReviewedAt)}
               />
             ) : null}
             <TimelineRow
@@ -198,28 +211,31 @@ export default function FamilyEpisodeDetailScreen() {
                   ? 'bg-green-500'
                   : 'bg-stone-300'
               }
-              title={`Current: ${familyEpisodeStatusLabel(episode.status ?? '')}`}
-              subtitle={episode.updatedAt ? formatDateTime(episode.updatedAt) : '—'}
+              title={t('episodeDetail.current', {
+                status: familyEpisodeStatusLabel(episode.status ?? ''),
+              })}
+              subtitle={
+                episode.updatedAt ? formatFamilyDateTime(episode.updatedAt) : '—'
+              }
             />
             <TimelineRow
               color={sessions.length > 0 ? 'bg-sky-500' : 'bg-stone-200'}
-              title="Care sessions"
+              title={t('episodeDetail.careSessions')}
               subtitle={
-                sessions.length > 0 ? `${sessions.length} scheduled` : 'None scheduled yet'
+                sessions.length > 0
+                  ? t('episodeDetail.sessionsBooked', { count: sessions.length })
+                  : t('episodeDetail.noSessions')
               }
             />
           </View>
         </Card>
 
         <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-          Sessions
+          {t('episodeDetail.careSessions')}
         </Text>
         {sessions.length === 0 ? (
           <Card shadow={false}>
-            <Text className="text-sm text-stone-500">
-              No care sessions scheduled yet. When your coordinator assigns a clinician, you can
-              book from open time slots.
-            </Text>
+            <Text className="text-sm text-stone-500">{t('episodeDetail.sessionsHint')}</Text>
             {!isClosed ? (
               <View className="mt-3">
                 <Button
@@ -228,7 +244,7 @@ export default function FamilyEpisodeDetailScreen() {
                     router.push(`/(family)/book-session?episodeId=${episode.id}` as never)
                   }
                 >
-                  Book a session
+                  {t('episodeDetail.bookSession')}
                 </Button>
               </View>
             ) : null}
@@ -246,16 +262,22 @@ export default function FamilyEpisodeDetailScreen() {
               <Card className="mb-2" shadow={false}>
                 <View className="flex-row items-start justify-between gap-2">
                   <Text className="flex-1 font-medium text-stone-900">
-                    {s.scheduledAt ? formatDateTime(s.scheduledAt) : 'Session'}
-                    {s.durationMinutes ? ` · ${s.durationMinutes} min` : ''}
+                    {s.scheduledAt ? formatFamilyDateTime(s.scheduledAt) : t('common.careTeam')}
+                    {s.durationMinutes
+                      ? ` · ${t('common.min', { count: s.durationMinutes })}`
+                      : ''}
                   </Text>
                   <StatusBadge status={s.status ?? 'scheduled'} />
                 </View>
                 {s.provider?.name ? (
-                  <Text className="mt-1 text-sm text-stone-500">With {s.provider.name}</Text>
+                  <Text className="mt-1 text-sm text-stone-500">
+                    {t('mobile.common.withProvider', { name: s.provider.name })}
+                  </Text>
                 ) : null}
                 {s.type === 'telehealth' ? (
-                  <Text className="mt-1 text-xs font-medium text-teal-700">Video visit</Text>
+                  <Text className="mt-1 text-xs font-medium text-teal-700">
+                    {t('nav.telehealth')}
+                  </Text>
                 ) : null}
               </Card>
             </Pressable>

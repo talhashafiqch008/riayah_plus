@@ -7,6 +7,7 @@ export default function ClinicalMessageThreadScreen() {
     <MessageThread
       conversationId={String(id ?? '')}
       basePath="/(clinical)/messages"
+      i18nNs="clinical"
     />
   );
 }

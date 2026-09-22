@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { resetPassword } from '@/lib/api/auth';
 import { isApiError } from '@/lib/errors';
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation('auth');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -30,32 +32,32 @@ export default function ResetPasswordPage() {
     e.preventDefault();
 
     if (!email || !token) {
-      toast.error('Invalid reset link. Please request a new password reset.');
+      toast.error(t('webReset.invalidLinkToast'));
       return;
     }
 
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters.');
+      toast.error(t('webReset.passwordMin'));
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match.');
+      toast.error(t('webReset.passwordsMismatch'));
       return;
     }
 
     setLoading(true);
     try {
       await resetPassword(email, token, password);
-      toast.success('Password reset successfully. You can now log in.');
+      toast.success(t('webReset.successToast'));
       navigate('/careseeker/login');
     } catch (error: unknown) {
       if (isApiError(error)) {
-        toast.error(error.message || 'Failed to reset password.');
+        toast.error(error.message || t('webReset.resetFailed'));
       } else if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error('Failed to reset password. The link may have expired.');
+        toast.error(t('webReset.resetFailedExpired'));
       }
     } finally {
       setLoading(false);
@@ -66,15 +68,13 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 px-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl text-center">
-          <h2 className="text-2xl font-semibold text-stone-900 mb-2">Invalid Reset Link</h2>
-          <p className="text-stone-600 mb-6">
-            This password reset link is missing required information or has expired.
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900 mb-2">{t('webReset.invalidTitle')}</h2>
+          <p className="text-stone-600 mb-6">{t('webReset.invalidBody')}</p>
           <Link
             to="/forgot-password"
             className="inline-flex items-center text-teal-600 hover:text-teal-700 font-medium"
           >
-            Request a new reset link
+            {t('webReset.requestNewLink')}
           </Link>
         </div>
       </div>
@@ -85,15 +85,15 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-stone-900 mb-2">Set New Password</h1>
-          <p className="text-stone-600">Enter a new password for {email}</p>
+          <h1 className="text-3xl font-semibold text-stone-900 mb-2">{t('webReset.title')}</h1>
+          <p className="text-stone-600">{t('webReset.subtitle', { email })}</p>
         </div>
 
         <div className="rounded-2xl bg-white p-8 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-stone-700 mb-2">
-                New Password
+                {t('webReset.newPassword')}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-stone-400" />
@@ -105,13 +105,13 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-lg border border-stone-300 pl-10 pr-12 py-3 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                  placeholder="At least 8 characters"
+                  placeholder={t('webReset.passwordPlaceholder')}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('webReset.hidePassword') : t('webReset.showPassword')}
                 >
                   {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                 </button>
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-stone-700 mb-2">
-                Confirm Password
+                {t('webReset.confirmPassword')}
               </label>
               <input
                 id="confirmPassword"
@@ -129,7 +129,7 @@ export default function ResetPasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full rounded-lg border border-stone-300 px-4 py-3 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                placeholder="Repeat your password"
+                placeholder={t('webReset.confirmPlaceholder')}
               />
             </div>
 
@@ -138,7 +138,7 @@ export default function ResetPasswordPage() {
               disabled={loading}
               className="w-full rounded-lg bg-teal-600 px-4 py-3 text-sm font-semibold text-white hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-60"
             >
-              {loading ? 'Resetting...' : 'Reset Password'}
+              {loading ? t('webReset.submitting') : t('webReset.submit')}
             </button>
 
             <div className="text-center">
@@ -147,7 +147,7 @@ export default function ResetPasswordPage() {
                 className="inline-flex items-center text-sm text-teal-600 hover:text-teal-700 font-medium"
               >
                 <ArrowLeft className="mr-2 size-4" />
-                Back to Login
+                {t('webReset.backToLogin')}
               </Link>
             </div>
           </form>

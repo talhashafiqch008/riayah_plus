@@ -10,7 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { EmptyState, StatusBadge } from '../../../components/ui';
+import { clinicalSessionStatus } from '../../../lib/clinicalI18n';
 import { ROLE, RoleTabHero } from '../../../components/shell/RoleChrome';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { listSessions, type CareSession } from '../../../lib/api/scheduling';
@@ -20,6 +22,7 @@ function isJoinable(session: CareSession): boolean {
 }
 
 export default function ClinicalTelehealthListScreen() {
+  const { t, i18n } = useTranslation('clinical');
   const toast = useToast();
   const [sessions, setSessions] = useState<CareSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,12 +33,12 @@ export default function ClinicalTelehealthListScreen() {
       const rows = await listSessions();
       setSessions(rows.filter((s) => s.type === 'telehealth'));
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load video sessions'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('telehealth.loadError')), { type: 'danger' });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [t, toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,7 +57,11 @@ export default function ClinicalTelehealthListScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: ROLE.stone50 }} edges={['top']}>
-      <RoleTabHero title="Telehealth" subtitle="Admit patients and join video visits" showBack />
+      <RoleTabHero
+        title={t('nav.telehealth')}
+        subtitle={t('mobile.more.telehealthDesc')}
+        showBack
+      />
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={ROLE.teal} />
@@ -77,8 +84,8 @@ export default function ClinicalTelehealthListScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="videocam-outline"
-              title="No telehealth sessions"
-              subtitle="Booked video visits assigned to you will appear here."
+              title={t('mobile.detail.telehealthListEmptyTitle')}
+              subtitle={t('mobile.detail.telehealthListEmptyHint')}
             />
           }
           renderItem={({ item }) => (
@@ -89,13 +96,16 @@ export default function ClinicalTelehealthListScreen() {
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-1">
                   <Text className="text-base font-semibold text-stone-900">
-                    {item.client?.name ?? 'Patient visit'}
+                    {item.client?.name ?? t('mobile.detail.patientVisit')}
                   </Text>
                   <Text className="mt-1 text-sm text-stone-600">{formatDateTime(item.scheduledAt)}</Text>
                 </View>
-                <StatusBadge status={item.status} />
+                <StatusBadge
+                  status={item.status}
+                  label={clinicalSessionStatus(t, i18n, item.status)}
+                />
               </View>
-              <Text className="mt-3 text-sm font-semibold text-teal-700">Open session</Text>
+              <Text className="mt-3 text-sm font-semibold text-teal-700">{t('telehealth.openSession')}</Text>
             </Pressable>
           )}
         />

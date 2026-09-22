@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
 import {
   endShift,
@@ -33,6 +34,7 @@ function nextOpenVisit(sessions: CareSession[]): CareSession | null {
 }
 
 export default function SupportShiftsScreen() {
+  const { t } = useTranslation('support');
   const toast = useToast();
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -57,31 +59,31 @@ export default function SupportShiftsScreen() {
       setActionError(null);
       await queryClient.invalidateQueries({ queryKey: ['support-shifts'] });
       await queryClient.invalidateQueries({ queryKey: ['support-shell-stats'] });
-      toast.show(result.message ?? 'Shift started', { type: 'success' });
+      toast.show(result.message ?? t('shifts.startedToast'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Start failed');
+      const msg = apiErrorMessage(e, t('shifts.startFailed'));
       setActionError(msg);
-      toastError(toast, e, 'Start failed');
+      toastError(toast, e, t('shifts.startFailed'));
     },
   });
 
   const endMutation = useMutation({
     mutationFn: async () => {
       const active = query.data?.active;
-      if (!active) throw new Error('No active shift');
+      if (!active) throw new Error(t('shifts.noActive'));
       return endShift(active.id);
     },
     onSuccess: async () => {
       setActionError(null);
       await queryClient.invalidateQueries({ queryKey: ['support-shifts'] });
       await queryClient.invalidateQueries({ queryKey: ['support-shell-stats'] });
-      toast.show('Shift ended', { type: 'success' });
+      toast.show(t('shifts.endedToast'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'End failed');
+      const msg = apiErrorMessage(e, t('shifts.endFailed'));
       setActionError(msg);
-      toastError(toast, e, 'End failed');
+      toastError(toast, e, t('shifts.endFailed'));
     },
   });
 
@@ -89,11 +91,14 @@ export default function SupportShiftsScreen() {
   const history = query.data?.history ?? [];
   const busy = startMutation.isPending || endMutation.isPending;
 
+  const statusLabel = (status: string) =>
+    t(`shifts.statusLabel.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="My Shifts"
-        subtitle="Start or end your shift"
+        title={t('shifts.title')}
+        subtitle={t('shifts.description')}
         showBack={false}
         rightAction={{
           icon: 'checkmark-circle-outline',
@@ -106,9 +111,9 @@ export default function SupportShiftsScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load shifts"
+          title={t('shifts.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <ScrollView
@@ -121,9 +126,7 @@ export default function SupportShiftsScreen() {
             />
           }
         >
-          <Text className="mb-3 text-sm text-stone-500">
-            Start your shift, then GPS check in at the patient address for each visit.
-          </Text>
+          <Text className="mb-3 text-sm text-stone-500">{t('shifts.description')}</Text>
 
           {actionError ? (
             <View className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
@@ -137,27 +140,27 @@ export default function SupportShiftsScreen() {
               onPress={() => router.push(`/(support)/visits/${nextVisit.id}`)}
             >
               <Text className="text-xs font-semibold uppercase tracking-wider text-teal-600">
-                Next visit
+                {t('visits.title')}
               </Text>
               <Text className="mt-1 text-base font-semibold text-stone-900">
-                {nextVisit.client?.name ?? 'Patient'}
+                {nextVisit.client?.name ?? t('visits.patient')}
               </Text>
               <Text className="mt-1 text-sm text-stone-500">
                 {formatDateTime(nextVisit.scheduledAt)}
               </Text>
               <Text className="mt-2 text-sm font-medium text-teal-700">
-                {nextVisit.checkInAt ? 'Open visit check-in' : 'GPS check-in'}
+                {nextVisit.checkInAt ? t('visits.checkedIn') : t('visits.description')}
               </Text>
             </Card>
           ) : null}
 
           <Card className="mb-6" shadow>
-            <Text className="font-semibold text-stone-900">Active shift</Text>
+            <Text className="font-semibold text-stone-900">{t('shifts.activeShift')}</Text>
             {active ? (
               <View className="mt-2">
-                <StatusBadge status={active.status} label={active.status.replace(/_/g, ' ')} />
+                <StatusBadge status={active.status} label={statusLabel(active.status)} />
                 <Text className="mt-2 text-sm text-stone-700">
-                  Started: {formatDateTime(active.startedAt)}
+                  {t('shifts.started')}: {formatDateTime(active.startedAt)}
                 </Text>
                 <View className="mt-4">
                   <Button
@@ -168,13 +171,13 @@ export default function SupportShiftsScreen() {
                       endMutation.mutate();
                     }}
                   >
-                    End shift
+                    {t('shifts.end')}
                   </Button>
                 </View>
               </View>
             ) : (
               <View className="mt-2">
-                <Text className="text-sm text-stone-500">No shift in progress.</Text>
+                <Text className="text-sm text-stone-500">{t('shifts.noActive')}</Text>
                 <View className="mt-4">
                   <Button
                     isLoading={busy}
@@ -183,21 +186,21 @@ export default function SupportShiftsScreen() {
                       startMutation.mutate();
                     }}
                   >
-                    Start shift
+                    {t('shifts.start')}
                   </Button>
                 </View>
               </View>
             )}
           </Card>
 
-          <Text className="mb-2 font-semibold text-stone-900">History</Text>
+          <Text className="mb-2 font-semibold text-stone-900">{t('shifts.history')}</Text>
           {history.length === 0 ? (
-            <Text className="text-sm text-stone-500">No past shifts.</Text>
+            <Text className="text-sm text-stone-500">{t('shifts.noHistory')}</Text>
           ) : (
             history.map((s) => (
               <Card key={s.id} className="mb-2" shadow={false}>
                 <View className="flex-row items-center justify-between gap-2">
-                  <StatusBadge status={s.status} label={s.status.replace(/_/g, ' ')} />
+                  <StatusBadge status={s.status} label={statusLabel(s.status)} />
                 </View>
                 <Text className="mt-1 text-sm text-stone-500">
                   {formatDateTime(s.startedAt)}

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Button,
@@ -24,7 +25,6 @@ import {
   StatusBadge,
 } from '../../../components/ui';
 import {
-  episodeStatusLabel,
   formatCountry,
   getCareUnit,
   updateCareUnit,
@@ -32,8 +32,8 @@ import {
 } from '../../../lib/api/care';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
-import { familyIntakeStatusLabel } from '../../../lib/familyLanguage';
 import { parseFamilyWizardSummary } from '../../../lib/familyCareseekerIntake';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 import { toastError } from '../../../lib/toast';
 
 type UnitForm = {
@@ -56,7 +56,15 @@ function toForm(unit: CareUnit): UnitForm {
   };
 }
 
+function episodeStatusLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  status: string,
+) {
+  return t(`episodes.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+}
+
 export default function CoordinatorCareUnitDetailScreen() {
+  const { t } = useTranslation('coordinator');
   const { unitId } = useLocalSearchParams<{ unitId: string }>();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
@@ -84,7 +92,7 @@ export default function CoordinatorCareUnitDetailScreen() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!unitId) throw new Error('Missing care unit');
-      if (!form.name.trim()) throw new Error('Care unit name is required');
+      if (!form.name.trim()) throw new Error(t('patients.nameRequired'));
       return updateCareUnit(unitId, {
         name: form.name.trim(),
         primaryCaregiverName: form.primaryCaregiverName.trim() || undefined,
@@ -98,15 +106,15 @@ export default function CoordinatorCareUnitDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['coordinator-care-unit', unitId] });
       queryClient.invalidateQueries({ queryKey: ['coordinator-care-units'] });
       setEditing(false);
-      toast.show('Care unit updated', { type: 'success' });
+      toast.show(t('patients.updated'), { type: 'success' });
     },
-    onError: (e) => toastError(toast, e, 'Save failed'),
+    onError: (e) => toastError(toast, e, t('patients.saveFailed')),
   });
 
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care unit" showBack />
+        <ScreenHeader title={t('mobile.detail.careUnitTitle')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -115,12 +123,12 @@ export default function CoordinatorCareUnitDetailScreen() {
   if (query.isError || !unit) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Care unit" showBack />
+        <ScreenHeader title={t('mobile.detail.careUnitTitle')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Care unit not found"
+          title={t('mobile.detail.careUnitNotFound')}
           subtitle={query.error ? apiErrorMessage(query.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
@@ -132,7 +140,11 @@ export default function CoordinatorCareUnitDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title={unit.name} subtitle="Care unit" showBack />
+      <ScreenHeader
+        title={unit.name}
+        subtitle={t('mobile.detail.careUnitTitle')}
+        showBack
+      />
 
       <KeyboardAvoidingView
         className="flex-1"
@@ -150,13 +162,14 @@ export default function CoordinatorCareUnitDetailScreen() {
           }
         >
           <Text className="text-sm text-stone-500">
-            {patients.length} {patients.length === 1 ? 'patient' : 'patients'} · open a profile
-            below
+            {t('mobile.detail.patientCountOpenHint', { count: patients.length })}
           </Text>
 
           <Card className="mt-4" shadow>
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-semibold text-stone-900">Household details</Text>
+              <Text className="text-sm font-semibold text-stone-900">
+                {t('mobile.detail.householdDetails')}
+              </Text>
               {!editing ? (
                 <Pressable
                   onPress={() => {
@@ -165,7 +178,9 @@ export default function CoordinatorCareUnitDetailScreen() {
                   }}
                   hitSlop={8}
                 >
-                  <Text className="text-sm font-semibold text-teal-700">Edit</Text>
+                  <Text className="text-sm font-semibold text-teal-700">
+                    {t('mobile.profile.edit')}
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -173,33 +188,33 @@ export default function CoordinatorCareUnitDetailScreen() {
             {editing ? (
               <View className="mt-3 gap-3">
                 <Input
-                  label="Name"
+                  label={t('patients.name')}
                   value={form.name}
                   onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
                 />
                 <Input
-                  label="Account holder"
+                  label={t('mobile.detail.accountHolder')}
                   value={form.primaryCaregiverName}
                   onChangeText={(v) => setForm((f) => ({ ...f, primaryCaregiverName: v }))}
                 />
                 <Input
-                  label="Phone"
+                  label={t('patients.phone')}
                   value={form.primaryCaregiverPhone}
                   onChangeText={(v) => setForm((f) => ({ ...f, primaryCaregiverPhone: v }))}
                   keyboardType="phone-pad"
                 />
                 <Input
-                  label="Relation"
+                  label={t('patients.relation')}
                   value={form.primaryCaregiverRelation}
                   onChangeText={(v) => setForm((f) => ({ ...f, primaryCaregiverRelation: v }))}
                 />
                 <Input
-                  label="City"
+                  label={t('patients.city')}
                   value={form.city}
                   onChangeText={(v) => setForm((f) => ({ ...f, city: v }))}
                 />
                 <Input
-                  label="Address"
+                  label={t('patients.address')}
                   value={form.address}
                   onChangeText={(v) => setForm((f) => ({ ...f, address: v }))}
                 />
@@ -212,7 +227,7 @@ export default function CoordinatorCareUnitDetailScreen() {
                         setForm(toForm(unit));
                       }}
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                   </View>
                   <View className="flex-1">
@@ -220,18 +235,18 @@ export default function CoordinatorCareUnitDetailScreen() {
                       isLoading={saveMutation.isPending}
                       onPress={() => saveMutation.mutate()}
                     >
-                      Save
+                      {t('common.save')}
                     </Button>
                   </View>
                 </View>
               </View>
             ) : (
               <View className="mt-3 gap-3">
-                <DetailRow label="Account holder" value={unit.primaryCaregiverName} />
-                <DetailRow label="Phone" value={unit.primaryCaregiverPhone} />
-                <DetailRow label="Relation" value={unit.primaryCaregiverRelation} />
+                <DetailRow label={t('mobile.detail.accountHolder')} value={unit.primaryCaregiverName} />
+                <DetailRow label={t('patients.phone')} value={unit.primaryCaregiverPhone} />
+                <DetailRow label={t('patients.relation')} value={unit.primaryCaregiverRelation} />
                 <DetailRow
-                  label="Location"
+                  label={t('patients.location')}
                   value={
                     [unit.address, unit.city, formatCountry(unit.country)]
                       .filter(Boolean)
@@ -243,12 +258,12 @@ export default function CoordinatorCareUnitDetailScreen() {
           </Card>
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Patients
+            {t('patients.patientsHeading')}
           </Text>
 
           {patients.length === 0 ? (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">No patients in this care unit yet.</Text>
+              <Text className="text-sm text-stone-500">{t('patients.emptyPatients')}</Text>
             </Card>
           ) : (
             patients.map((patient) => {
@@ -256,7 +271,9 @@ export default function CoordinatorCareUnitDetailScreen() {
               const summary = parseFamilyWizardSummary(intake?.wizardPayload);
               const meta = [
                 patient.relationship,
-                patient.dateOfBirth ? `DOB ${formatDate(patient.dateOfBirth)}` : null,
+                patient.dateOfBirth
+                  ? t('patients.dob', { date: formatDate(patient.dateOfBirth) })
+                  : null,
                 summary?.supportCategories?.length
                   ? summary.supportCategories.join(', ')
                   : null,
@@ -283,15 +300,17 @@ export default function CoordinatorCareUnitDetailScreen() {
                         {intake ? (
                           <StatusBadge
                             status={intake.status}
-                            label={familyIntakeStatusLabel(intake.status)}
+                            label={t(`intake.status.${intake.status}`, {
+                              defaultValue: intake.status.replace(/_/g, ' '),
+                            })}
                           />
                         ) : null}
                       </View>
                       <Text className="mt-0.5 text-sm text-stone-500">
-                        {meta || 'Open to view profile'}
+                        {meta || t('mobile.detail.openToViewProfile')}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+                    <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
                   </View>
                 </Card>
               );
@@ -301,7 +320,7 @@ export default function CoordinatorCareUnitDetailScreen() {
           {episodes.length > 0 ? (
             <>
               <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Episodes
+                {t('nav.episodes')}
               </Text>
               {episodes.map((ep) => (
                 <Card
@@ -312,7 +331,7 @@ export default function CoordinatorCareUnitDetailScreen() {
                 >
                   <View className="flex-row items-center justify-between gap-2">
                     <Text className="flex-1 font-medium text-stone-900">{ep.title}</Text>
-                    <Chip label={episodeStatusLabel(ep.status)} tone="green" />
+                    <Chip label={episodeStatusLabel(t, ep.status)} tone="green" />
                   </View>
                 </Card>
               ))}

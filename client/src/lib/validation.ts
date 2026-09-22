@@ -1,67 +1,152 @@
 import { z } from 'zod';
+import type { TFunction } from 'i18next';
 
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const nameRegex = /^[\p{L}\s'-]+$/u;
 
+type AuthT = TFunction<'auth'>;
+
+function createAccountFieldsSchema(t: AuthT) {
+  return z.object({
+    firstName: z
+      .string()
+      .min(2, t('register.firstNameMin'))
+      .max(50, t('register.firstNameMax'))
+      .regex(nameRegex, t('register.firstNameInvalid')),
+    lastName: z
+      .string()
+      .min(2, t('register.lastNameMin'))
+      .max(50, t('register.lastNameMax'))
+      .regex(nameRegex, t('register.lastNameInvalid')),
+    email: z.string().email(t('register.emailInvalid')).toLowerCase().trim(),
+    password: z
+      .string()
+      .min(8, t('register.passwordMin'))
+      .regex(passwordRegex, t('register.passwordComplexity')),
+    confirmPassword: z.string(),
+  });
+}
+
+/** Static English fallback for non-i18n call sites (booking/onboarding helpers). */
 const accountFieldsSchema = z.object({
-    firstName: z.string().min(2, 'First name must be at least 2 characters').max(50, 'First name must be less than 50 characters').regex(nameRegex, 'First name can only contain letters, spaces, hyphens, and apostrophes'),
-    lastName: z.string().min(2, 'Last name must be at least 2 characters').max(50, 'Last name must be less than 50 characters').regex(nameRegex, 'Last name can only contain letters, spaces, hyphens, and apostrophes'),
-    email: z.string().email('Please enter a valid email address').toLowerCase().trim(),
-    password: z.string().min(8, 'Password must be at least 8 characters').regex(passwordRegex, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
-    confirmPassword: z.string()
+  firstName: z
+    .string()
+    .min(2, 'First name must be at least 2 characters')
+    .max(50, 'First name must be less than 50 characters')
+    .regex(nameRegex, 'First name can only contain letters, spaces, hyphens, and apostrophes'),
+  lastName: z
+    .string()
+    .min(2, 'Last name must be at least 2 characters')
+    .max(50, 'Last name must be less than 50 characters')
+    .regex(nameRegex, 'Last name can only contain letters, spaces, hyphens, and apostrophes'),
+  email: z.string().email('Please enter a valid email address').toLowerCase().trim(),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(
+      passwordRegex,
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+    ),
+  confirmPassword: z.string(),
 });
 
-export const accountSchema = accountFieldsSchema.refine(data => data.password === data.confirmPassword, {
+export const accountSchema = accountFieldsSchema.refine(
+  (data) => data.password === data.confirmPassword,
+  {
     message: "Passwords don't match",
-    path: ["confirmPassword"]
-});
+    path: ['confirmPassword'],
+  },
+);
 
 const careNeedsSchema = z.object({
-    careTypes: z.array(z.string()).min(1, 'Please select at least one care type'),
-    supportAreas: z.array(z.string()).optional(),
-    clinicalNeeds: z.array(z.string()).optional(),
-    alliedHealth: z.array(z.string()).optional()
+  careTypes: z.array(z.string()).min(1, 'Please select at least one care type'),
+  supportAreas: z.array(z.string()).optional(),
+  clinicalNeeds: z.array(z.string()).optional(),
+  alliedHealth: z.array(z.string()).optional(),
 });
 
 const personalDetailsSchema = z.object({
-    dateOfBirth: z.string().optional(),
-    gender: z.string().optional(),
-    address: z.string().optional(),
-    phone: z.string().optional()
+  dateOfBirth: z.string().optional(),
+  gender: z.string().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
 });
 
-const onboardingSchema = accountFieldsSchema.merge(careNeedsSchema).merge(personalDetailsSchema).refine(data => data.password === data.confirmPassword, {
+const onboardingSchema = accountFieldsSchema
+  .merge(careNeedsSchema)
+  .merge(personalDetailsSchema)
+  .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
-    path: ["confirmPassword"]
-});
+    path: ['confirmPassword'],
+  });
 
 export const bookingSchema = z.object({
-    providerId: z.string().min(1, 'Provider is required'),
-    scheduledAt: z.string().min(1, 'Date is required'),
-    startTime: z.string().min(1, 'Start time is required'),
-    endTime: z.string().min(1, 'End time is required'),
-    bookingType: z.enum(['one-off', 'recurring']),
-    serviceType: z.enum(['visit', 'online', 'clinic']),
-    consultationMethod: z.enum(['video', 'audio', 'chat']).optional()
+  providerId: z.string().min(1, 'Provider is required'),
+  scheduledAt: z.string().min(1, 'Date is required'),
+  startTime: z.string().min(1, 'Start time is required'),
+  endTime: z.string().min(1, 'End time is required'),
+  bookingType: z.enum(['one-off', 'recurring']),
+  serviceType: z.enum(['visit', 'online', 'clinic']),
+  consultationMethod: z.enum(['video', 'audio', 'chat']).optional(),
 });
 
-export const loginSchema = z.object({
-    email: z.string().min(1, 'Please enter your email address').email('Please enter a valid email address'),
-    password: z.string().min(1, 'Please enter your password')
-});
+export function createLoginSchema(t: AuthT) {
+  return z.object({
+    email: z
+      .string()
+      .min(1, t('login.emailRequired'))
+      .email(t('login.emailInvalid')),
+    password: z.string().min(1, t('login.passwordRequired')),
+  });
+}
 
-export const registerSchema = accountFieldsSchema.extend({
-    phone: z.string().min(1, 'Please enter your phone number'),
-    terms: z.boolean().refine((val) => val === true, {
-        message: 'Please agree to the terms and conditions'
+export function createRegisterSchema(t: AuthT) {
+  return createAccountFieldsSchema(t)
+    .extend({
+      phone: z.string().min(1, t('register.phoneRequired')),
+      terms: z.boolean().refine((val) => val === true, {
+        message: t('register.consentRequired'),
+      }),
     })
-}).refine(data => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"]
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('register.passwordsMismatch'),
+      path: ['confirmPassword'],
+    });
+}
+
+/** @deprecated Prefer createLoginSchema(t) so messages follow the active locale. */
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Please enter your email address')
+    .email('Please enter a valid email address'),
+  password: z.string().min(1, 'Please enter your password'),
 });
+
+/** @deprecated Prefer createRegisterSchema(t) so messages follow the active locale. */
+export const registerSchema = createRegisterSchema(((key: string) => {
+  const fallbacks: Record<string, string> = {
+    'register.firstNameMin': 'First name must be at least 2 characters',
+    'register.firstNameMax': 'First name must be less than 50 characters',
+    'register.firstNameInvalid':
+      'First name can only contain letters, spaces, hyphens, and apostrophes',
+    'register.lastNameMin': 'Last name must be at least 2 characters',
+    'register.lastNameMax': 'Last name must be less than 50 characters',
+    'register.lastNameInvalid':
+      'Last name can only contain letters, spaces, hyphens, and apostrophes',
+    'register.emailInvalid': 'Enter a valid email',
+    'register.passwordMin': 'Password must be at least 8 characters',
+    'register.passwordComplexity':
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+    'register.phoneRequired': 'Please enter your phone number',
+    'register.consentRequired': 'You must accept the terms to register',
+    'register.passwordsMismatch': 'Passwords do not match',
+  };
+  return fallbacks[key] ?? key;
+}) as AuthT);
 
 const providerIdentitySchema = z.object({
-    nationalId: z.string().min(5, 'ID number must be at least 5 characters')
+  nationalId: z.string().min(5, 'ID number must be at least 5 characters'),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
@@ -69,7 +154,7 @@ type CareNeedsFormData = z.infer<typeof careNeedsSchema>;
 type OnboardingFormData = z.infer<typeof onboardingSchema>;
 type BookingFormData = z.infer<typeof bookingSchema>;
 type LoginFormData = z.infer<typeof loginSchema>;
-type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterFormData = z.infer<ReturnType<typeof createRegisterSchema>>;
 type ProviderIdentityFormData = z.infer<typeof providerIdentitySchema>;
 
 export const validators = {

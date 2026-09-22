@@ -12,13 +12,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, Chip, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import { listOrgStaff, updateOrgStaff } from '../../../lib/api/org';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
 import { toastError } from '../../../lib/toast';
 
+function roleLabel(
+  role: string,
+  t: (key: string, opts?: { defaultValue?: string }) => string,
+) {
+  return t(`staff.roles.${role}`, { defaultValue: role.replace(/_/g, ' ') });
+}
+
 export default function OrgStaffDetailScreen() {
+  const { t } = useTranslation('org');
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [name, setName] = useState('');
@@ -41,8 +50,8 @@ export default function OrgStaffDetailScreen() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      if (!id) throw new Error('Missing staff member');
-      if (!name.trim()) throw new Error('Name is required');
+      if (!id) throw new Error(t('mobile.staffDetail.missing'));
+      if (!name.trim()) throw new Error(t('mobile.common.nameRequired'));
       return updateOrgStaff(id, {
         name: name.trim(),
         phone: phone.trim() || null,
@@ -51,10 +60,10 @@ export default function OrgStaffDetailScreen() {
     onSuccess: async () => {
       setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ['org-staff'] });
-      toast.show('Staff updated', { type: 'success' });
+      toast.show(t('mobile.staffDetail.updatedToast'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Update failed');
+      const msg = apiErrorMessage(e, t('staff.updateFailed'));
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
     },
@@ -62,20 +71,23 @@ export default function OrgStaffDetailScreen() {
 
   const activeMutation = useMutation({
     mutationFn: () => {
-      if (!id || !member) throw new Error('Missing staff member');
+      if (!id || !member) throw new Error(t('mobile.staffDetail.missing'));
       return updateOrgStaff(id, { isActive: !member.isActive });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['org-staff'] });
-      toast.show(member?.isActive ? 'Deactivated' : 'Activated', { type: 'success' });
+      toast.show(
+        member?.isActive ? t('mobile.common.deactivated') : t('mobile.common.activated'),
+        { type: 'success' },
+      );
     },
-    onError: (e) => toastError(toast, e, 'Update failed'),
+    onError: (e) => toastError(toast, e, t('staff.updateFailed')),
   });
 
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Staff" showBack />
+        <ScreenHeader title={t('mobile.staffDetail.titleFallback')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -84,11 +96,11 @@ export default function OrgStaffDetailScreen() {
   if (!member) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Staff" showBack />
+        <ScreenHeader title={t('mobile.staffDetail.titleFallback')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Staff member not found"
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          title={t('mobile.staffDetail.notFound')}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
@@ -96,7 +108,10 @@ export default function OrgStaffDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title={member.name || 'Staff'} showBack />
+      <ScreenHeader
+        title={member.name || t('mobile.staffDetail.titleFallback')}
+        showBack
+      />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -113,44 +128,56 @@ export default function OrgStaffDetailScreen() {
           }
         >
           <View className="mb-3 flex-row flex-wrap gap-2">
-            <Chip label={member.role.replace(/_/g, ' ')} tone="sky" />
+            <Chip label={roleLabel(member.role, t)} tone="sky" />
             <Chip
-              label={member.isActive ? 'Active' : 'Inactive'}
+              label={member.isActive ? t('common.active') : t('common.inactive')}
               tone={member.isActive ? 'green' : 'stone'}
             />
             {member.mustSetPassword ? (
-              <Chip label="Awaiting password setup" tone="amber" />
+              <Chip label={t('staff.awaitingPassword')} tone="amber" />
             ) : null}
           </View>
           {member.createdAt ? (
-            <Text className="mb-4 text-sm text-stone-500">Joined {formatDate(member.createdAt)}</Text>
+            <Text className="mb-4 text-sm text-stone-500">
+              {t('staff.joined', { date: formatDate(member.createdAt) })}
+            </Text>
           ) : null}
 
           <Card className="p-5" shadow>
-            <Text className="mb-3 text-sm font-semibold text-stone-900">Profile</Text>
+            <Text className="mb-3 text-sm font-semibold text-stone-900">
+              {t('mobile.common.profile')}
+            </Text>
             {formError ? (
               <View className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
                 <Text className="text-sm text-red-700">{formError}</Text>
               </View>
             ) : null}
             <View className="gap-3">
-              <Input label="Name" value={name} onChangeText={setName} />
-              <Input label="Email" value={member.email} editable={false} />
               <Input
-                label="Phone"
+                label={t('mobile.common.name')}
+                value={name}
+                onChangeText={setName}
+              />
+              <Input
+                label={t('mobile.common.email')}
+                value={member.email}
+                editable={false}
+              />
+              <Input
+                label={t('mobile.common.phone')}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
               />
               <Button isLoading={saveMutation.isPending} onPress={() => saveMutation.mutate()}>
-                Save
+                {t('common.save')}
               </Button>
               <Button
                 variant="secondary"
                 isLoading={activeMutation.isPending}
                 onPress={() => activeMutation.mutate()}
               >
-                {member.isActive ? 'Deactivate' : 'Activate'}
+                {member.isActive ? t('staff.deactivate') : t('staff.activate')}
               </Button>
             </View>
           </Card>

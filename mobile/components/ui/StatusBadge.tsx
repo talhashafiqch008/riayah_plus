@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 type Size = 'sm' | 'md';
 
@@ -39,11 +40,18 @@ interface StatusBadgeProps {
   label?: string;
 }
 
+function titleCaseStatus(status: string): string {
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function StatusBadge({ status, size = 'sm', label: labelOverride }: StatusBadgeProps) {
+  const { t } = useTranslation('common');
   const key = status.toLowerCase();
   const style = STATUS_STYLES[key] ?? { bg: 'bg-stone-100', text: 'text-stone-600' };
+  const translated = t(`status.${key}`, { defaultValue: '' });
   const label =
-    labelOverride ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    labelOverride ??
+    (translated && translated !== `status.${key}` ? translated : titleCaseStatus(status));
 
   return (
     <View className={`shrink-0 rounded-full px-2.5 py-1 ${style.bg}`}>

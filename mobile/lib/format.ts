@@ -1,5 +1,12 @@
+import i18n from '../i18n/config';
+
+/** BCP-47 tag for date/time formatting from the active UI language. */
+export function activeDateLocale(): string {
+  return i18n.language?.startsWith('ar') ? 'ar-QA' : 'en-AU';
+}
+
 export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-AU', {
+  return new Date(iso).toLocaleDateString(activeDateLocale(), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -7,7 +14,7 @@ export function formatDate(iso: string) {
 }
 
 export function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString('en-AU', {
+  return new Date(iso).toLocaleString(activeDateLocale(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -17,7 +24,7 @@ export function formatDateTime(iso: string) {
 }
 
 export function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-AU', {
+  return new Date(iso).toLocaleTimeString(activeDateLocale(), {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -29,9 +36,9 @@ export function todayIsoDate() {
 
 export function greetingForNow() {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return i18n.t('mobile.greeting.morning', { ns: 'family' });
+  if (h < 17) return i18n.t('mobile.greeting.afternoon', { ns: 'family' });
+  return i18n.t('mobile.greeting.evening', { ns: 'family' });
 }
 
 export function haversineMetres(
@@ -165,10 +172,12 @@ function messageFromBody(data: unknown): string | null {
   return null;
 }
 
-export function apiErrorMessage(e: unknown, fallback = 'Something went wrong'): string {
-  if (e == null) return fallback;
+export function apiErrorMessage(e: unknown, fallback?: string): string {
+  const resolvedFallback =
+    fallback ?? i18n.t('errors.generic', { ns: 'common' });
+  if (e == null) return resolvedFallback;
   if (typeof e === 'string' && e.trim()) {
-    return isGenericMessage(e) ? fallback : e.trim();
+    return isGenericMessage(e) ? resolvedFallback : e.trim();
   }
 
   const err = e as {
@@ -182,10 +191,10 @@ export function apiErrorMessage(e: unknown, fallback = 'Something went wrong'): 
 
   if (!err.response) {
     if (err.code === 'ECONNABORTED' || /timeout/i.test(err.message ?? '')) {
-      return 'Request timed out. Check your connection.';
+      return i18n.t('errors.timeout', { ns: 'common' });
     }
     if (/network error/i.test(err.message ?? '')) {
-      return 'Could not reach the server. Check your connection.';
+      return i18n.t('errors.network', { ns: 'common' });
     }
   }
 
@@ -199,6 +208,5 @@ export function apiErrorMessage(e: unknown, fallback = 'Something went wrong'): 
   }
 
   if (fromBody) return fromBody;
-  return fallback;
+  return resolvedFallback;
 }
-

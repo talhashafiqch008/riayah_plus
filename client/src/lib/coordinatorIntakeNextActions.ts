@@ -8,12 +8,20 @@ export type CoordinatorNextActionId =
 
 export type CoordinatorNextAction = {
   id: CoordinatorNextActionId;
-  label: string;
-  description: string;
   primary?: boolean;
-  /** Short chip for queue list rows */
-  queueHint: string;
+  /** Documents action: whether the intake has zero files yet */
+  noDocumentsYet?: boolean;
+  /** Escalate action: current urgency slug for description interpolation */
+  currentUrgency?: UrgencyLevel;
 };
+
+export type QueueHintId =
+  | 'review'
+  | 'completeReview'
+  | 'schedule'
+  | 'createEpisode'
+  | 'docs'
+  | 'escalate';
 
 const URGENCY_RANK: Record<string, number> = {
   low: 1,
@@ -22,22 +30,36 @@ const URGENCY_RANK: Record<string, number> = {
   urgent: 4,
 };
 
-export function queueHintForIntake(row: Pick<IntakeRecord, 'status' | 'careEpisode'>): string {
+export function queueHintIdForIntake(
+  row: Pick<IntakeRecord, 'status' | 'careEpisode'>,
+): QueueHintId | '' {
   switch (row.status) {
     case 'submitted':
-      return 'Review';
+      return 'review';
     case 'under_review':
-      return 'Complete review';
+      return 'completeReview';
     case 'validated':
-      return row.careEpisode ? 'Schedule' : 'Create episode';
+      return row.careEpisode ? 'schedule' : 'createEpisode';
     case 'episode_created':
-      return 'Schedule';
+      return 'schedule';
     default:
       return '';
   }
 }
 
-/** Derive clear next actions for the selected intake (R6). */
+/** @deprecated Use queueHintIdForIntake + i18n */
+export function queueHintForIntake(row: Pick<IntakeRecord, 'status' | 'careEpisode'>): string {
+  const id = queueHintIdForIntake(row);
+  const fallback: Record<string, string> = {
+    review: 'Review',
+    completeReview: 'Complete review',
+    schedule: 'Schedule',
+    createEpisode: 'Create episode',
+  };
+  return id ? fallback[id] ?? '' : '';
+}
+
+/** Derive clear next actions for the selected intake (R6). Labels come from i18n. */
 export function buildCoordinatorNextActions(intake: IntakeRecord): CoordinatorNextAction[] {
   const actions: CoordinatorNextAction[] = [];
   const open = intake.status === 'submitted' || intake.status === 'under_review';
@@ -46,57 +68,33 @@ export function buildCoordinatorNextActions(intake: IntakeRecord): CoordinatorNe
   const urgencyRank = URGENCY_RANK[urgency] ?? 2;
   const episodeId = intake.careEpisode?.id;
 
-  if (intake.status === 'submitted') {
+  if (intake.status === 'submitted' || intake.status === 'under_review') {
     actions.push({
       id: 'review',
-      label: 'Review new request',
-      description: 'Mark under review and complete the structured clinical fields.',
       primary: true,
-      queueHint: 'Review',
-    });
-  } else if (intake.status === 'under_review') {
-    actions.push({
-      id: 'review',
-      label: 'Complete structured review',
-      description: 'Fill guided chips and validate to open a care episode.',
-      primary: true,
-      queueHint: 'Complete review',
     });
   }
 
   if (open) {
     actions.push({
       id: 'documents',
-      label: docCount === 0 ? 'Request missing documents' : 'Request additional documents',
-      description:
-        docCount === 0
-          ? 'No files attached yet — ask the family to upload what you need.'
-          : 'Ask the family for another document type if something is missing.',
       primary: false,
-      queueHint: 'Docs',
+      noDocumentsYet: docCount === 0,
     });
   }
 
   if (episodeId && (intake.status === 'validated' || intake.status === 'episode_created')) {
     actions.push({
       id: 'schedule',
-      label: 'Schedule consultation',
-      description: 'Open the care episode to book a clinician consultation.',
       primary: true,
-      queueHint: 'Schedule',
     });
   }
 
   if (open && urgencyRank < 4) {
     actions.push({
       id: 'escalate',
-      label: 'Escalate urgency',
-      description:
-        urgencyRank < 3
-          ? `Current urgency is ${urgency}. Raise it so this request sorts higher in the queue.`
-          : 'Raise to urgent if clinical risk requires immediate coordination.',
       primary: false,
-      queueHint: 'Escalate',
+      currentUrgency: urgency,
     });
   }
 

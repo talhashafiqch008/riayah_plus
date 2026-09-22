@@ -3,6 +3,7 @@ import { Linking, Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { deleteTempFile } from '../sessionCleanup';
+import { familyConversationTypeLabel } from '../familyLanguage';
 
 export type ConversationUser = {
   id: string;
@@ -65,12 +66,7 @@ export function conversationHasUnread(conversation: Conversation, myId: string):
 }
 
 export function conversationTypeLabel(type: string): string {
-  if (type === 'family_coordinator') return 'Care coordinator';
-  if (type === 'family_clinical') return 'Clinician';
-  if (type === 'coordinator_clinical') return 'Care team';
-  if (type === 'internal_staff') return 'Internal';
-  if (type === 'episode') return 'Care journey';
-  return 'Message';
+  return familyConversationTypeLabel(type);
 }
 
 export function attachmentFileName(fileUrl: string): string | null {

@@ -3,17 +3,26 @@ import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Chip, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import { listCareUnits, type CareUnit } from '../../../lib/api/care';
 import { apiErrorMessage } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
-function locationLine(unit: CareUnit): string {
-  const place = [unit.city, unit.country].filter(Boolean).join(', ') || 'No location';
-  return unit.primaryCaregiverName ? `${place} · Caregiver: ${unit.primaryCaregiverName}` : place;
+function locationLine(
+  unit: CareUnit,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  const place =
+    [unit.city, unit.country].filter(Boolean).join(', ') || t('patients.noLocation');
+  return unit.primaryCaregiverName
+    ? t('patients.caregiver', { name: unit.primaryCaregiverName })
+    : place;
 }
 
 export default function CoordinatorPatientsScreen() {
+  const { t } = useTranslation('coordinator');
   const [search, setSearch] = useState('');
 
   const query = useQuery({
@@ -27,17 +36,17 @@ export default function CoordinatorPatientsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Patients"
-        subtitle="Care units in your organization"
+        title={t('patients.title')}
+        subtitle={t('mobile.home.patientsHint')}
         showBack
       />
 
       <View className="border-b border-stone-200 bg-white px-4 pb-4 pt-4">
         <Text className="mb-3 text-sm leading-5 text-stone-500">
-          Browse care units and open patient profiles from intake.
+          {t('mobile.detail.patientsBrowseHint')}
         </Text>
         <Input
-          placeholder="Search care units…"
+          placeholder={t('patients.searchPlaceholder')}
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
@@ -50,9 +59,9 @@ export default function CoordinatorPatientsScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load care units"
+          title={t('mobile.detail.careUnitsLoadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -69,15 +78,15 @@ export default function CoordinatorPatientsScreen() {
           ListHeaderComponent={
             units.length > 0 ? (
               <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                {total} unit{total === 1 ? '' : 's'}
+                {t('patients.unitCount', { count: total })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon="people-outline"
-              title="No care units yet"
-              subtitle="Families in your organization will appear here after onboarding."
+              title={t('patients.empty')}
+              subtitle={t('mobile.detail.noCareUnitsHint')}
             />
           }
           renderItem={({ item }) => {
@@ -96,24 +105,22 @@ export default function CoordinatorPatientsScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="font-semibold text-stone-900">{item.name}</Text>
-                    <Text className="mt-0.5 text-sm text-stone-500">{locationLine(item)}</Text>
+                    <Text className="mt-0.5 text-sm text-stone-500">{locationLine(item, t)}</Text>
                     <View className="mt-2 flex-row flex-wrap gap-2">
+                      <Chip label={t('patients.patientCount', { count: patientCount })} />
                       <Chip
-                        label={`${patientCount} ${patientCount === 1 ? 'patient' : 'patients'}`}
-                      />
-                      <Chip
-                        label={`${requests} request${requests === 1 ? '' : 's'}`}
+                        label={t('patients.intakeCount', { count: requests })}
                         tone="amber"
                       />
                       {journeys > 0 ? (
                         <Chip
-                          label={`${journeys} episode${journeys === 1 ? '' : 's'}`}
+                          label={t('patients.episodeCount', { count: journeys })}
                           tone="green"
                         />
                       ) : null}
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+                  <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
                 </View>
               </Card>
             );

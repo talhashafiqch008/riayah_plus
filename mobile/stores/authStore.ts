@@ -10,6 +10,8 @@ import {
 } from '../lib/api/client';
 import { revokePushToken } from '../lib/notifications';
 import { purgeLocalSession } from '../lib/sessionCleanup';
+import { syncI18nToAccountLanguage } from '../lib/uiLanguage';
+import i18n from '../i18n/config';
 import { router } from 'expo-router';
 
 export type UserRole =
@@ -44,6 +46,8 @@ export interface AuthUser {
   organizationId?: string | null;
   organizationName?: string | null;
   careUnitId?: string | null;
+  /** Permanent UI language (`en` | `ar`). Null until forced chooser completes. */
+  uiLanguage?: 'en' | 'ar' | null;
 }
 
 export const FAMILY_ROLES: UserRole[] = ['family', 'client', 'consumer', 'patient'];
@@ -112,6 +116,11 @@ function mapUser(raw: Record<string, unknown>): AuthUser {
     organizationId: (raw.organizationId ?? raw.organization_id ?? null) as string | null,
     organizationName: orgNameFromRaw(raw),
     careUnitId: (raw.careUnitId ?? raw.care_unit_id ?? null) as string | null,
+    uiLanguage: (() => {
+      const v = (raw.uiLanguage ?? raw.ui_language ?? null) as string | null;
+      if (v === 'en' || v === 'ar') return v;
+      return null;
+    })(),
   };
 }
 
@@ -178,6 +187,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
       }
 
       set({ token: stored, user, isLoading: false });
+      if (user.uiLanguage === 'en' || user.uiLanguage === 'ar') {
+        await syncI18nToAccountLanguage(user.uiLanguage);
+      }
     } catch {
       await clearAuthTokens();
       set({ token: null, user: null, isLoading: false });
@@ -188,7 +200,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     const res = await apiClient.post('/api/login', { email, password });
     const data = res.data;
     if (data.requires2fa || data.requires_2fa) {
-      throw Object.assign(new Error('Two-factor authentication required.'), {
+      throw Object.assign(new Error(i18n.t('login.requires2fa', { ns: 'auth' })), {
         code: '2FA_REQUIRED',
         // AUTH-11: signed pending token (not raw user id)
         mfaPendingToken: data.mfaPendingToken ?? data.two_fa_token,
@@ -196,7 +208,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       });
     }
     const jwt: string = data.token ?? data.accessToken ?? data.access_token;
-    if (!jwt) throw new Error('Login succeeded but no token was returned.');
+    if (!jwt) throw new Error(i18n.t('login.noToken', { ns: 'auth' }));
 
     await persistAuthTokensFromResponse(jwt, res.headers as Record<string, unknown>);
 
@@ -221,6 +233,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
     }
 
     set({ token: jwt, user });
+    if (user.uiLanguage === 'en' || user.uiLanguage === 'ar') {
+      await syncI18nToAccountLanguage(user.uiLanguage);
+    }
     routeByRole(user);
   },
 

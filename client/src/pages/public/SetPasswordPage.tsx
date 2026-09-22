@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPasswordFromInvite } from '@/lib/api/invite';
@@ -7,6 +8,7 @@ import { isApiError } from '@/lib/errors';
 import { getLoginRedirectForPath } from '@/routes/getLoginRedirectForPath';
 
 export default function SetPasswordPage() {
+  const { t } = useTranslation('auth');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const email = searchParams.get('email') ?? '';
@@ -21,31 +23,31 @@ export default function SetPasswordPage() {
     e.preventDefault();
 
     if (!email || !token) {
-      toast.error('Invalid invite link. Ask your administrator to resend the invite.');
+      toast.error(t('webSetPassword.invalidLinkToast'));
       return;
     }
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters.');
+      toast.error(t('webSetPassword.passwordMin'));
       return;
     }
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match.');
+      toast.error(t('webSetPassword.passwordsMismatch'));
       return;
     }
 
     setLoading(true);
     try {
       const result = await setPasswordFromInvite(email, token, password);
-      toast.success(result.message || 'Password set. You can now log in.');
+      toast.success(result.message || t('webSetPassword.successToast'));
       // Role-aware portal login (e.g. org_admin → /login?portal=org, not family)
       navigate(getLoginRedirectForPath(result.redirectPath || '/'));
     } catch (error: unknown) {
       if (isApiError(error)) {
-        toast.error(error.message || 'Failed to set password.');
+        toast.error(error.message || t('webSetPassword.setFailed'));
       } else if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error('Failed to set password. The link may have expired.');
+        toast.error(t('webSetPassword.setFailedExpired'));
       }
     } finally {
       setLoading(false);
@@ -56,12 +58,10 @@ export default function SetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 px-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl text-center">
-          <h2 className="text-2xl font-semibold text-stone-900 mb-2">Invalid Invite Link</h2>
-          <p className="text-stone-600 mb-6">
-            This link is missing required information or has expired.
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900 mb-2">{t('webSetPassword.invalidTitle')}</h2>
+          <p className="text-stone-600 mb-6">{t('webSetPassword.invalidBody')}</p>
           <Link to="/login" className="inline-flex items-center text-teal-600 hover:text-teal-700 font-medium">
-            Go to login
+            {t('webSetPassword.goToLogin')}
           </Link>
         </div>
       </div>
@@ -72,13 +72,15 @@ export default function SetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-stone-900 mb-2">Set your password</h1>
-          <p className="text-stone-600">Create a password for {email}</p>
+          <h1 className="text-3xl font-semibold text-stone-900 mb-2">{t('webSetPassword.title')}</h1>
+          <p className="text-stone-600">{t('webSetPassword.subtitle', { email })}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-8 shadow-xl space-y-5">
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-2">New password</label>
+            <label className="block text-sm font-medium text-stone-700 mb-2">
+              {t('webSetPassword.newPassword')}
+            </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-stone-400" />
               <input
@@ -93,13 +95,18 @@ export default function SetPasswordPage() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
+                aria-label={
+                  showPassword ? t('webSetPassword.hidePassword') : t('webSetPassword.showPassword')
+                }
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-2">Confirm password</label>
+            <label className="block text-sm font-medium text-stone-700 mb-2">
+              {t('webSetPassword.confirmPassword')}
+            </label>
             <input
               type={showPassword ? 'text' : 'password'}
               value={confirmPassword}
@@ -114,7 +121,7 @@ export default function SetPasswordPage() {
             disabled={loading}
             className="w-full rounded-xl bg-teal-600 py-3 font-medium text-white hover:bg-teal-700 disabled:opacity-60"
           >
-            {loading ? 'Saving…' : 'Set password & continue'}
+            {loading ? t('webSetPassword.submitting') : t('webSetPassword.submit')}
           </button>
         </form>
       </div>

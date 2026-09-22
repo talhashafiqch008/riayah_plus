@@ -1,5 +1,5 @@
 import { NotificationsScreen } from '../../components/NotificationsScreen';
 
 export default function OrgNotificationsScreen() {
-  return <NotificationsScreen tone="family" />;
+  return <NotificationsScreen tone="family" i18nNs="org" />;
 }

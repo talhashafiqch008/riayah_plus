@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
 import { VisitCheckinMap } from '../../../components/maps/VisitCheckinMap';
 import { getSession } from '../../../lib/api/scheduling';
@@ -38,23 +39,13 @@ function geofenceTone(status: string | undefined): string {
   return 'text-stone-500';
 }
 
-function geofenceCopy(result: GeofenceResult | null): string {
-  if (!result) return 'Waiting for GPS…';
-  if (result.status === 'no_address') {
-    return 'No patient coordinates on file — geofence check skipped.';
-  }
-  if (result.status === 'within_radius') {
-    return `You are ${result.distanceMeters}m from the address (within ${result.radiusMeters}m).`;
-  }
-  return `You are ${result.distanceMeters}m from the address (radius ${result.radiusMeters}m). You can still check in; the coordinator will be flagged.`;
-}
-
 function toCoord(lat?: number | null, lng?: number | null) {
   if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return { latitude: lat, longitude: lng };
 }
 
 export default function SupportVisitDetailScreen() {
+  const { t } = useTranslation('support');
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [notes, setNotes] = useState('');
@@ -65,6 +56,23 @@ export default function SupportVisitDetailScreen() {
   const [you, setYou] = useState<ForegroundPosition | null>(null);
   const lastValidated = useRef<{ lat: number; lng: number; at: number } | null>(null);
   const lastPinged = useRef<{ lat: number; lng: number; at: number } | null>(null);
+
+  function geofenceCopy(result: GeofenceResult | null): string {
+    if (!result) return t('visits.waitingGps');
+    if (result.status === 'no_address') {
+      return t('visits.noAddress');
+    }
+    if (result.status === 'within_radius') {
+      return t('visits.withinRadius', {
+        distance: result.distanceMeters,
+        radius: result.radiusMeters,
+      });
+    }
+    return t('visits.outsideRadius', {
+      distance: result.distanceMeters,
+      radius: result.radiusMeters,
+    });
+  }
 
   const query = useQuery({
     queryKey: ['support-visit', id],
@@ -99,7 +107,7 @@ export default function SupportVisitDetailScreen() {
           if (!cancelled) setYou(pos);
         });
       } catch (e) {
-        if (!cancelled) setGeoError(apiErrorMessage(e, 'Could not read GPS'));
+        if (!cancelled) setGeoError(apiErrorMessage(e, t('visits.gpsReadFailed')));
       }
     })();
 
@@ -107,7 +115,7 @@ export default function SupportVisitDetailScreen() {
       cancelled = true;
       stop?.();
     };
-  }, [id, checkedOut]);
+  }, [id, checkedOut, t]);
 
   useEffect(() => {
     if (!id || !checkedIn || checkedOut || !you) return;
@@ -145,7 +153,7 @@ export default function SupportVisitDetailScreen() {
         setGeo(result.geofence);
         setTarget(result.target);
       } catch (e) {
-        if (!cancelled) setGeoError(apiErrorMessage(e, 'Could not read GPS'));
+        if (!cancelled) setGeoError(apiErrorMessage(e, t('visits.gpsReadFailed')));
       } finally {
         if (!cancelled) setLocating(false);
       }
@@ -155,7 +163,7 @@ export default function SupportVisitDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, checkedIn, you]);
+  }, [id, checkedIn, you, t]);
 
   const checkInMutation = useMutation({
     mutationFn: async () => {
@@ -171,14 +179,14 @@ export default function SupportVisitDetailScreen() {
       const status = result.geofence.status;
       if (status === 'out_of_radius') {
         toast.show(
-          `Checked in ${result.geofence.distanceMeters}m from the address. Coordinator flagged.`,
+          t('visits.checkedInFarToast', { distance: result.geofence.distanceMeters }),
           { type: 'warning' },
         );
       } else {
-        toast.show('Checked in', { type: 'success' });
+        toast.show(t('visits.checkedInToast'), { type: 'success' });
       }
     },
-    onError: (e) => toastError(toast, e, 'Check-in failed'),
+    onError: (e) => toastError(toast, e, t('visits.checkInFailed')),
   });
 
   const checkOutMutation = useMutation({
@@ -194,16 +202,16 @@ export default function SupportVisitDetailScreen() {
       await queryClient.invalidateQueries({ queryKey: ['support-visit', id] });
       await queryClient.invalidateQueries({ queryKey: ['support-visits'] });
       await queryClient.invalidateQueries({ queryKey: ['support-visit-gps', id] });
-      toast.show('Checked out', { type: 'success' });
+      toast.show(t('visits.checkedOutToast'), { type: 'success' });
     },
-    onError: (e) => toastError(toast, e, 'Check-out failed'),
+    onError: (e) => toastError(toast, e, t('visits.checkOutFailed')),
   });
 
   if (!id) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Visit" />
-        <EmptyState icon="alert-circle-outline" title="Missing visit" />
+        <ScreenHeader title={t('visits.visitFallback')} />
+        <EmptyState icon="alert-circle-outline" title={t('visits.missingVisit')} />
       </SafeAreaView>
     );
   }
@@ -212,7 +220,7 @@ export default function SupportVisitDetailScreen() {
   const youCoord = toCoord(you?.latitude, you?.longitude);
   const address = target?.address ?? replayQuery.data?.target.address ?? null;
   const radius = geo?.radiusMeters ?? replayQuery.data?.target.radiusMeters ?? null;
-  const patientName = session?.client?.name ?? replayQuery.data?.session.clientName ?? 'Patient';
+  const patientName = session?.client?.name ?? replayQuery.data?.session.clientName ?? t('visits.patient');
 
   const mapBlock = (
     <View className="mb-4">
@@ -228,16 +236,16 @@ export default function SupportVisitDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Visit check-in" />
+      <ScreenHeader title={t('visits.detailTitle')} />
 
       {query.isLoading && !session ? (
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       ) : query.isError || !session ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load visit"
-          subtitle={query.error ? apiErrorMessage(query.error) : 'Visit not found'}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          title={t('visits.loadDetailError')}
+          subtitle={query.error ? apiErrorMessage(query.error) : t('visits.notFound')}
+          action={{ label: t('visits.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <ScrollView
@@ -248,16 +256,23 @@ export default function SupportVisitDetailScreen() {
             <View className="flex-row items-start justify-between gap-3">
               <View className="flex-1">
                 <Text className="text-lg font-semibold text-stone-900">
-                  {session.client?.name ?? 'Patient'}
+                  {session.client?.name ?? t('visits.patient')}
                 </Text>
                 <Text className="mt-1 text-sm text-stone-500">
                   {formatDateTime(session.scheduledAt)}
                 </Text>
                 <Text className="mt-0.5 text-xs capitalize text-stone-400">
-                  {(session.type ?? 'visit').replace(/_/g, ' ')}
+                  {t(`visits.types.${session.type ?? 'visit'}`, {
+                    defaultValue: (session.type ?? 'visit').replace(/_/g, ' '),
+                  })}
                 </Text>
               </View>
-              <StatusBadge status={session.status} />
+              <StatusBadge
+                status={session.status}
+                label={t(`visits.status.${session.status}`, {
+                  defaultValue: session.status.replace(/_/g, ' '),
+                })}
+              />
             </View>
           </Card>
 
@@ -265,17 +280,15 @@ export default function SupportVisitDetailScreen() {
 
           {checkedOut ? (
             <Card>
-              <Text className="text-sm font-medium text-stone-700">Checked out</Text>
+              <Text className="text-sm font-medium text-stone-700">{t('visits.checkedOut')}</Text>
               <Text className="mt-1 text-sm text-stone-500">
-                {session.checkOutAt ? formatDateTime(session.checkOutAt) : 'Complete'}
+                {session.checkOutAt ? formatDateTime(session.checkOutAt) : t('visits.complete')}
               </Text>
             </Card>
           ) : checkedIn ? (
             <Card>
-              <Text className="text-sm font-medium text-teal-800">Checked in</Text>
-              <Text className="mt-1 text-sm text-stone-500">
-                Live location is sharing with your coordinator while this visit is open.
-              </Text>
+              <Text className="text-sm font-medium text-teal-800">{t('visits.checkedIn')}</Text>
+              <Text className="mt-1 text-sm text-stone-500">{t('visits.liveSharing')}</Text>
               {session.checkInAt ? (
                 <Text className="mt-1 text-sm text-stone-500">
                   {formatDateTime(session.checkInAt)}
@@ -283,14 +296,20 @@ export default function SupportVisitDetailScreen() {
               ) : null}
               {session.geofenceStatus ? (
                 <Text className={`mt-2 text-sm ${geofenceTone(session.geofenceStatus)}`}>
-                  Geofence: {session.geofenceStatus.replace(/_/g, ' ')}
+                  {t('visits.geofenceLabel', {
+                    status: t(`visits.geofenceStatus.${session.geofenceStatus}`, {
+                      defaultValue: session.geofenceStatus.replace(/_/g, ' '),
+                    }),
+                  })}
                 </Text>
               ) : null}
 
-              <Text className="mt-4 mb-2 text-sm font-medium text-stone-700">Visit notes</Text>
+              <Text className="mt-4 mb-2 text-sm font-medium text-stone-700">
+                {t('visits.visitNotes')}
+              </Text>
               <TextInput
                 className="min-h-[100px] rounded-xl border border-stone-200 bg-white px-3 py-2 text-base text-stone-900"
-                placeholder="Optional notes on checkout"
+                placeholder={t('visits.notesPlaceholder')}
                 placeholderTextColor="#A8A29E"
                 multiline
                 textAlignVertical="top"
@@ -303,17 +322,17 @@ export default function SupportVisitDetailScreen() {
                   variant="destructive"
                   isLoading={checkOutMutation.isPending}
                   onPress={() => {
-                    Alert.alert('Check out?', 'This records your GPS location and ends the visit.', [
-                      { text: 'Cancel', style: 'cancel' },
+                    Alert.alert(t('visits.checkOutConfirmTitle'), t('visits.checkOutConfirmBody'), [
+                      { text: t('visits.cancel'), style: 'cancel' },
                       {
-                        text: 'Check out',
+                        text: t('visits.checkOutAction'),
                         style: 'destructive',
                         onPress: () => checkOutMutation.mutate(),
                       },
                     ]);
                   }}
                 >
-                  GPS check-out
+                  {t('visits.gpsCheckOut')}
                 </Button>
               </View>
             </Card>
@@ -325,7 +344,7 @@ export default function SupportVisitDetailScreen() {
                 </View>
               ) : (
                 <Text className={`mb-3 text-sm ${geofenceTone(geo?.status)}`}>
-                  {locating && !geo ? 'Getting your location…' : geofenceCopy(geo)}
+                  {locating && !geo ? t('visits.gettingLocation') : geofenceCopy(geo)}
                 </Text>
               )}
               <Button
@@ -333,7 +352,7 @@ export default function SupportVisitDetailScreen() {
                 isLoading={checkInMutation.isPending}
                 onPress={() => checkInMutation.mutate()}
               >
-                GPS check-in
+                {t('visits.gpsCheckIn')}
               </Button>
             </Card>
           )}

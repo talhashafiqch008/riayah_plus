@@ -56,7 +56,45 @@ const updateProfileSchema = z.object({
   hourlyRate: z.number().optional(),
 });
 
+const setUiLanguageSchema = z.object({
+  language: z.enum(['en', 'ar']),
+});
+
 export class UserProfileController {
+  /** Permanent UI language chooser — set once; subsequent changes are rejected. */
+  static async setUiLanguage(req: Request, res: Response): Promise<void> {
+    const { language } = setUiLanguageSchema.parse(req.body);
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({ where: { id: userId, deletedAt: null } });
+    if (!user) throw new AppError('User not found.', 404);
+
+    if (user.uiLanguage) {
+      if (user.uiLanguage === language) {
+        res.json({ message: 'Language preference already set.', uiLanguage: user.uiLanguage });
+        return;
+      }
+      throw new AppError('Language preference is permanent and cannot be changed.', 409);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { uiLanguage: language },
+      select: { id: true, uiLanguage: true },
+    });
+
+    await AuditService.log({
+      userId,
+      action: 'ui_language_set',
+      entity: 'User',
+      entityId: userId,
+      after: { uiLanguage: language },
+      req,
+    });
+
+    res.json({ message: 'Language preference saved.', uiLanguage: updated.uiLanguage });
+  }
+
   static async updatePassword(req: Request, res: Response): Promise<void> {
     const data = updatePasswordSchema.parse(req.body);
     if (data.password !== data.password_confirmation) {

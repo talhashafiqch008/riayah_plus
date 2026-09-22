@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { m, LazyMotion, domAnimation } from 'framer-motion';
 import { ArrowRight, Check, LogOut, User, LayoutDashboard, FileCheck } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { useAuth, isProviderRole } from '@/contexts/AuthContext';
 
 export default function OnboardingRequiredPage() {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [userRole, setUserRole] = useState<string>('');
@@ -22,9 +24,9 @@ export default function OnboardingRequiredPage() {
   };
 
   const steps = [
-    { id: 1, label: 'Account', icon: User, status: 'completed' },
-    { id: 2, label: 'Verification', icon: FileCheck, status: 'current' },
-    { id: 3, label: 'Success', icon: LayoutDashboard, status: 'upcoming' },
+    { id: 1, label: t('onboardingRequired.stepAccount'), icon: User, status: 'completed' },
+    { id: 2, label: t('onboardingRequired.stepVerification'), icon: FileCheck, status: 'current' },
+    { id: 3, label: t('onboardingRequired.stepSuccess'), icon: LayoutDashboard, status: 'upcoming' },
   ];
 
   return (
@@ -55,8 +57,8 @@ export default function OnboardingRequiredPage() {
           </div>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-stone-900 mb-2">One Last Step</h1>
-            <p className="text-stone-500">Let's complete your profile to verify your account.</p>
+            <h1 className="text-3xl font-semibold text-stone-900 mb-2">{t('onboardingRequired.title')}</h1>
+            <p className="text-stone-500">{t('onboardingRequired.subtitle')}</p>
           </div>
 
           <div className="bg-white/50 backdrop-blur-sm p-6 rounded-3xl border border-white mb-10 mx-2 shadow-sm">
@@ -94,7 +96,7 @@ export default function OnboardingRequiredPage() {
                 className="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold shadow-xl shadow-stone-900/10 hover:shadow-stone-900/20 hover:bg-stone-800 transition-all flex items-center justify-center gap-2 group relative overflow-hidden"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-teal-500/0 via-white/10 to-teal-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
-                Complete Setup
+                {t('onboardingRequired.completeSetup')}
                 <ArrowRight className="size-5 group-hover:translate-x-1 transition-transform" />
               </m.button>
             </Link>
@@ -103,12 +105,12 @@ export default function OnboardingRequiredPage() {
               className="w-full py-3 text-stone-500 hover:text-stone-800 text-sm font-semibold transition-colors flex items-center justify-center gap-2 hover:bg-stone-100 rounded-xl"
             >
               <LogOut className="size-4" />
-              Sign Out
+              {t('onboardingRequired.signOut')}
             </button>
           </div>
 
           <div className="absolute bottom-6 left-0 right-0 text-center">
-            <p className="text-xs text-stone-400">Raiyah Plus © 2024</p>
+            <p className="text-xs text-stone-400">{t('onboardingRequired.copyright')}</p>
           </div>
         </m.div>
       </div>

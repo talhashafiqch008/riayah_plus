@@ -7,7 +7,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Card, EmptyState, StatusBadge } from '../../../components/ui';
+import {
+  carePlanStatusLabel,
+  normalizeCarePlanStatus,
+} from '../../../lib/api/care';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { apiClient } from '../../../lib/api/client';
 import { apiErrorMessage } from '../../../lib/format';
@@ -43,6 +48,7 @@ type PlanRow =
   | { kind: 'service'; service: CareItem; key: string };
 
 export function CarePlanTab({ episodeId }: { episodeId?: string }) {
+  const { t } = useTranslation('family');
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['care-plan', episodeId],
     enabled: Boolean(episodeId),
@@ -82,8 +88,8 @@ export function CarePlanTab({ episodeId }: { episodeId?: string }) {
     return (
       <EmptyState
         icon="document-text-outline"
-        title="No episode"
-        subtitle="Select an episode to view its care plan."
+        title={t('mobile.episode.noEpisodeTitle')}
+        subtitle={t('mobile.episode.selectEpisodePlan')}
       />
     );
   }
@@ -96,9 +102,9 @@ export function CarePlanTab({ episodeId }: { episodeId?: string }) {
     return (
       <EmptyState
         icon="alert-circle-outline"
-        title="Could not load"
+        title={t('mobile.common.notifications.loadError')}
         subtitle={apiErrorMessage(error)}
-        action={{ label: 'Try again', onPress: () => void refetch() }}
+        action={{ label: t('mobile.common.tryAgain'), onPress: () => void refetch() }}
       />
     );
   }
@@ -107,8 +113,8 @@ export function CarePlanTab({ episodeId }: { episodeId?: string }) {
     return (
       <EmptyState
         icon="document-text-outline"
-        title="No care plan yet"
-        subtitle="Your coordinator is preparing one."
+        title={t('mobile.episode.noCarePlanTitle')}
+        subtitle={t('mobile.episode.noCarePlanSubtitle')}
       />
     );
   }
@@ -129,19 +135,24 @@ export function CarePlanTab({ episodeId }: { episodeId?: string }) {
         <View className="px-4 pt-4">
           <View className="mb-3 flex-row items-center justify-between gap-2">
             <Text className="flex-1 text-lg font-bold text-stone-900">
-              {data.title ?? 'Care Plan'}
+              {data.title ?? t('mobile.episode.defaultPlanTitle')}
             </Text>
-            {data.status ? <StatusBadge status={data.status} /> : null}
+            {data.status ? (
+              <StatusBadge
+                status={normalizeCarePlanStatus(data.status)}
+                label={carePlanStatusLabel(data.status)}
+              />
+            ) : null}
           </View>
           {data.notes ? (
             <Text className="mb-4 text-sm text-stone-600">{data.notes}</Text>
           ) : null}
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Goals & Services
+            {t('mobile.episode.goalsServicesHeader')}
           </Text>
           {rows.length === 0 ? (
             <Text className="mb-2 text-sm text-stone-400">
-              No goals or services listed yet.
+              {t('mobile.episode.noGoalsOrServices')}
             </Text>
           ) : null}
         </View>
@@ -201,9 +212,14 @@ export function CarePlanTab({ episodeId }: { episodeId?: string }) {
 }
 
 export default function CarePlanScreen() {
+  const { t } = useTranslation('family');
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Care plan" subtitle="Goals and services for this journey" showBack />
+      <FamilyTabHero
+        title={t('mobile.episode.carePlanTitle')}
+        subtitle={t('mobile.episode.carePlanSubtitle')}
+        showBack
+      />
       <CarePlanTab />
     </SafeAreaView>
   );

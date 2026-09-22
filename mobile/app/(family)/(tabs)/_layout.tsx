@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../../lib/api/client';
 
@@ -17,6 +18,7 @@ function badgeText(n?: number): string | undefined {
 }
 
 export default function FamilyTabsLayout() {
+  const { t } = useTranslation('family');
   const badgesQuery = useQuery({
     queryKey: ['family-nav-badges'],
     queryFn: async () => {
@@ -43,14 +45,14 @@ export default function FamilyTabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('mobile.tabs.home'),
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="episodes"
         options={{
-          title: 'Journey',
+          title: t('mobile.tabs.journey'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart-outline" size={size} color={color} />
           ),
@@ -59,7 +61,7 @@ export default function FamilyTabsLayout() {
       <Tabs.Screen
         name="bookings"
         options={{
-          title: 'Appointments',
+          title: t('mobile.tabs.appointments'),
           tabBarBadge: bookingsBadge,
           tabBarBadgeStyle: { backgroundColor: '#0D9488', fontSize: 10 },
           tabBarIcon: ({ color, size }) => (
@@ -70,7 +72,7 @@ export default function FamilyTabsLayout() {
       <Tabs.Screen
         name="care-plans"
         options={{
-          title: 'Plans',
+          title: t('mobile.tabs.plans'),
           tabBarBadge: plansBadge,
           tabBarBadgeStyle: { backgroundColor: '#D97706', fontSize: 10 },
           tabBarIcon: ({ color, size }) => (
@@ -81,7 +83,7 @@ export default function FamilyTabsLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More',
+          title: t('mobile.tabs.more'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="ellipsis-horizontal" size={size} color={color} />
           ),

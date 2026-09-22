@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,17 +11,35 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
-import {
-  episodeStatusLabel,
-  listEpisodes,
-  STAFF_EPISODE_STATUS_FILTERS,
-} from '../../../lib/api/care';
+import { listEpisodes, STAFF_EPISODE_STATUS_FILTERS } from '../../../lib/api/care';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
+
+function episodeStatusLabelForList(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  status: string,
+) {
+  return t(`episodes.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+}
 
 export default function CoordinatorEpisodesScreen() {
+  const { t } = useTranslation('coordinator');
   const [status, setStatus] = useState('');
+
+  const filters = useMemo(
+    () =>
+      STAFF_EPISODE_STATUS_FILTERS.map((filter) => ({
+        value: filter.value,
+        label:
+          filter.value === ''
+            ? t('common.all')
+            : t(`episodes.status.${filter.value}`, { defaultValue: filter.label }),
+      })),
+    [t],
+  );
 
   const query = useQuery({
     queryKey: ['coordinator-episodes', status],
@@ -30,22 +48,25 @@ export default function CoordinatorEpisodesScreen() {
 
   const episodes = query.data?.data ?? [];
   const total = query.data?.total ?? episodes.length;
+  const forwardIcon = navForwardIcon();
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Episodes" subtitle="Advance status and schedule" showBack={false} />
+      <ScreenHeader
+        title={t('episodes.title')}
+        subtitle={t('mobile.home.episodesHint')}
+        showBack={false}
+      />
 
       <View className="border-b border-stone-100 bg-white pb-3">
-        <Text className="px-4 pt-3 text-sm text-stone-500">
-          Track episode status from intake through active care.
-        </Text>
+        <Text className="px-4 pt-3 text-sm text-stone-500">{t('episodes.description')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-3"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
-          {STAFF_EPISODE_STATUS_FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -71,9 +92,9 @@ export default function CoordinatorEpisodesScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load episodes"
+          title={t('episodes.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -90,17 +111,17 @@ export default function CoordinatorEpisodesScreen() {
           ListHeaderComponent={
             episodes.length > 0 ? (
               <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                {total} episode{total === 1 ? '' : 's'}
+                {t(total === 1 ? 'episodes.count_one' : 'episodes.count_other', { count: total })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon="heart-outline"
-              title="No episodes yet"
-              subtitle="Complete intake review to create one."
+              title={t('episodes.empty')}
+              subtitle={t('mobile.detail.episodesEmptyHint')}
               action={{
-                label: 'Open intake queue',
+                label: t('dashboard.openIntake'),
                 onPress: () => router.push('/(coordinator)/intake'),
               }}
             />
@@ -118,18 +139,22 @@ export default function CoordinatorEpisodesScreen() {
                 <View className="flex-1">
                   <View className="flex-row flex-wrap items-center gap-2">
                     <Text className="font-semibold text-stone-900">
-                      {item.title ?? 'Episode'}
+                      {item.title ?? t('mobile.detail.episodeFallback')}
                     </Text>
                     {item.status ? (
                       <StatusBadge
                         status={item.status}
-                        label={episodeStatusLabel(item.status)}
+                        label={episodeStatusLabelForList(t, item.status)}
                       />
                     ) : null}
                   </View>
                   <Text className="mt-0.5 text-sm text-stone-500">
-                    {item.careRecipient?.name ?? item.patient?.name ?? 'Patient'}
-                    {item.urgencyLevel ? ` · ${item.urgencyLevel}` : ''}
+                    {item.careRecipient?.name ?? item.patient?.name ?? t('intake.detail.patient')}
+                    {item.urgencyLevel
+                      ? ` · ${t(`intake.urgency.${item.urgencyLevel}`, {
+                          defaultValue: item.urgencyLevel.replace(/_/g, ' '),
+                        })}`
+                      : ''}
                     {item.createdAt ? ` · ${formatDate(item.createdAt)}` : ''}
                   </Text>
                   {item.reasonForCare ? (
@@ -138,7 +163,7 @@ export default function CoordinatorEpisodesScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+                <Ionicons name={forwardIcon} size={18} color="#D6D3D1" />
               </View>
             </Card>
           )}

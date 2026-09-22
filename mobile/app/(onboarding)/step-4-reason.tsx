@@ -2,11 +2,13 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui';
 import { DAYS_OF_WEEK, FREQUENCY_OPTIONS, TIME_SLOTS } from '../../lib/onboardingOptions';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 
 export default function Step4Schedule() {
+  const { t } = useTranslation('family');
   const data = useOnboardingStore((s) => s.data);
   const updateData = useOnboardingStore((s) => s.updateData);
   const setStep = useOnboardingStore((s) => s.setStep);
@@ -37,10 +39,10 @@ export default function Step4Schedule() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['bottom']}>
       <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text className="text-2xl font-bold text-stone-900">When do you need care?</Text>
-        <Text className="mb-6 mt-1 text-sm text-stone-500">Select your preferred schedule.</Text>
+        <Text className="text-2xl font-bold text-stone-900">{t('onboarding.stepTitles.whenCare')}</Text>
+        <Text className="mb-6 mt-1 text-sm text-stone-500">{t('onboarding.scheduleHint')}</Text>
 
-        <Text className="mb-2 font-semibold text-stone-900">How often?</Text>
+        <Text className="mb-2 font-semibold text-stone-900">{t('onboarding.howOften')}</Text>
         <View className="mb-6 gap-3">
           {FREQUENCY_OPTIONS.map((option) => {
             const selected = data.scheduleType === option.id;
@@ -53,10 +55,10 @@ export default function Step4Schedule() {
                 }`}
               >
                 <Text className={`text-lg font-bold ${selected ? 'text-white' : 'text-stone-900'}`}>
-                  {option.label}
+                  {t(`enums.schedule.${option.id}`)}
                 </Text>
                 <Text className={`text-xs ${selected ? 'text-teal-100' : 'text-stone-500'}`}>
-                  {option.description}
+                  {t(`enums.scheduleHint.${option.id}`)}
                 </Text>
               </Pressable>
             );
@@ -65,7 +67,7 @@ export default function Step4Schedule() {
 
         {data.scheduleType && data.scheduleType !== 'one_time' ? (
           <View className="mb-6">
-            <Text className="mb-2 font-semibold text-stone-900">Preferred Days</Text>
+            <Text className="mb-2 font-semibold text-stone-900">{t('onboarding.whichDays')}</Text>
             <View className="flex-row justify-between">
               {DAYS_OF_WEEK.map((day) => {
                 const selected = data.preferredDays.includes(day.id);
@@ -80,7 +82,7 @@ export default function Step4Schedule() {
                     <Text
                       className={`text-xs font-bold ${selected ? 'text-white' : 'text-stone-400'}`}
                     >
-                      {day.label}
+                      {t(`enums.day.${day.id}`)}
                     </Text>
                   </Pressable>
                 );
@@ -89,7 +91,7 @@ export default function Step4Schedule() {
           </View>
         ) : null}
 
-        <Text className="mb-2 font-semibold text-stone-900">Preferred Time Slots</Text>
+        <Text className="mb-2 font-semibold text-stone-900">{t('onboarding.whatTimes')}</Text>
         <View className="mb-4 flex-row flex-wrap gap-3">
           {TIME_SLOTS.map((slot) => {
             const selected = data.preferredTimeSlots.includes(slot.id) && !data.isCustomTime;
@@ -104,10 +106,10 @@ export default function Step4Schedule() {
                 <Ionicons name={slot.icon} size={18} color={selected ? '#fff' : '#A8A29E'} />
                 <View>
                   <Text className={`text-sm font-bold ${selected ? 'text-white' : 'text-stone-900'}`}>
-                    {slot.label}
+                    {t(`enums.time.${slot.id}`)}
                   </Text>
                   <Text className={`text-[10px] ${selected ? 'text-teal-100' : 'text-stone-400'}`}>
-                    {slot.time}
+                    {t(`onboarding.mobile.timeRange.${slot.id}`)}
                   </Text>
                 </View>
               </Pressable>
@@ -126,20 +128,24 @@ export default function Step4Schedule() {
             data.isCustomTime ? 'border-stone-900 bg-stone-50' : 'border-stone-200 bg-white'
           }`}
         >
-          <Text className="font-bold text-stone-900">Custom Hours</Text>
-          <Text className="text-xs text-stone-500">Choose specific start and end times</Text>
+          <Text className="font-bold text-stone-900">{t('onboarding.customHours')}</Text>
+          <Text className="text-xs text-stone-500">{t('onboarding.customHoursHint')}</Text>
         </Pressable>
 
         {data.isCustomTime ? (
           <View className="gap-3 rounded-2xl bg-stone-50 p-4">
-            <Text className="text-xs font-bold uppercase text-stone-500">Start (HH:mm)</Text>
+            <Text className="text-xs font-bold uppercase text-stone-500">
+              {t('onboarding.mobile.startTimeHm')}
+            </Text>
             <TextInput
               className="rounded-xl border border-stone-200 bg-white px-3 py-3 font-bold text-stone-900"
               placeholder="09:00"
               value={data.customStartTime}
               onChangeText={(customStartTime) => updateData({ customStartTime })}
             />
-            <Text className="text-xs font-bold uppercase text-stone-500">End (HH:mm)</Text>
+            <Text className="text-xs font-bold uppercase text-stone-500">
+              {t('onboarding.mobile.endTimeHm')}
+            </Text>
             <TextInput
               className="rounded-xl border border-stone-200 bg-white px-3 py-3 font-bold text-stone-900"
               placeholder="17:00"
@@ -158,12 +164,12 @@ export default function Step4Schedule() {
               router.back();
             }}
           >
-            Back
+            {t('onboarding.back')}
           </Button>
         </View>
         <View className="flex-1">
           <Button onPress={onNext} disabled={!isValid}>
-            Continue
+            {t('onboarding.continue')}
           </Button>
         </View>
       </View>

@@ -139,7 +139,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
       const user = authUser;
 
       if (!user) {
-        toast.error('Please log in to continue onboarding.');
+        toast.error(t('onboarding.toasts.loginRequired'));
         navigate(isFamily ? '/login' : '/');
         return;
       }
@@ -148,7 +148,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
         const role = typeof user.role === 'string' ? user.role.toLowerCase() : '';
 
         if (role.includes('provider')) {
-          toast.error('You are logged in as a Provider.');
+          toast.error(t('onboarding.toasts.providerLoggedIn'));
           navigate('/provider/dashboard');
           return;
         }
@@ -158,7 +158,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
           (role === 'client' || role.includes('family')) &&
           status === 'complete'
         ) {
-          toast.success('You have already completed onboarding.');
+          toast.success(t('onboarding.toasts.alreadyCompleted'));
           navigate('/careseeker/dashboard');
           return;
         }
@@ -167,13 +167,13 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
         setIsAuthChecking(false);
       } catch (e) {
         console.error('Auth parse error', e);
-        toast.error('Session invalid. Please log in again.');
+        toast.error(t('onboarding.toasts.sessionInvalid'));
         navigate(isFamily ? '/login' : '/');
       }
     };
 
     checkAuth();
-  }, [authUser, authLoading, navigate, isFamily]);
+  }, [authUser, authLoading, navigate, isFamily, t]);
 
   useEffect(() => {
     try {
@@ -327,7 +327,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
     setIsSubmitting(true);
     try {
       if (!authUser) {
-        toast.error('Please complete account registration first.');
+        toast.error(t('onboarding.toasts.completeRegistration'));
         setStep(OnboardingStep.REGISTRATION);
         setIsSubmitting(false);
         return;
@@ -339,7 +339,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
         await refreshUser();
         localStorage.removeItem(draftKey);
         setStep(OnboardingStep.COMPLETE);
-        toast.success('Request received — our care team will review it soon.');
+        toast.success(t('onboarding.toasts.requestReceived'));
       } else {
         const profilePayload = buildProfilePayload();
         await completeClientOnboarding(
@@ -353,14 +353,14 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
       if (isFamily) {
         if (isApiError(error)) toast.error(error.message);
         else if (error instanceof Error) toast.error(error.message);
-        else toast.error('Failed to submit care request.');
+        else toast.error(t('onboarding.toasts.submitFailed'));
       } else {
         const apiError = extractApiError(error);
         if (apiError.fieldErrors) {
           const errorMessages = Object.values(apiError.fieldErrors).flat();
           toast.error(
             <div className="flex flex-col gap-1">
-              <span className="font-bold">{apiError.message || 'Please check your inputs'}</span>
+              <span className="font-bold">{apiError.message || t('onboarding.toasts.checkInputs')}</span>
               <ul className="list-disc pl-4 text-sm mt-1 space-y-0.5">
                 {errorMessages.map((msg) => (
                   <li key={msg}>{msg}</li>
@@ -370,12 +370,12 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
             { duration: 6000, className: 'min-w-[350px]' },
           );
         } else if (apiError.statusCode === 401) {
-          toast.error('Session expired. Please try again.');
+          toast.error(t('onboarding.toasts.sessionExpired'));
           setIsLoggedIn(false);
         } else {
           toast.error(
             apiError.message ||
-              'An error occurred while saving your progress. Please try again.',
+              t('onboarding.toasts.saveProgressError'),
           );
         }
       }
@@ -457,7 +457,7 @@ export function CareOnboardingWizard({ variant = 'careseeker' }: CareOnboardingW
                 await updateOnboardingProfile(
                   fullPayload as Parameters<typeof updateOnboardingProfile>[0],
                 );
-                toast.success('Profile synced successfully');
+                toast.success(t('onboarding.toasts.profileSynced'));
               } catch (error) {
                 console.error('Silent profile update failed:', error);
               }

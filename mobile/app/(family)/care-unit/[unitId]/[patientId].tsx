@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -29,24 +30,27 @@ import {
   type CarePatient,
 } from '../../../../lib/api/care';
 import { queryClient } from '../../../../lib/query/client';
-import { apiErrorMessage, formatDate, formatDateTime } from '../../../../lib/format';
+import { apiErrorMessage } from '../../../../lib/format';
 import {
+  familyEnumLabel,
   familyEpisodeStatusLabel,
   familyIntakeStatusLabel,
+  formatFamilyDate,
+  formatFamilyDateTime,
 } from '../../../../lib/familyLanguage';
+import {
+  localizeChip,
+  localizeSummaryToken,
+} from '../../../../lib/familyWizardDisplay';
 import { parseFamilyWizardSummary } from '../../../../lib/familyCareseekerIntake';
 import { toastError } from '../../../../lib/toast';
 
-/** Same options as careseeker onboarding gender preference. */
-const GENDER_OPTIONS = [
-  { id: 'male', label: 'Male' },
-  { id: 'female', label: 'Female' },
-  { id: 'no_preference', label: 'No Preference' },
-] as const;
-
-function genderLabel(value?: string | null) {
+function genderLabel(value: string | null | undefined, t: (key: string) => string) {
   if (!value) return null;
-  return GENDER_OPTIONS.find((o) => o.id === value)?.label ?? value;
+  if (value === 'male') return t('patientDetail.male');
+  if (value === 'female') return t('patientDetail.female');
+  if (value === 'no_preference') return t('patientDetail.noPreference');
+  return value.replace(/_/g, ' ');
 }
 
 type ProfileForm = {
@@ -88,6 +92,12 @@ const EMPTY_FORM: ProfileForm = {
 };
 
 export default function FamilyCarePatientDetailScreen() {
+  const { t } = useTranslation('family');
+  const genderOptions = [
+    { id: 'male', label: t('patientDetail.male') },
+    { id: 'female', label: t('patientDetail.female') },
+    { id: 'no_preference', label: t('patientDetail.noPreference') },
+  ] as const;
   const { unitId, patientId } = useLocalSearchParams<{
     unitId: string;
     patientId: string;
@@ -132,8 +142,8 @@ export default function FamilyCarePatientDetailScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!unitId || !patientId) throw new Error('Missing person');
-      if (!form.name.trim()) throw new Error('Name is required');
+      if (!unitId || !patientId) throw new Error(t('patientDetail.missingPerson'));
+      if (!form.name.trim()) throw new Error(t('patientDetail.nameRequired'));
       return updatePatient(unitId, patientId, {
         name: form.name.trim(),
         dateOfBirth: form.dateOfBirth.trim() || undefined,
@@ -150,15 +160,15 @@ export default function FamilyCarePatientDetailScreen() {
         queryKey: ['family-patient-revisions', unitId, patientId],
       });
       setEditing(false);
-      toast.show('Person profile updated', { type: 'success' });
+      toast.show(t('patientDetail.updated'), { type: 'success' });
     },
-    onError: (e) => toastError(toast, e, 'Save failed'),
+    onError: (e) => toastError(toast, e, t('patientDetail.saveFailed')),
   });
 
   if (unitQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Person" showBack />
+        <FamilyTabHero title={t('careUnit.person')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -167,12 +177,12 @@ export default function FamilyCarePatientDetailScreen() {
   if (unitQuery.isError || !unit || !patient) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Person" showBack />
+        <FamilyTabHero title={t('careUnit.person')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Person not found on this care unit"
+          title={t('patientDetail.notFound')}
           subtitle={unitQuery.error ? apiErrorMessage(unitQuery.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void unitQuery.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void unitQuery.refetch() }}
         />
       </SafeAreaView>
     );
@@ -204,19 +214,25 @@ export default function FamilyCarePatientDetailScreen() {
         >
           {requestSummary ? (
             <Card shadow>
-              <Text className="text-sm font-semibold text-stone-900">Care request</Text>
+              <Text className="text-sm font-semibold text-stone-900">
+                {t('patientDetail.careRequestLabel')}
+              </Text>
               <Text className="mt-0.5 text-xs text-stone-500">
-                What you told us during onboarding.
+                {t('patientDetail.requestOnboardingHint')}
               </Text>
               <View className="mt-3 gap-3">
                 {requestSummary.supportCategories.length > 0 ? (
                   <View>
                     <Text className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                      Support needed
+                      {t('careUnit.summary.supportNeeded')}
                     </Text>
                     <View className="flex-row flex-wrap gap-2">
                       {requestSummary.supportCategories.map((c) => (
-                        <Chip key={c} label={c} tone="teal" />
+                        <Chip
+                          key={c}
+                          label={localizeSummaryToken('support', c)}
+                          tone="teal"
+                        />
                       ))}
                     </View>
                   </View>
@@ -224,46 +240,68 @@ export default function FamilyCarePatientDetailScreen() {
                 {requestSummary.specificNeeds.length > 0 ? (
                   <View>
                     <Text className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                      Specific needs
+                      {t('careUnit.summary.specificNeeds')}
                     </Text>
                     {requestSummary.specificNeeds.map((n) => (
                       <Text key={n} className="text-sm capitalize text-stone-700">
-                        • {n}
+                        • {localizeChip(n)}
                       </Text>
                     ))}
                   </View>
                 ) : null}
-                <SummaryRow label="Schedule" value={requestSummary.scheduleType} />
-                <SummaryRow label="Care location" value={requestSummary.careLocation} />
                 <SummaryRow
-                  label="Provider preference"
-                  value={requestSummary.practitionerGender}
-                />
-                <SummaryRow
-                  label="Provider languages"
+                  label={t('careUnit.summary.schedule')}
                   value={
-                    requestSummary.providerLanguages.length > 0
-                      ? requestSummary.providerLanguages.join(', ')
+                    requestSummary.scheduleType
+                      ? localizeSummaryToken('schedule', requestSummary.scheduleType)
                       : null
                   }
                 />
-                <SummaryRow label="Start" value={requestSummary.startTiming} />
-                <SummaryRow label="Address" value={requestSummary.address} />
+                <SummaryRow
+                  label={t('careUnit.summary.careLocation')}
+                  value={
+                    requestSummary.careLocation
+                      ? localizeSummaryToken('careLocation', requestSummary.careLocation)
+                      : null
+                  }
+                />
+                <SummaryRow
+                  label={t('patientDetail.providerPreference')}
+                  value={
+                    requestSummary.practitionerGender
+                      ? localizeSummaryToken('gender', requestSummary.practitionerGender)
+                      : null
+                  }
+                />
+                <SummaryRow
+                  label={t('careUnit.summary.providerLanguages')}
+                  value={
+                    requestSummary.providerLanguages.length > 0
+                      ? requestSummary.providerLanguages.map((l) => localizeChip(l)).join(', ')
+                      : null
+                  }
+                />
+                <SummaryRow
+                  label={t('patientDetail.startLabel')}
+                  value={
+                    requestSummary.startTiming
+                      ? localizeChip(requestSummary.startTiming)
+                      : null
+                  }
+                />
+                <SummaryRow label={t('careUnit.summary.address')} value={requestSummary.address} />
               </View>
             </Card>
           ) : (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">
-                No care request linked to this person yet. Submit one from onboarding, or ask your
-                care team to attach an intake.
-              </Text>
+              <Text className="text-sm text-stone-500">{t('patientDetail.noRequestLinked')}</Text>
               <View className="mt-3">
                 <Button
                   variant="secondary"
                   size="sm"
                   onPress={() => router.push('/(onboarding)/step-1-care-unit')}
                 >
-                  Start a care request
+                  {t('dashboard.startCareRequest')}
                 </Button>
               </View>
             </Card>
@@ -271,7 +309,9 @@ export default function FamilyCarePatientDetailScreen() {
 
           <Card className="mt-4" shadow>
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-semibold text-stone-900">Person profile</Text>
+              <Text className="text-sm font-semibold text-stone-900">
+                {t('patientDetail.personProfile')}
+              </Text>
               {!editing ? (
                 <Pressable
                   onPress={() => {
@@ -281,7 +321,9 @@ export default function FamilyCarePatientDetailScreen() {
                   hitSlop={8}
                   accessibilityRole="button"
                 >
-                  <Text className="text-sm font-semibold text-teal-700">Edit</Text>
+                  <Text className="text-sm font-semibold text-teal-700">
+                    {t('careUnit.editShort')}
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -289,21 +331,21 @@ export default function FamilyCarePatientDetailScreen() {
             {editing ? (
               <View className="mt-3 gap-3">
                 <Input
-                  label="Name"
+                  label={t('patientDetail.name')}
                   value={form.name}
                   onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
                 />
                 <Input
-                  label="Date of birth (YYYY-MM-DD)"
+                  label={t('patientDetail.dateOfBirthInput')}
                   value={form.dateOfBirth}
                   onChangeText={(v) => setForm((f) => ({ ...f, dateOfBirth: v }))}
                   placeholder="1958-04-12"
                   autoCapitalize="none"
                 />
                 <View>
-                  <Text className="mb-1 text-sm text-stone-700">Gender</Text>
+                  <Text className="mb-1 text-sm text-stone-700">{t('patientDetail.gender')}</Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {GENDER_OPTIONS.map((option) => {
+                    {genderOptions.map((option) => {
                       const selected = form.gender === option.id;
                       return (
                         <Pressable
@@ -331,23 +373,23 @@ export default function FamilyCarePatientDetailScreen() {
                   </View>
                 </View>
                 <Input
-                  label="Relationship"
+                  label={t('patientDetail.relationship')}
                   value={form.relationship}
                   onChangeText={(v) => setForm((f) => ({ ...f, relationship: v }))}
                 />
                 <Input
-                  label="Point of contact"
+                  label={t('patientDetail.pointOfContact')}
                   value={form.pocName}
                   onChangeText={(v) => setForm((f) => ({ ...f, pocName: v }))}
                 />
                 <Input
-                  label="Point of contact phone"
+                  label={t('patientDetail.pointOfContactPhone')}
                   value={form.pocPhone}
                   onChangeText={(v) => setForm((f) => ({ ...f, pocPhone: v }))}
                   keyboardType="phone-pad"
                 />
                 <Input
-                  label="Notes"
+                  label={t('patientDetail.notes')}
                   value={form.notes}
                   onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
                   multiline
@@ -364,7 +406,7 @@ export default function FamilyCarePatientDetailScreen() {
                         setForm(toForm(patient));
                       }}
                     >
-                      Cancel
+                      {t('careUnit.cancel')}
                     </Button>
                   </View>
                   <View className="flex-1">
@@ -372,37 +414,49 @@ export default function FamilyCarePatientDetailScreen() {
                       isLoading={saveMutation.isPending}
                       onPress={() => saveMutation.mutate()}
                     >
-                      Save
+                      {t('careUnit.save')}
                     </Button>
                   </View>
                 </View>
               </View>
             ) : (
               <View className="mt-3 gap-3">
-                <SummaryRow label="Name" value={patient.name} />
+                <SummaryRow label={t('patientDetail.name')} value={patient.name} />
                 <SummaryRow
-                  label="Date of birth"
-                  value={patient.dateOfBirth ? formatDate(patient.dateOfBirth) : null}
+                  label={t('patientDetail.dateOfBirth')}
+                  value={patient.dateOfBirth ? formatFamilyDate(patient.dateOfBirth) : null}
                 />
-                <SummaryRow label="Gender" value={genderLabel(patient.gender)} />
-                <SummaryRow label="Relationship" value={patient.relationship} />
                 <SummaryRow
-                  label="Point of contact"
+                  label={t('patientDetail.gender')}
+                  value={genderLabel(patient.gender, t)}
+                />
+                <SummaryRow
+                  label={t('patientDetail.relationship')}
+                  value={
+                    patient.relationship
+                      ? familyEnumLabel('relationship', patient.relationship)
+                      : null
+                  }
+                />
+                <SummaryRow
+                  label={t('patientDetail.pointOfContact')}
                   value={
                     [patient.pocName, patient.pocPhone].filter(Boolean).join(' · ') || null
                   }
                 />
-                {patient.notes ? <SummaryRow label="Notes" value={patient.notes} /> : null}
+                {patient.notes ? (
+                  <SummaryRow label={t('patientDetail.notes')} value={patient.notes} />
+                ) : null}
               </View>
             )}
           </Card>
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Care journeys
+            {t('patientDetail.careJourneys')}
           </Text>
           {linkedEpisodes.length === 0 ? (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">No care journey for this person yet.</Text>
+              <Text className="text-sm text-stone-500">{t('patientDetail.noJourneysForPerson')}</Text>
             </Card>
           ) : (
             linkedEpisodes.map((ep) => (
@@ -421,18 +475,20 @@ export default function FamilyCarePatientDetailScreen() {
           )}
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Request history
+            {t('patientDetail.requestHistory')}
           </Text>
           {linkedIntakes.length === 0 ? (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">No care requests yet.</Text>
+              <Text className="text-sm text-stone-500">{t('patientDetail.noRequests')}</Text>
             </Card>
           ) : (
             linkedIntakes.map((intake) => (
               <Card key={intake.id} className="mb-2" shadow={false}>
                 <View className="flex-row items-center justify-between gap-2">
                   <Text className="flex-1 text-sm text-stone-600">
-                    {intake.submittedAt ? formatDateTime(intake.submittedAt) : 'Care request'}
+                    {intake.submittedAt
+                      ? formatFamilyDateTime(intake.submittedAt)
+                      : t('patientDetail.careRequestLabel')}
                   </Text>
                   <StatusBadge
                     status={intake.status}
@@ -444,32 +500,42 @@ export default function FamilyCarePatientDetailScreen() {
           )}
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Edit history
+            {t('patientDetail.editHistory')}
           </Text>
           {revisionsQuery.isLoading ? (
             <ActivityIndicator color="#0D9488" className="mt-2" />
           ) : revisions.length === 0 ? (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">No revisions recorded yet.</Text>
+              <Text className="text-sm text-stone-500">{t('patientDetail.noRevisions')}</Text>
             </Card>
           ) : (
             revisions.map((rev) => {
               const snapName =
                 typeof rev.snapshot?.name === 'string' ? rev.snapshot.name : '—';
+              const summary = rev.changeSummary
+                ? rev.changeSummary
+                    .replace(/^Updated\b/i, t('patientDetail.revisionUpdated'))
+                    .replace(/^Created\b/i, t('patientDetail.revisionCreated'))
+                    .replace(/^تم التحديث\b/, t('patientDetail.revisionUpdated'))
+                    .replace(/^تم الإنشاء\b/, t('patientDetail.revisionCreated'))
+                : t('patientDetail.revisionUpdated');
               return (
                 <Card key={rev.id} className="mb-2" shadow={false}>
                   <View className="flex-row items-start justify-between gap-2">
-                    <Text className="flex-1 font-medium text-stone-900">
-                      {rev.changeSummary || 'Updated'}
-                    </Text>
+                    <Text className="flex-1 font-medium text-stone-900">{summary}</Text>
                     <Text className="text-xs text-stone-400">
-                      {formatDateTime(rev.createdAt)}
+                      {formatFamilyDateTime(rev.createdAt)}
                     </Text>
                   </View>
                   <Text className="mt-1 text-xs text-stone-500">
-                    by {rev.changedBy?.name || rev.changedBy?.email || 'Unknown'}
+                    {t('patientDetail.by')}{' '}
+                    {rev.changedBy?.name ||
+                      rev.changedBy?.email ||
+                      t('patientDetail.unknown')}
                   </Text>
-                  <Text className="mt-1.5 text-sm text-stone-700">Snapshot: {snapName}</Text>
+                  <Text className="mt-1.5 text-sm text-stone-700">
+                    {t('patientDetail.snapshot')}: {snapName}
+                  </Text>
                 </Card>
               );
             })

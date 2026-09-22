@@ -28,6 +28,21 @@ import arBlog from '@/locales/ar/blog.json';
 import enFamily from '@/locales/en/family.json';
 import arFamily from '@/locales/ar/family.json';
 
+import enCoordinator from '@/locales/en/coordinator.json';
+import arCoordinator from '@/locales/ar/coordinator.json';
+
+import enClinical from '@/locales/en/clinical.json';
+import arClinical from '@/locales/ar/clinical.json';
+
+import enSupport from '@/locales/en/support.json';
+import arSupport from '@/locales/ar/support.json';
+
+import enOrg from '@/locales/en/org.json';
+import arOrg from '@/locales/ar/org.json';
+
+import enAuth from '@/locales/en/auth.json';
+import arAuth from '@/locales/ar/auth.json';
+
 i18n
     .use(LanguageDetector)
     .use(initReactI18next)
@@ -40,6 +55,11 @@ i18n
                 common: enCommon,
                 blog: enBlog,
                 family: enFamily,
+                coordinator: enCoordinator,
+                clinical: enClinical,
+                support: enSupport,
+                org: enOrg,
+                auth: enAuth,
             },
             ar: {
                 translation: arTranslation,
@@ -48,11 +68,16 @@ i18n
                 common: arCommon,
                 blog: arBlog,
                 family: arFamily,
+                coordinator: arCoordinator,
+                clinical: arClinical,
+                support: arSupport,
+                org: arOrg,
+                auth: arAuth,
             },
         },
         fallbackLng: 'en',
         defaultNS: 'translation',
-        ns: ['translation', 'landing', 'about', 'common', 'blog', 'family'],
+        ns: ['translation', 'landing', 'about', 'common', 'blog', 'family', 'coordinator', 'clinical', 'support', 'org', 'auth'],
         debug: false,
         interpolation: {
             escapeValue: false,

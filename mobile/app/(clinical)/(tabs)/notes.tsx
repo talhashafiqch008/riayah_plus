@@ -8,12 +8,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
-import { episodeStatusLabel, listEpisodes } from '../../../lib/api/care';
+import { listEpisodes } from '../../../lib/api/care';
+import { clinicalEpisodeStatus } from '../../../lib/clinicalI18n';
 import { apiErrorMessage } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 export default function ClinicalNotesHubScreen() {
+  const { t, i18n } = useTranslation('clinical');
   const query = useQuery({
     queryKey: ['clinical-notes-episodes'],
     queryFn: () => listEpisodes({ limit: 50 }),
@@ -23,12 +27,14 @@ export default function ClinicalNotesHubScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Session Notes" subtitle="Document visits and follow-ups" showBack={false} />
+      <ScreenHeader
+        title={t('notes.title')}
+        subtitle={t('notes.description')}
+        showBack={false}
+      />
 
       <View className="border-b border-stone-100 bg-white px-4 pb-3 pt-3">
-        <Text className="text-sm text-stone-500">
-          Choose a care episode to view or add clinical notes. Notes are immutable after save.
-        </Text>
+        <Text className="text-sm text-stone-500">{t('notes.description')}</Text>
       </View>
 
       {query.isLoading ? (
@@ -36,9 +42,9 @@ export default function ClinicalNotesHubScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load episodes"
+          title={t('notes.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -55,8 +61,8 @@ export default function ClinicalNotesHubScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="medkit-outline"
-              title="No episodes available yet"
-              subtitle="Episodes appear after a coordinator starts a care journey for a patient in your organization."
+              title={t('notes.empty')}
+              subtitle={t('notes.emptyHint')}
             />
           }
           renderItem={({ item }) => (
@@ -72,21 +78,20 @@ export default function ClinicalNotesHubScreen() {
                 <View className="flex-1">
                   <View className="flex-row flex-wrap items-center gap-2">
                     <Text className="font-semibold text-stone-900">
-                      {item.title ?? 'Episode'}
+                      {item.title ?? t('common.episode')}
                     </Text>
                     {item.status ? (
                       <StatusBadge
                         status={item.status}
-                        label={episodeStatusLabel(item.status)}
+                        label={clinicalEpisodeStatus(t, i18n, item.status)}
                       />
                     ) : null}
                   </View>
                   <Text className="mt-0.5 text-sm text-stone-500">
-                    {item.careRecipient?.name ?? item.patient?.name ?? 'Patient'}
-                    {item.coordinator?.name ? ` · Coord: ${item.coordinator.name}` : ''}
+                    {item.careRecipient?.name ?? item.patient?.name ?? t('common.patient')}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+                <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
               </View>
             </Card>
           )}

@@ -1,6 +1,7 @@
 import { client } from './client';
 import { extractApiError } from '@/lib/errors';
 import type { PublicStaffCard } from './staffProfile';
+import { familyStaffRoleLabel } from '@/lib/familyLanguage';
 
 export interface AvailabilitySlot {
   id: string;
@@ -126,7 +127,7 @@ export async function listScheduleStaff() {
 }
 
 export function scheduleStaffRoleLabel(role: string): string {
-  return role.replace(/_/g, ' ');
+  return familyStaffRoleLabel(role);
 }
 
 export type OpenSlot = {

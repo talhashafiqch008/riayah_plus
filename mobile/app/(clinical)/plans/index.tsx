@@ -11,22 +11,38 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
-import { carePlanStatusLabel, listCarePlans } from '../../../lib/api/care';
+import { listCarePlans } from '../../../lib/api/care';
 import { apiErrorMessage } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
+import { clinicalPlanStatus } from '../../../lib/clinicalI18n';
 
-const STATUS_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'submitted_for_approval', label: 'Submitted' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'active', label: 'Active' },
-  { value: 'revision_requested', label: 'Revision requested' },
-  { value: 'completed', label: 'Completed' },
+const STATUS_FILTER_VALUES = [
+  '',
+  'submitted_for_approval',
+  'approved',
+  'active',
+  'revision_requested',
+  'completed',
 ] as const;
 
 export default function ClinicalCarePlansScreen() {
+  const { t, i18n } = useTranslation('clinical');
   const [status, setStatus] = useState('');
+
+  const filters = useMemo(
+    () =>
+      STATUS_FILTER_VALUES.map((value) => ({
+        value,
+        label:
+          value === ''
+            ? t('common.all')
+            : clinicalPlanStatus(t, i18n, value),
+      })),
+    [t, i18n],
+  );
 
   const query = useQuery({
     queryKey: ['clinical-care-plans'],
@@ -45,19 +61,17 @@ export default function ClinicalCarePlansScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Care Plans" showBack />
+      <ScreenHeader title={t('plans.title')} showBack />
 
       <View className="border-b border-stone-100 bg-white pb-3">
-        <Text className="px-4 pt-3 text-sm text-stone-500">
-          Review plans for your organization and add an optional clinical co-sign.
-        </Text>
+        <Text className="px-4 pt-3 text-sm text-stone-500">{t('plans.description')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-3"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
-          {STATUS_FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -83,9 +97,9 @@ export default function ClinicalCarePlansScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load care plans"
+          title={t('plans.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -102,39 +116,46 @@ export default function ClinicalCarePlansScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="book-outline"
-              title="No care plans to review yet"
-              subtitle="Plans appear after a coordinator creates and submits one for an episode in your org."
+              title={t('plans.empty')}
+              subtitle={t('plans.emptyHint')}
             />
           }
-          renderItem={({ item }) => (
-            <Card
-              className="mb-3"
-              onPress={() => router.push(`/(clinical)/plans/${item.id}`)}
-              shadow
-            >
-              <View className="flex-row items-start gap-3">
-                <View className="mt-0.5 rounded-xl bg-teal-50 p-2.5">
-                  <Ionicons name="book-outline" size={20} color="#0F766E" />
-                </View>
-                <View className="flex-1">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="font-semibold text-stone-900">{item.title}</Text>
-                    <StatusBadge
-                      status={item.status}
-                      label={carePlanStatusLabel(item.status, 'staff')}
-                    />
+          renderItem={({ item }) => {
+            const goalsCount = item.goals?.length ?? 0;
+            const servicesCount = item.items?.length ?? 0;
+            return (
+              <Card
+                className="mb-3"
+                onPress={() => router.push(`/(clinical)/plans/${item.id}`)}
+                shadow
+              >
+                <View className="flex-row items-start gap-3">
+                  <View className="mt-0.5 rounded-xl bg-teal-50 p-2.5">
+                    <Ionicons name="book-outline" size={20} color="#0F766E" />
                   </View>
-                  <Text className="mt-0.5 text-sm text-stone-500">
-                    {item.episode?.title || 'Episode'}
-                    {' · '}
-                    {item.goals?.length ?? 0} goals · {item.items?.length ?? 0} services · v
-                    {item.version}
-                  </Text>
+                  <View className="flex-1">
+                    <View className="flex-row flex-wrap items-center gap-2">
+                      <Text className="font-semibold text-stone-900">{item.title}</Text>
+                      <StatusBadge
+                        status={item.status}
+                        label={clinicalPlanStatus(t, i18n, item.status)}
+                      />
+                    </View>
+                    <Text className="mt-0.5 text-sm text-stone-500">
+                      {item.episode?.title || t('mobile.detail.episodeFallback')}
+                      {' · '}
+                      {t('plans.goalsCount', { count: goalsCount })}
+                      {' · '}
+                      {t('plans.servicesCount', { count: servicesCount })}
+                      {' · '}
+                      {t('plans.version', { version: item.version })}
+                    </Text>
+                  </View>
+                  <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
-              </View>
-            </Card>
-          )}
+              </Card>
+            );
+          }}
         />
       )}
     </SafeAreaView>

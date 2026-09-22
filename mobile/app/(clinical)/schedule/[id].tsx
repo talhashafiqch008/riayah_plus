@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -24,6 +25,11 @@ import { getAssessment, updateAssessment } from '../../../lib/api/assessments';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { toastError } from '../../../lib/toast';
+import {
+  clinicalAssessmentType,
+  clinicalEmDash,
+  clinicalScheduleStatus,
+} from '../../../lib/clinicalI18n';
 
 function findingString(findings: Record<string, unknown> | null | undefined, key: string): string {
   const v = findings?.[key];
@@ -31,6 +37,8 @@ function findingString(findings: Record<string, unknown> | null | undefined, key
 }
 
 export default function ClinicalAssessmentDetailScreen() {
+  const { t, i18n } = useTranslation('clinical');
+  const emDash = clinicalEmDash(t);
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [mobility, setMobility] = useState('');
@@ -53,10 +61,10 @@ export default function ClinicalAssessmentDetailScreen() {
     mutationFn: async () => {
       if (!id) throw new Error('Missing assessment');
       if (!mobility.trim() && !pain.trim() && !summary.trim()) {
-        throw new Error('Enter at least one findings field');
+        throw new Error(t('schedule.needFindings'));
       }
       if (!recommendations.trim() && !reportUrl.trim()) {
-        throw new Error('Add recommendations or a report URL');
+        throw new Error(t('schedule.needRecOrReport'));
       }
       return updateAssessment(id, {
         status: 'completed',
@@ -74,19 +82,19 @@ export default function ClinicalAssessmentDetailScreen() {
       await queryClient.invalidateQueries({ queryKey: ['clinical-assessment', id] });
       await queryClient.invalidateQueries({ queryKey: ['clinical-assessments'] });
       await queryClient.invalidateQueries({ queryKey: ['clinical-shell-stats'] });
-      toast.show('Assessment completed', { type: 'success' });
+      toast.show(t('schedule.completed'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Complete failed');
+      const msg = apiErrorMessage(e, t('schedule.completeFailed'));
       setFormError(msg);
-      toastError(toast, e, 'Complete failed');
+      toastError(toast, e, t('schedule.completeFailed'));
     },
   });
 
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Assessment" showBack />
+        <ScreenHeader title={t('mobile.detail.assessmentTitle')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -95,18 +103,21 @@ export default function ClinicalAssessmentDetailScreen() {
   if (query.isError || !row) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Assessment" showBack />
+        <ScreenHeader title={t('mobile.detail.assessmentTitle')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Assessment not found"
+          title={t('mobile.detail.assessmentNotFound')}
           subtitle={query.error ? apiErrorMessage(query.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
   }
 
-  const patientName = row.patient?.name || row.episode?.title || 'Patient';
+  const patientName =
+    row.patient?.name || row.episode?.title || t('common.patient');
+  const assessmentType = clinicalAssessmentType(t, i18n, row.type);
+  const statusLabel = clinicalScheduleStatus(t, i18n, row.status);
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
@@ -127,10 +138,8 @@ export default function ClinicalAssessmentDetailScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View className="flex-row flex-wrap items-center gap-2">
-            <StatusBadge status={row.status} label={row.status.replace(/_/g, ' ')} size="md" />
-            <Text className="text-sm capitalize text-stone-500">
-              {(row.type ?? 'assessment').replace(/_/g, ' ')}
-            </Text>
+            <StatusBadge status={row.status} label={statusLabel} size="md" />
+            <Text className="text-sm text-stone-500">{assessmentType}</Text>
           </View>
           {row.scheduledAt ? (
             <Text className="mt-1 text-sm text-stone-600">{formatDateTime(row.scheduledAt)}</Text>
@@ -138,10 +147,10 @@ export default function ClinicalAssessmentDetailScreen() {
 
           {isScheduled ? (
             <Card className="mt-4" shadow>
-              <Text className="text-sm font-semibold text-stone-900">Complete assessment</Text>
-              <Text className="mt-1 text-sm text-stone-500">
-                Enter at least one findings field, plus recommendations or a report URL.
+              <Text className="text-sm font-semibold text-stone-900">
+                {t('schedule.completeTitle', { type: assessmentType })}
               </Text>
+              <Text className="mt-1 text-sm text-stone-500">{t('mobile.detail.completeHint')}</Text>
               {formError ? (
                 <View className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
                   <Text className="text-sm text-red-700">{formError}</Text>
@@ -149,36 +158,36 @@ export default function ClinicalAssessmentDetailScreen() {
               ) : null}
               <View className="mt-3 gap-3">
                 <Input
-                  label="Mobility"
+                  label={t('schedule.mobility')}
                   value={mobility}
                   onChangeText={setMobility}
-                  placeholder="Mobility findings"
+                  placeholder={t('schedule.mobilityPlaceholder')}
                 />
                 <Input
-                  label="Pain"
+                  label={t('schedule.pain')}
                   value={pain}
                   onChangeText={setPain}
-                  placeholder="Pain findings"
+                  placeholder={t('schedule.painPlaceholder')}
                 />
                 <Input
-                  label="Summary"
+                  label={t('schedule.summary')}
                   value={summary}
                   onChangeText={setSummary}
-                  placeholder="Clinical summary"
+                  placeholder={t('schedule.summary')}
                   multiline
                 />
                 <Input
-                  label="Recommendations"
+                  label={t('schedule.recommendations')}
                   value={recommendations}
                   onChangeText={setRecommendations}
-                  placeholder="Recommendations"
+                  placeholder={t('schedule.recommendations')}
                   multiline
                 />
                 <Input
-                  label="Report URL"
+                  label={t('schedule.report')}
                   value={reportUrl}
                   onChangeText={setReportUrl}
-                  placeholder="https://…"
+                  placeholder={t('schedule.reportUrlPlaceholder')}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
@@ -189,44 +198,44 @@ export default function ClinicalAssessmentDetailScreen() {
                     completeMutation.mutate();
                   }}
                 >
-                  Complete assessment
+                  {t('schedule.markCompleted')}
                 </Button>
               </View>
             </Card>
           ) : (
             <Card className="mt-4" shadow>
-              <Text className="text-sm font-semibold text-stone-900">Findings</Text>
+              <Text className="text-sm font-semibold text-stone-900">{t('schedule.findings')}</Text>
               <View className="mt-3 gap-3">
                 <View>
                   <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Mobility
+                    {t('schedule.mobility')}
                   </Text>
                   <Text className="mt-0.5 text-sm text-stone-800">
-                    {findingString(row.findings, 'mobility') || '—'}
+                    {findingString(row.findings, 'mobility') || emDash}
                   </Text>
                 </View>
                 <View>
                   <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Pain
+                    {t('schedule.pain')}
                   </Text>
                   <Text className="mt-0.5 text-sm text-stone-800">
-                    {findingString(row.findings, 'pain') || '—'}
+                    {findingString(row.findings, 'pain') || emDash}
                   </Text>
                 </View>
                 <View>
                   <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Summary
+                    {t('schedule.summary')}
                   </Text>
                   <Text className="mt-0.5 text-sm text-stone-800">
-                    {findingString(row.findings, 'summary') || '—'}
+                    {findingString(row.findings, 'summary') || emDash}
                   </Text>
                 </View>
                 <View>
                   <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Recommendations
+                    {t('schedule.recommendations')}
                   </Text>
                   <Text className="mt-0.5 text-sm text-stone-800">
-                    {row.recommendations || '—'}
+                    {row.recommendations || emDash}
                   </Text>
                 </View>
                 {row.reportUrl ? (

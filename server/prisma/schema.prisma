@@ -327,6 +327,8 @@ model User {
   lastTotpStep     Int?
   /// AUTH-07: access tokens issued before this timestamp are treated as revoked (logout-all / password change)
   tokensInvalidBefore DateTime?
+  /// Permanent UI language (`en` | `ar`). Null until the user completes the forced chooser.
+  uiLanguage       String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?

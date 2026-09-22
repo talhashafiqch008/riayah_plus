@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui';
 import { AuthError, AuthShell } from '../../components/auth/AuthShell';
 import { ROLE } from '../../components/shell/RoleChrome';
@@ -12,6 +13,7 @@ import { apiErrorMessage } from '../../lib/format';
 const CELL_COUNT = 6;
 
 export default function OtpScreen() {
+  const { t } = useTranslation('auth');
   const { email = '' } = useLocalSearchParams<{ email: string }>();
   const setUser = useAuthStore((s) => s.setUser);
   const [digits, setDigits] = useState<string[]>(Array(CELL_COUNT).fill(''));
@@ -46,7 +48,7 @@ export default function OtpScreen() {
 
   const verify = async () => {
     if (code.length !== CELL_COUNT) {
-      setError('Enter the 6-digit code.');
+      setError(t('otp.enter6Digit'));
       return;
     }
     setSubmitting(true);
@@ -73,7 +75,7 @@ export default function OtpScreen() {
       }
       router.replace('/(auth)/login');
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Verification failed.'));
+      setError(apiErrorMessage(e, t('otp.verifyFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -88,17 +90,17 @@ export default function OtpScreen() {
       setError(null);
       inputs.current[0]?.focus();
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Could not resend code.'));
+      setError(apiErrorMessage(e, t('otp.resendFailed')));
     }
   };
 
   return (
     <AuthShell
-      kicker="Verification"
-      title="Check your email"
-      subtitle={`We sent a 6-digit code to ${email || 'your email'}.`}
+      kicker={t('otp.kicker')}
+      title={t('otp.title')}
+      subtitle={t('otp.subtitle', { email: email || t('otp.subtitleFallback') })}
       showBack
-      backLabel="Back"
+      backLabel={t('otp.back')}
     >
       <View className="flex-row justify-between gap-2">
         {digits.map((d, i) => (
@@ -113,7 +115,7 @@ export default function OtpScreen() {
             keyboardType="number-pad"
             maxLength={1}
             selectTextOnFocus
-            accessibilityLabel={`Digit ${i + 1}`}
+            accessibilityLabel={t('otp.digitLabel', { n: i + 1 })}
             style={{
               flex: 1,
               height: 54,
@@ -136,7 +138,7 @@ export default function OtpScreen() {
 
       <View className="mt-5">
         <Button isLoading={submitting} onPress={() => void verify()} size="lg">
-          Verify code
+          {t('otp.verify')}
         </Button>
       </View>
 
@@ -148,10 +150,10 @@ export default function OtpScreen() {
       >
         {seconds > 0 ? (
           <Text className="text-sm text-stone-400">
-            Resend code in <Text className="font-semibold text-stone-600">{seconds}s</Text>
+            {t('otp.resendIn', { seconds })}
           </Text>
         ) : (
-          <Text className="text-sm font-semibold text-teal-700">Resend code</Text>
+          <Text className="text-sm font-semibold text-teal-700">{t('otp.resend')}</Text>
         )}
       </Pressable>
     </AuthShell>

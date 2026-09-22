@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   Easing,
@@ -27,8 +28,10 @@ import { Avatar } from '../../../components/ui';
 import { apiClient } from '../../../lib/api/client';
 import { listEpisodes } from '../../../lib/api/care';
 import { listSessions, type CareSession } from '../../../lib/api/scheduling';
-import { formatDateTime, greetingForNow } from '../../../lib/format';
+import { formatFamilyDateTime } from '../../../lib/familyLanguage';
+import { greetingForNow } from '../../../lib/format';
 import { useAuthStore } from '../../../stores/authStore';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -37,9 +40,7 @@ const TEAL = '#0D9488';
 const TEAL_DARK = '#0F766E';
 const TEAL_LIGHT = '#14B8A6';
 const TEAL_50 = '#F0FDFA';
-const STONE_50 = '#FAFAF9';
 const STONE_200 = '#E7E5E4';
-const STONE_400 = '#A8A29E';
 const STONE_500 = '#78716C';
 const STONE_900 = '#1C1917';
 const AMBER = '#F59E0B';
@@ -253,11 +254,11 @@ function QuickAction({
 }
 
 export default function FamilyHomeScreen() {
+  const { t, i18n } = useTranslation('family');
   const user = useAuthStore((s) => s.user);
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const firstName = user?.name?.split(' ')[0] ?? t('mobile.home.fallbackName');
   const greeting = greetingForNow();
-  const hour = new Date().getHours();
-  const arabicGreeting = hour < 12 ? 'صباح الخير' : 'مساء الخير';
+  const isArabic = i18n.language?.startsWith('ar');
 
   const { data: stats, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['family-shell-stats'],
@@ -319,7 +320,11 @@ export default function FamilyHomeScreen() {
 
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-3">
-              <Text className="mb-1 text-right text-[13px] text-white/40">{arabicGreeting}</Text>
+              {!isArabic ? (
+                <Text className="mb-1 text-right text-[13px] text-white/40">
+                  {new Date().getHours() < 12 ? 'صباح الخير' : 'مساء الخير'}
+                </Text>
+              ) : null}
               <Text className="text-[13px] font-medium text-white/70">{greeting},</Text>
               <Text
                 className="mt-0.5 text-[28px] font-extrabold leading-9 text-white"
@@ -328,14 +333,14 @@ export default function FamilyHomeScreen() {
                 {firstName}
               </Text>
               <Text className="mt-2 max-w-[240px] text-[13px] leading-5 text-white/75">
-                Your care, in one place.
+                {t('mobile.home.tagline')}
               </Text>
             </View>
 
             <View className="flex-row items-center gap-3 pt-3">
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Notifications"
+                accessibilityLabel={t('mobile.home.notifications')}
                 onPress={() => router.push('/(family)/notifications')}
                 hitSlop={10}
                 className="h-[38px] w-[38px] items-center justify-center rounded-full"
@@ -351,7 +356,7 @@ export default function FamilyHomeScreen() {
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Profile"
+                accessibilityLabel={t('mobile.home.profile')}
                 onPress={() => router.push('/(family)/profile')}
                 hitSlop={10}
               >
@@ -364,19 +369,19 @@ export default function FamilyHomeScreen() {
         <View className="-mt-7 flex-row gap-2.5 px-4">
           <StatPill
             value={stats?.activeEpisodes ?? 0}
-            label={'Active\njourneys'}
+            label={t('mobile.home.statsActive')}
             accent={TEAL}
             loading={isLoading}
           />
           <StatPill
             value={stats?.upcomingAppointments ?? 0}
-            label={'Upcoming\nsessions'}
+            label={t('mobile.home.statsUpcoming')}
             accent={STONE_900}
             loading={isLoading}
           />
           <StatPill
             value={stats?.unreadAlerts ?? 0}
-            label={'Unread\nalerts'}
+            label={t('mobile.home.statsAlerts')}
             accent={AMBER}
             loading={isLoading}
           />
@@ -385,7 +390,8 @@ export default function FamilyHomeScreen() {
         {isError ? (
           <Pressable onPress={() => void refetch()} className="mt-3 items-center">
             <Text className="text-xs text-stone-400">
-              Could not load — <Text className="font-semibold text-teal-600">tap to retry</Text>
+              {t('mobile.home.loadRetryPrefix')}
+              <Text className="font-semibold text-teal-600">{t('mobile.home.retry')}</Text>
             </Text>
           </Pressable>
         ) : null}
@@ -395,7 +401,7 @@ export default function FamilyHomeScreen() {
             <Animated.View style={visitAnimStyle}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Open next appointment"
+                accessibilityLabel={t('mobile.home.openNextAppointment')}
                 onPress={() => router.push('/(family)/bookings')}
                 onPressIn={() => {
                   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -421,14 +427,16 @@ export default function FamilyHomeScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-[11px] font-semibold uppercase tracking-widest text-teal-600">
-                      Next visit
+                      {t('mobile.home.nextVisit')}
                     </Text>
                     <Text className="mt-0.5 text-[15px] font-semibold text-stone-900">
                       {next.provider?.name ?? next.type.replace(/_/g, ' ')}
                     </Text>
-                    <Text className="mt-0.5 text-xs text-stone-400">{formatDateTime(next.scheduledAt)}</Text>
+                    <Text className="mt-0.5 text-xs text-stone-400">
+                      {formatFamilyDateTime(next.scheduledAt)}
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={TEAL} />
+                  <Ionicons name={navForwardIcon()} size={18} color={TEAL} />
                 </View>
               </Pressable>
             </Animated.View>
@@ -439,7 +447,7 @@ export default function FamilyHomeScreen() {
           <Animated.View style={ctaAnimStyle}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Request care"
+              accessibilityLabel={t('mobile.home.requestCare')}
               onPress={() => router.push('/(onboarding)/step-1-care-unit')}
               onPressIn={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -467,10 +475,10 @@ export default function FamilyHomeScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-[15px] font-bold text-stone-900" style={{ letterSpacing: -0.2 }}>
-                      Request care
+                      {t('mobile.home.requestCare')}
                     </Text>
                     <Text className="mt-0.5 text-xs leading-4 text-stone-400">
-                      Find the right support for your family
+                      {t('mobile.home.requestCareHint')}
                     </Text>
                   </View>
                   <Ionicons name="arrow-forward" size={18} color={TEAL} />
@@ -482,33 +490,33 @@ export default function FamilyHomeScreen() {
 
         <View className="mt-7 px-4">
           <Text className="mb-3 text-[10px] font-bold uppercase tracking-[2.5px] text-stone-400">
-            Quick access
+            {t('mobile.home.quickAccess')}
           </Text>
           <View className="flex-row flex-wrap gap-3">
             <QuickAction
               icon="heart-outline"
-              label="Care Journey"
-              hint="Follow your progress"
+              label={t('dashboard.links.episodes.name')}
+              hint={t('mobile.home.journeyHint')}
               onPress={() => router.push('/(family)/episodes')}
               featured
             />
             <QuickAction
               icon="calendar-outline"
-              label="Appointments"
-              hint="View and book sessions"
+              label={t('dashboard.links.bookings.name')}
+              hint={t('mobile.home.appointmentsHint')}
               onPress={() => router.push('/(family)/bookings')}
               badge={stats?.upcomingAppointments}
             />
             <QuickAction
               icon="folder-outline"
-              label="Documents"
-              hint="Upload and manage files"
+              label={t('dashboard.links.documents.name')}
+              hint={t('mobile.home.documentsHint')}
               onPress={() => router.push('/(family)/documents')}
             />
             <QuickAction
               icon="people-outline"
-              label="Care Unit"
-              hint="Your care team"
+              label={t('nav.care-unit')}
+              hint={t('mobile.home.careUnitHint')}
               onPress={() => router.push('/(family)/care-unit')}
             />
           </View>
@@ -524,12 +532,18 @@ export default function FamilyHomeScreen() {
                 <Ionicons name="chatbubbles-outline" size={16} color={TEAL} />
               </View>
               <View>
-                <Text className="text-[13px] font-semibold text-stone-900">Messages</Text>
-                <Text className="mt-0.5 text-[11px] text-stone-400">Chat with your care team</Text>
+                <Text className="text-[13px] font-semibold text-stone-900">
+                  {t('dashboard.links.messages.name')}
+                </Text>
+                <Text className="mt-0.5 text-[11px] text-stone-400">
+                  {t('mobile.home.messagesHint')}
+                </Text>
               </View>
             </View>
             <View className="rounded-full bg-amber-50 px-2.5 py-1">
-              <Text className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Soon</Text>
+              <Text className="text-[10px] font-bold uppercase tracking-widest text-amber-500">
+                {t('dashboard.soon')}
+              </Text>
             </View>
           </View>
         </View>

@@ -173,9 +173,9 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       description:
         'Your daily clinical workspace — schedule, assigned patients, and session documentation.',
       stats: [
-        { label: "Today's sessions", value: '—' },
-        { label: 'Assigned patients', value: '—' },
-        { label: 'Notes due', value: '—' },
+        { id: 'todaysSessions', label: "Today's sessions", value: '—' },
+        { id: 'assignedPatients', label: 'Assigned patients', value: '—' },
+        { id: 'notesDue', label: 'Notes due', value: '—' },
       ],
       nextSteps: [
         'Join today’s video sessions and admit waiting families',
@@ -195,18 +195,19 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       { name: 'Dashboard', href: '/support', icon: LayoutDashboard },
       { name: 'My Shifts', href: '/support/shifts', icon: Clock },
       { name: 'Tasks', href: '/support/tasks', icon: ClipboardList },
-      { name: 'Shift Notes', href: '/support/notes', icon: FileText },
+      // Shift Notes / Messages — placeholder until live APIs; hide from sidebar for now
+      // { name: 'Shift Notes', href: '/support/notes', icon: FileText },
       { name: 'Profile', href: '/support/profile', icon: UserCog },
-      { name: 'Messages', href: '/support/messages', icon: MessageCircle },
+      // { name: 'Messages', href: '/support/messages', icon: MessageCircle },
     ],
     dashboard: {
       title: 'Support Worker Dashboard',
       description:
         'View assigned shifts and tasks, document visits, and stay connected with your care team.',
       stats: [
-        { label: 'Shifts this week', value: '—' },
-        { label: 'Open tasks', value: '—' },
-        { label: 'Notes pending', value: '—' },
+        { id: 'shiftsThisWeek', label: 'Shifts this week', value: '—' },
+        { id: 'openTasks', label: 'Open tasks', value: '—' },
+        { id: 'notesPending', label: 'Notes pending', value: '—' },
       ],
       nextSteps: [
         'Check in to your next shift',
@@ -233,9 +234,9 @@ export const ROLE_SHELLS: Record<string, RoleShellConfig> = {
       description:
         'Manage families linked to your organization, invite coordinators and clinical staff, and route care requests.',
       stats: [
-        { label: 'Families', value: '—' },
-        { label: 'Coordinators', value: '—' },
-        { label: 'Pending requests', value: '—' },
+        { id: 'families', label: 'Families', value: '—' },
+        { id: 'coordinators', label: 'Coordinators', value: '—' },
+        { id: 'pendingRequests', label: 'Pending requests', value: '—' },
       ],
       nextSteps: [
         'Assign coordinators to new families',
@@ -264,9 +265,14 @@ export function getShellNavLabel(shell: RoleShellConfig, pathname: string): stri
   return item?.name ?? shell.portalTitle;
 }
 
-/** Stable i18n key for family nav items (e.g. `/family/care-plans` → `care-plans`). */
-export function familyNavKey(href: string, basePath = '/family'): string {
+/** Stable i18n key for shell nav items (e.g. `/coordinator/care-plans` → `plans`). */
+export function shellNavKey(href: string, basePath: string): string {
   if (href === basePath) return 'dashboard';
   const rest = href.startsWith(`${basePath}/`) ? href.slice(basePath.length + 1) : href.replace(/^\//, '');
   return rest.split('/')[0] || 'dashboard';
+}
+
+/** @deprecated Prefer shellNavKey */
+export function familyNavKey(href: string, basePath = '/family'): string {
+  return shellNavKey(href, basePath);
 }

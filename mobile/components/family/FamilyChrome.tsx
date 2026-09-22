@@ -3,6 +3,8 @@ import { Pressable, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { navBackIcon } from '../../lib/rtlIcons';
 
 /** Website tokens from mern/client/src/index.css */
 export const FAMILY = {
@@ -49,6 +51,7 @@ export function FamilyTabHero({
   right?: ReactNode;
   showBack?: boolean;
 }) {
+  const { t } = useTranslation('common');
   return (
     <LinearGradient
       colors={[...FAMILY_HERO_COLORS]}
@@ -74,13 +77,13 @@ export function FamilyTabHero({
           {showBack ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={t('a11y.back')}
               onPress={() => router.back()}
               hitSlop={12}
               className="mb-3 h-[38px] w-[38px] items-center justify-center rounded-full"
               style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
             >
-              <Ionicons name="chevron-back" size={22} color={FAMILY.white} />
+              <Ionicons name={navBackIcon()} size={22} color={FAMILY.white} />
             </Pressable>
           ) : null}
           <Text

@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { EmptyState, StatusBadge } from '../../../components/ui';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
@@ -26,6 +27,7 @@ import {
 type Tab = 'invoices' | 'quotations';
 
 export default function FamilyInvoicesScreen() {
+  const { t } = useTranslation('family');
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('invoices');
   const [rows, setRows] = useState<Invoice[]>([]);
@@ -40,7 +42,10 @@ export default function FamilyInvoicesScreen() {
         const updates = await Promise.all(
           payable.map(async (row) => {
             try {
-              const confirmed = await confirmInvoicePayment(row.id, { maxAttempts: 10, intervalMs: 1500 });
+              const confirmed = await confirmInvoicePayment(row.id, {
+                maxAttempts: 10,
+                intervalMs: 1500,
+              });
               if (confirmed.data) return confirmed.data;
               if (confirmed.paid || confirmed.alreadyPaid) return getInvoice(row.id);
               return row;
@@ -52,17 +57,17 @@ export default function FamilyInvoicesScreen() {
         const byId = new Map(updates.map((row) => [row.id, row]));
         next = next.map((row) => byId.get(row.id) ?? row);
         if (updates.some((row, i) => row.status === 'paid' && payable[i]?.status !== 'paid')) {
-          toast.show('Payment received', { type: 'success' });
+          toast.show(t('billing.paymentReceived'), { type: 'success' });
         }
       }
       setRows(next);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load billing'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('billing.loadError')), { type: 'danger' });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [t, toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,7 +82,7 @@ export default function FamilyInvoicesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Billing" subtitle="Quotations, invoices, and payments" showBack />
+      <FamilyTabHero title={t('billing.title')} subtitle={t('billing.description')} showBack />
 
       <View className="flex-row gap-2 px-4 pb-2 pt-3">
         {(['invoices', 'quotations'] as Tab[]).map((key) => {
@@ -89,7 +94,9 @@ export default function FamilyInvoicesScreen() {
               className={`rounded-full px-4 py-2 ${active ? 'bg-teal-600' : 'bg-white border border-stone-200'}`}
             >
               <Text className={`text-sm font-semibold ${active ? 'text-white' : 'text-stone-600'}`}>
-                {key === 'invoices' ? `Invoices (${invoices.length})` : `Quotations (${quotations.length})`}
+                {key === 'invoices'
+                  ? `${t('billing.invoices')} (${invoices.length})`
+                  : `${t('billing.quotations')} (${quotations.length})`}
               </Text>
             </Pressable>
           );
@@ -118,12 +125,10 @@ export default function FamilyInvoicesScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="receipt-outline"
-              title={tab === 'quotations' ? 'No quotations yet' : 'No invoices yet'}
-              subtitle={
-                tab === 'quotations'
-                  ? 'When a care plan is approved, a quotation appears here.'
-                  : 'Invoices are created when sessions or services are completed.'
+              title={
+                tab === 'quotations' ? t('billing.emptyQuotations') : t('billing.emptyInvoices')
               }
+              subtitle={t('billing.description')}
             />
           }
           renderItem={({ item }) => {
@@ -136,14 +141,16 @@ export default function FamilyInvoicesScreen() {
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1">
                     <Text className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                      {isQuotation ? 'Quotation' : 'Invoice'}
+                      {isQuotation ? t('billing.quotation') : t('billing.invoice')}
                     </Text>
                     <Text className="mt-0.5 text-base font-semibold text-stone-900">
                       {item.invoiceNumber}
                     </Text>
                     <Text className="mt-1 text-sm text-stone-600">
                       {formatMoney(item.total, item.currency)}
-                      {item.dueDate ? ` · due ${formatDate(item.dueDate)}` : ''}
+                      {item.dueDate
+                        ? ` · ${t('common.due', { date: formatDate(item.dueDate) })}`
+                        : ''}
                     </Text>
                   </View>
                   <StatusBadge

@@ -10,9 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
 import {
-  carePlanStatusLabel,
   listCarePlans,
   listEpisodes,
   normalizeCarePlanStatus,
@@ -20,18 +20,38 @@ import {
 } from '../../../lib/api/care';
 import { apiErrorMessage } from '../../../lib/format';
 
-const STATUS_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'submitted_for_approval', label: 'Awaiting approval' },
-  { value: 'active', label: 'Active' },
-  { value: 'revision_requested', label: 'Revision requested' },
-  { value: 'rejected', label: 'Rejected' },
+const STATUS_FILTER_VALUES = [
+  '',
+  'draft',
+  'submitted_for_approval',
+  'active',
+  'revision_requested',
+  'rejected',
 ] as const;
 
+function episodeStatusLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  status: string,
+) {
+  return t(`episodes.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+}
+
 export default function CoordinatorPlansScreen() {
+  const { t } = useTranslation('coordinator');
   const [status, setStatus] = useState('');
   const [showPicker, setShowPicker] = useState(false);
+
+  const statusFilters = useMemo(
+    () =>
+      STATUS_FILTER_VALUES.map((value) => ({
+        value,
+        label:
+          value === ''
+            ? t('plans.allStatuses')
+            : t(`plans.status.${value}`, { defaultValue: value }),
+      })),
+    [t],
+  );
 
   const plansQuery = useQuery({
     queryKey: ['coordinator-care-plans'],
@@ -58,15 +78,13 @@ export default function CoordinatorPlansScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Care Plans" subtitle="Build and submit plans" showBack={false} />
+      <ScreenHeader title={t('plans.title')} subtitle={t('mobile.home.plansHint')} showBack={false} />
 
       <View className="border-b border-stone-100 bg-white px-4 pb-3">
-        <Text className="mt-3 text-sm text-stone-500">
-          Build, submit, and track care plans for your episodes.
-        </Text>
+        <Text className="mt-3 text-sm text-stone-500">{t('plans.description')}</Text>
         <View className="mt-3">
           <Button size="sm" onPress={() => setShowPicker((v) => !v)}>
-            {showPicker ? 'Hide episode picker' : 'New plan'}
+            {showPicker ? t('mobile.detail.hideEpisodePicker') : t('plans.newPlan')}
           </Button>
         </View>
         <ScrollView
@@ -75,7 +93,7 @@ export default function CoordinatorPlansScreen() {
           className="mt-3"
           contentContainerStyle={{ gap: 8 }}
         >
-          {STATUS_FILTERS.map((filter) => {
+          {statusFilters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -101,9 +119,9 @@ export default function CoordinatorPlansScreen() {
       ) : plansQuery.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load care plans"
+          title={t('plans.loadError')}
           subtitle={apiErrorMessage(plansQuery.error)}
-          action={{ label: 'Try again', onPress: () => void plansQuery.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void plansQuery.refetch() }}
         />
       ) : (
         <ScrollView
@@ -118,13 +136,11 @@ export default function CoordinatorPlansScreen() {
         >
           {showPicker ? (
             <Card className="mb-4" shadow>
-              <Text className="mb-2 text-sm font-medium text-stone-800">
-                Choose an episode to build a plan
-              </Text>
+              <Text className="mb-2 text-sm font-medium text-stone-800">{t('plans.pickEpisode')}</Text>
               {episodesQuery.isLoading ? (
                 <ActivityIndicator color="#0D9488" />
               ) : episodes.length === 0 ? (
-                <Text className="text-sm text-stone-500">No episodes found.</Text>
+                <Text className="text-sm text-stone-500">{t('plans.noEpisodes')}</Text>
               ) : (
                 episodes.map((ep) => (
                   <Pressable
@@ -136,10 +152,10 @@ export default function CoordinatorPlansScreen() {
                     className="flex-row items-center justify-between border-t border-stone-100 py-3"
                   >
                     <Text className="flex-1 text-sm font-medium text-stone-900">
-                      {ep.title ?? 'Episode'}
+                      {ep.title ?? t('mobile.detail.episodeFallback')}
                     </Text>
-                    <Text className="text-xs capitalize text-stone-500">
-                      {(ep.status ?? '').replace(/_/g, ' ')}
+                    <Text className="text-xs text-stone-500">
+                      {episodeStatusLabel(t, ep.status ?? '')}
                     </Text>
                   </Pressable>
                 ))
@@ -150,8 +166,8 @@ export default function CoordinatorPlansScreen() {
           {filtered.length === 0 ? (
             <EmptyState
               icon="document-text-outline"
-              title="No care plans yet"
-              subtitle="Create a draft from an episode, or generate an AI draft."
+              title={t('plans.empty')}
+              subtitle={t('mobile.detail.plansEmptyHint')}
             />
           ) : (
             filtered.map((plan) => <PlanCard key={plan.id} plan={plan} />)
@@ -163,19 +179,28 @@ export default function CoordinatorPlansScreen() {
 }
 
 function PlanCard({ plan }: { plan: CarePlan }) {
+  const { t } = useTranslation('coordinator');
+  const goalsCount = plan.goals?.length ?? 0;
+  const servicesCount = plan.items?.length ?? 0;
+
   return (
     <Card className="mb-3" onPress={() => router.push(`/(coordinator)/plans/${plan.id}`)} shadow>
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1">
           <Text className="font-semibold text-stone-900">{plan.title}</Text>
           <Text className="mt-1 text-sm text-stone-500">
-            {(plan.goals?.length ?? 0)} goals · {(plan.items?.length ?? 0)} services · v
-            {plan.version}
+            {t('mobile.detail.planGoalsServices', {
+              goals: goalsCount,
+              services: servicesCount,
+              version: plan.version,
+            })}
           </Text>
         </View>
         <StatusBadge
           status={normalizeCarePlanStatus(plan.status)}
-          label={carePlanStatusLabel(plan.status, 'staff')}
+          label={t(`plans.status.${normalizeCarePlanStatus(plan.status)}`, {
+            defaultValue: plan.status.replace(/_/g, ' '),
+          })}
         />
       </View>
     </Card>

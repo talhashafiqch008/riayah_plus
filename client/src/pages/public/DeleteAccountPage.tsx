@@ -1,17 +1,13 @@
-
-import { useState, useCallback , useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
-import { Mail, Smartphone, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Mail, Smartphone, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { deleteAccount } from '@/lib/api/user';
 import { clearLegacyTokenStorage } from '@/lib/api/client';
 import { isApiError } from '@/lib/errors';
 import toast from 'react-hot-toast';
-
-
-
 
 const fadeIn = {
  initial: { opacity: 0, y: 10 },
@@ -20,6 +16,7 @@ const fadeIn = {
 };
 
 export default function DeleteAccountPage() {
+ const { t } = useTranslation('auth');
  const [identifierMethod, setIdentifierMethod] = useState<'email' | 'phone'>('email');
  const [email, setEmail] = useState('');
  const [phone, setPhone] = useState('');
@@ -36,16 +33,16 @@ export default function DeleteAccountPage() {
  try {
  await deleteAccount();
  setSubmitted(true);
- toast.success('Account deleted successfully.');
+ toast.success(t('deleteAccount.deletedToast'));
  clearLegacyTokenStorage();
  setTimeout(() => navigate('/'), 2000);
  } catch (error) {
  if (isApiError(error)) {
- toast.error(error.message || 'Failed to delete account. Please try again later.');
+ toast.error(error.message || t('deleteAccount.failedToast'));
  } else if (error instanceof Error) {
  toast.error(error.message);
  } else {
- toast.error('Failed to delete account. Please try again later.');
+ toast.error(t('deleteAccount.failedToast'));
  }
  } finally {
  setLoading(false);
@@ -67,12 +64,14 @@ export default function DeleteAccountPage() {
  <div className="size-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
  <CheckCircle2 className="size-10" />
  </div>
- <h2 className="text-2xl font-semibold text-stone-900 mb-4">Request Received</h2>
+ <h2 className="text-2xl font-semibold text-stone-900 mb-4">{t('deleteAccount.successTitle')}</h2>
  <p className="text-stone-500 mb-8 leading-relaxed">
- Your account deletion request has been successfully received. Our team will review your request and process it within 3-5 business days. We will contact you at the provided {identifierMethod === 'email' ? 'email' : 'phone number'} if we need any further information.
+ {identifierMethod === 'email'
+ ? t('deleteAccount.successBodyEmail')
+ : t('deleteAccount.successBodyPhone')}
  </p>
  <Link to="/" className="inline-flex items-center justify-center gap-2 w-full py-4 bg-stone-900 text-white rounded-2xl font-bold hover:bg-stone-800 transition-all">
- Return to Home Page
+ {t('deleteAccount.returnHome')}
  </Link>
  </div>
  </div>
@@ -80,8 +79,8 @@ export default function DeleteAccountPage() {
  }
 
  return (
+ <LazyMotion features={domAnimation}>
  <div className="min-h-screen relative flex items-center justify-center bg-[#FDFBF7] overflow-hidden">
- {/* Animated Warm Background Elements */}
  <div className="absolute inset-0 pointer-events-none">
  <m.div
  animate={{ scale: [1, 1.1, 1], rotate: [0, 5, 0] }}
@@ -106,9 +105,9 @@ export default function DeleteAccountPage() {
  <div className="size-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
  <AlertTriangle className="size-8" />
  </div>
- <h1 className="text-2xl font-semibold text-stone-900 mb-2">Delete Your Account</h1>
+ <h1 className="text-2xl font-semibold text-stone-900 mb-2">{t('deleteAccount.title')}</h1>
  <p className="text-stone-500 text-sm leading-relaxed">
- Submitting this form will initiate the process to permanently delete your account and all associated data. This action cannot be undone.
+ {t('deleteAccount.subtitle')}
  </p>
  </div>
 
@@ -127,14 +126,14 @@ export default function DeleteAccountPage() {
  className={`flex-1 relative z-10 py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${identifierMethod === 'email' ? 'text-stone-900' : 'text-stone-400'}`}
  >
  <Mail className="size-4" />
- Email
+ {t('deleteAccount.email')}
  </button>
  <button
  onClick={handleSetPhoneMethod}
  className={`flex-1 relative z-10 py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${identifierMethod === 'phone' ? 'text-stone-900' : 'text-stone-400'}`}
  >
  <Smartphone className="size-4" />
- Phone Number
+ {t('deleteAccount.phone')}
  </button>
  </div>
 
@@ -150,7 +149,7 @@ export default function DeleteAccountPage() {
  onChange={(e) => setEmail(e.target.value)}
  required
  className="w-full pl-12 pr-4 py-4 bg-stone-50 border-2 border-stone-100 rounded-2xl focus:bg-white focus:border-red-500 focus:ring-0 transition-all outline-none font-medium placeholder:text-stone-400 text-stone-900"
- placeholder="Registered Email Address"
+ placeholder={t('deleteAccount.emailPlaceholder')}
  />
  </div>
  </m.div>
@@ -164,7 +163,7 @@ export default function DeleteAccountPage() {
  onChange={(e) => setPhone(e.target.value)}
  required
  className="w-full pl-12 pr-4 py-4 bg-stone-50 border-2 border-stone-100 rounded-2xl focus:bg-white focus:border-red-500 focus:ring-0 transition-all outline-none font-medium placeholder:text-stone-400 text-stone-900"
- placeholder="Registered Phone Number"
+ placeholder={t('deleteAccount.phonePlaceholder')}
  />
  </div>
  </m.div>
@@ -177,15 +176,15 @@ export default function DeleteAccountPage() {
  onChange={(e) => setReason(e.target.value)}
  rows={3}
  className="w-full p-4 bg-stone-50 border-2 border-stone-100 rounded-2xl focus:bg-white focus:border-red-500 focus:ring-0 transition-all outline-none font-medium placeholder:text-stone-400 text-stone-900 resize-none"
- placeholder="Please let us know why you are leaving (Optional)"
+ placeholder={t('deleteAccount.reasonPlaceholder')}
  ></textarea>
  </div>
 
  <div className="bg-red-50 border border-red-100 p-4 rounded-2xl">
  <ul className="text-xs text-red-800 space-y-1 ml-4 list-disc">
- <li>All your personal data will be completely deleted.</li>
- <li>You will lose all your history and records.</li>
- <li>Any active subscriptions will be cancelled.</li>
+ <li>{t('deleteAccount.warningData')}</li>
+ <li>{t('deleteAccount.warningHistory')}</li>
+ <li>{t('deleteAccount.warningSubscriptions')}</li>
  </ul>
  </div>
 
@@ -196,17 +195,18 @@ export default function DeleteAccountPage() {
  disabled={loading}
  className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-red-600/20 hover:shadow-red-600/40 hover:bg-red-700 transition-all flex items-center justify-center gap-2"
  >
- {loading ? 'Submitting Request...' : 'Request Account Deletion'}
+ {loading ? t('deleteAccount.submitting') : t('deleteAccount.submit')}
  </m.button>
 
  <div className="text-center mt-4">
  <Link to="/" className="text-sm font-semibold text-stone-500 hover:text-stone-700 transition-colors">
- Cancel and return to Home
+ {t('deleteAccount.cancel')}
  </Link>
  </div>
  </form>
  </div>
  </div>
  </div>
+ </LazyMotion>
  );
 }

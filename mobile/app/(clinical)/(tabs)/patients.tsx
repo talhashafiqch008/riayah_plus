@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,17 +11,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
-import {
-  episodeStatusLabel,
-  listEpisodes,
-  STAFF_EPISODE_STATUS_FILTERS,
-} from '../../../lib/api/care';
+import { listEpisodes, STAFF_EPISODE_STATUS_FILTERS } from '../../../lib/api/care';
+import { clinicalEpisodeStatus } from '../../../lib/clinicalI18n';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 export default function ClinicalPatientsScreen() {
+  const { t, i18n } = useTranslation('clinical');
   const [status, setStatus] = useState('');
+
+  const filters = useMemo(
+    () =>
+      STAFF_EPISODE_STATUS_FILTERS.map((filter) => ({
+        value: filter.value,
+        label:
+          filter.value === ''
+            ? t('common.all')
+            : clinicalEpisodeStatus(t, i18n, filter.value),
+      })),
+    [t, i18n],
+  );
 
   const query = useQuery({
     queryKey: ['clinical-episodes', status],
@@ -33,20 +45,21 @@ export default function ClinicalPatientsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Patients" subtitle="Care episodes in your organization" showBack={false} />
+      <ScreenHeader
+        title={t('episodes.title')}
+        subtitle={t('mobile.patientsSubtitle')}
+        showBack={false}
+      />
 
       <View className="border-b border-stone-100 bg-white pb-3">
-        <Text className="px-4 pt-3 text-sm text-stone-500">
-          Care episodes in your organization — open one for details, or use Session Notes to
-          document.
-        </Text>
+        <Text className="px-4 pt-3 text-sm text-stone-500">{t('mobile.patientsBody')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-3"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
-          {STAFF_EPISODE_STATUS_FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -72,9 +85,9 @@ export default function ClinicalPatientsScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load patients"
+          title={t('mobile.patientsLoadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -91,15 +104,15 @@ export default function ClinicalPatientsScreen() {
           ListHeaderComponent={
             episodes.length > 0 ? (
               <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                {total} episode{total === 1 ? '' : 's'}
+                {t(total === 1 ? 'episodes.count_one' : 'episodes.count_other', { count: total })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon="people-outline"
-              title="No episodes yet"
-              subtitle="Episodes appear after a coordinator starts a care journey in your organization."
+              title={t('episodes.empty')}
+              subtitle={t('episodes.description')}
             />
           }
           renderItem={({ item }) => (
@@ -115,22 +128,24 @@ export default function ClinicalPatientsScreen() {
                 <View className="flex-1">
                   <View className="flex-row flex-wrap items-center gap-2">
                     <Text className="font-semibold text-stone-900">
-                      {item.title ?? 'Episode'}
+                      {item.title ?? t('common.episode')}
                     </Text>
                     {item.status ? (
                       <StatusBadge
                         status={item.status}
-                        label={episodeStatusLabel(item.status)}
+                        label={clinicalEpisodeStatus(t, i18n, item.status)}
                       />
                     ) : null}
                   </View>
                   <Text className="mt-0.5 text-sm text-stone-500">
-                    {item.careRecipient?.name ?? item.patient?.name ?? 'Patient'}
-                    {item.coordinator?.name ? ` · Coord: ${item.coordinator.name}` : ''}
+                    {item.careRecipient?.name ?? item.patient?.name ?? t('common.patient')}
+                    {item.coordinator?.name
+                      ? ` · ${t('notes.coord', { name: item.coordinator.name })}`
+                      : ''}
                     {item.createdAt ? ` · ${formatDate(item.createdAt)}` : ''}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+                <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
               </View>
             </Card>
           )}

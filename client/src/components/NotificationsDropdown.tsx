@@ -1,21 +1,26 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Bell, Check, Trash2, X } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 import { deleteNotification, getNotifications, getUnreadNotificationCount, markAllNotificationsAsRead, markNotificationAsRead, notificationIsUnread } from '@/lib/api';
 import { m, LazyMotion, domAnimation, AnimatePresence } from "framer-motion";
 import { Link } from 'react-router-dom';
 import { useAuth } from "@/contexts/AuthContext";
+import { localizeNotification } from '@/lib/localizeNotification';
 
 interface NotificationItem {
  id: string;
  title: string;
  message: string;
+ type?: string | null;
+ data?: Record<string, unknown> | null;
  read: boolean;
  createdAt: string;
 }
 
 export default function NotificationsDropdown() {
  const { user } = useAuth();
+ const { t } = useTranslation('common');
  const [isOpen, setIsOpen] = useState(false);
  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
  const [unreadCount, setUnreadCount] = useState(0);
@@ -75,6 +80,8 @@ export default function NotificationsDropdown() {
  id: n.id,
  title: n.title,
  message: n.body,
+ type: n.type,
+ data: n.data ?? null,
  read: !notificationIsUnread(n),
  createdAt: n.createdAt,
  }));
@@ -153,14 +160,14 @@ export default function NotificationsDropdown() {
  className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-xl shadow-xl border border-stone-200 z-50 overflow-hidden"
  >
  <div className="flex items-center justify-between p-4 border-b border-stone-100">
- <h3 className="font-semibold text-stone-900">Notifications</h3>
+ <h3 className="font-semibold text-stone-900">{t('notificationsUi.title')}</h3>
  {unreadCount > 0 && (
  <button
  onClick={markAllRead}
  className="text-xs font-medium text-teal-600 hover:text-teal-700 flex items-center"
  >
  <Check className="size-3 mr-1" />
- Mark all read
+ {t('notificationsUi.markAllRead')}
  </button>
  )}
  </div>
@@ -173,11 +180,21 @@ export default function NotificationsDropdown() {
  ) : notifications.length === 0 ? (
  <div className="p-8 text-center text-stone-500">
  <Bell className="size-8 mx-auto mb-2 text-stone-300" />
- <p className="text-sm">No notifications yet</p>
+ <p className="text-sm">{t('notificationsUi.empty')}</p>
  </div>
  ) : (
  <div className="divide-y divide-stone-50">
- {notifications.map((notification) => (
+ {notifications.map((notification) => {
+ const localized = localizeNotification(
+ {
+ title: notification.title,
+ body: notification.message,
+ type: notification.type,
+ data: notification.data,
+ },
+ t,
+ );
+ return (
  <div
  key={notification.id}
  className={`p-4 hover:bg-stone-50 transition-colors relative group ${!notification.read ? 'bg-teal-50/30' : ''}`}
@@ -186,10 +203,10 @@ export default function NotificationsDropdown() {
  <div className={`mt-1 flex-shrink-0 size-2 rounded-full ${!notification.read ? 'bg-teal-500' : 'bg-transparent'}`} />
  <div className="flex-1 min-w-0">
  <p className={`text-sm ${!notification.read ? 'font-semibold text-stone-900' : 'text-stone-700'}`}>
- {notification.title}
+ {localized.title}
  </p>
  <p className="text-sm text-stone-500 mt-0.5 line-clamp-2">
- {notification.message}
+ {localized.body}
  </p>
  <div className="flex items-center gap-2 mt-2">
  <span className="text-xs text-stone-400">
@@ -200,7 +217,7 @@ export default function NotificationsDropdown() {
  onClick={() => markAsRead(notification.id)}
  className="text-xs font-medium text-teal-600 hover:underline"
  >
- Mark read
+ {t('notificationsUi.markRead')}
  </button>
  )}
  </div>
@@ -211,13 +228,14 @@ export default function NotificationsDropdown() {
  removeNotification(notification.id);
  }}
  className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-red-500 transition-opacity"
- title="Remove"
+ title={t('notificationsUi.remove')}
  >
  <Trash2 className="size-4" />
  </button>
  </div>
  </div>
- ))}
+ );
+ })}
  </div>
  )}
  </div>

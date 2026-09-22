@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -14,8 +15,12 @@ import {
   type GoalInput,
   type ItemInput,
 } from '@/lib/api/carePlans';
+import { familyDateLocale } from '@/lib/familyLanguage';
+import { localizeFrequencyLine, localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
 
 export default function CoordinatorCarePlanDetailPage() {
+  const { t } = useTranslation('coordinator');
+  const dateLocale = familyDateLocale();
   const { id = '' } = useParams();
   const [plan, setPlan] = useState<CarePlan | null>(null);
   const [title, setTitle] = useState('');
@@ -32,11 +37,11 @@ export default function CoordinatorCarePlanDetailPage() {
       setTitle(data.title);
       setNotes(data.notes ?? '');
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load plan');
+      toast.error(isApiError(error) ? error.message : t('plans.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -87,14 +92,14 @@ export default function CoordinatorCarePlanDetailPage() {
       setPlan(updated);
       toast.success(
         updated.id !== plan.id
-          ? `New draft version v${updated.version} created for re-approval`
-          : 'Plan saved',
+          ? t('plans.toasts.newVersion', { version: updated.version })
+          : t('plans.toasts.saved'),
       );
       if (updated.id !== plan.id) {
         window.history.replaceState(null, '', `/coordinator/plans/${updated.id}`);
       }
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Save failed');
+      toast.error(isApiError(error) ? error.message : t('plans.toasts.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -105,7 +110,7 @@ export default function CoordinatorCarePlanDetailPage() {
     if (plan.status === 'revision_requested') {
       const trimmed = changeNotes.trim();
       if (trimmed.length < 10) {
-        toast.error('Describe what you changed (at least 10 characters) before resubmitting.');
+        toast.error(t('plans.toasts.changeNotesRequired'));
         return;
       }
     }
@@ -115,11 +120,11 @@ export default function CoordinatorCarePlanDetailPage() {
         plan.id,
         plan.status === 'revision_requested' ? changeNotes.trim() : undefined,
       );
-      toast.success('Submitted for family approval');
+      toast.success(t('plans.toasts.submitted'));
       setChangeNotes('');
       await load();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Submit failed');
+      toast.error(isApiError(error) ? error.message : t('plans.toasts.submitFailed'));
     } finally {
       setBusy(false);
     }
@@ -129,10 +134,10 @@ export default function CoordinatorCarePlanDetailPage() {
     if (!plan) return;
     try {
       await updateCarePlanGoal(plan.id, goalId, { status: 'achieved' });
-      toast.success('Goal marked achieved');
+      toast.success(t('plans.toasts.goalAchieved'));
       await load();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Update failed');
+      toast.error(isApiError(error) ? error.message : t('plans.toasts.updateFailed'));
     }
   }
 
@@ -145,7 +150,7 @@ export default function CoordinatorCarePlanDetailPage() {
   }
 
   if (!plan) {
-    return <p className="text-stone-600">Care plan not found.</p>;
+    return <p className="text-stone-600">{t('plans.toasts.notFound')}</p>;
   }
 
   return (
@@ -154,14 +159,14 @@ export default function CoordinatorCarePlanDetailPage() {
         to="/coordinator/plans"
         className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
       >
-        <ArrowLeft className="size-4" /> Back to plans
+        <ArrowLeft className="size-4 rtl-flip" /> {t('plans.back')}
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">{plan.title}</h2>
+          <h2 className="text-2xl font-semibold text-stone-900">{localizeGeneratedLabel(plan.title)}</h2>
           <p className="mt-1 text-sm text-stone-500">
-            Version {plan.version}
+            {t('plans.versionMeta', { version: plan.version ?? 1 })}
             {plan.episodeId ? (
               <>
                 {' · '}
@@ -169,14 +174,14 @@ export default function CoordinatorCarePlanDetailPage() {
                   className="text-teal-700 hover:underline"
                   to={`/coordinator/episodes/${plan.episodeId}`}
                 >
-                  Open episode
+                  {t('plans.openEpisode')}
                 </Link>
                 {' · '}
                 <Link
                   className="text-teal-700 hover:underline"
                   to={`/coordinator/episodes/${plan.episodeId}/care-plan/new`}
                 >
-                  New version / AI
+                  {t('plans.newVersion')}
                 </Link>
               </>
             ) : null}
@@ -185,13 +190,15 @@ export default function CoordinatorCarePlanDetailPage() {
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${carePlanStatusBadgeClass(plan.status)}`}
         >
-          {carePlanStatusLabel(plan.status)}
+          {t(`plans.status.${plan.status}`, {
+            defaultValue: carePlanStatusLabel(plan.status),
+          })}
         </span>
       </div>
 
       <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-stone-700">Title</span>
+          <span className="text-sm font-medium text-stone-700">{t('plans.fieldTitle')}</span>
           <input
             value={title}
             disabled={!editable}
@@ -200,7 +207,7 @@ export default function CoordinatorCarePlanDetailPage() {
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-stone-700">Notes</span>
+          <span className="text-sm font-medium text-stone-700">{t('plans.fieldNotes')}</span>
           <textarea
             value={notes}
             disabled={!editable}
@@ -214,26 +221,24 @@ export default function CoordinatorCarePlanDetailPage() {
             {familyRevisionFeedback ? (
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
-                  Family feedback
+                  {t('plans.familyFeedback')}
                 </p>
                 <p className="mt-1 text-sm text-stone-700">{familyRevisionFeedback}</p>
               </div>
             ) : null}
             <label className="block space-y-1">
               <span className="text-sm font-medium text-stone-800">
-                What changed <span className="text-amber-700">(required to resubmit)</span>
+                {t('plans.changeNotesLabel')}{' '}
+                <span className="text-amber-700">{t('plans.changeNotesRequired')}</span>
               </span>
               <textarea
                 value={changeNotes}
                 onChange={(e) => setChangeNotes(e.target.value)}
                 rows={3}
-                placeholder="e.g. Updated visit frequency to twice weekly and clarified goal measurements per family request."
+                placeholder={t('plans.changeNotesPlaceholder')}
                 className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm"
               />
-              <p className="text-xs text-stone-500">
-                This is sent with the resubmit — separate from plan Notes above. At least 10
-                characters.
-              </p>
+              <p className="text-xs text-stone-500">{t('plans.changeNotesHint')}</p>
             </label>
           </div>
         )}
@@ -245,7 +250,7 @@ export default function CoordinatorCarePlanDetailPage() {
               onClick={() => void onSave()}
               className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-800 hover:bg-stone-50 disabled:opacity-50"
             >
-              Save changes
+              {t('plans.saveChanges')}
             </button>
             {(plan.status === 'draft' || plan.status === 'revision_requested') && (
               <button
@@ -254,7 +259,7 @@ export default function CoordinatorCarePlanDetailPage() {
                 onClick={() => void onSubmit()}
                 className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
               >
-                Submit for family approval
+                {t('plans.submitApproval')}
               </button>
             )}
           </div>
@@ -262,76 +267,94 @@ export default function CoordinatorCarePlanDetailPage() {
       </div>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-900 mb-3">Goals</h3>
+        <h3 className="font-semibold text-stone-900 mb-3">{t('plans.goals')}</h3>
         <ul className="space-y-2">
           {(plan.goals ?? []).map((g) => (
             <li
               key={g.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-100 px-3 py-2"
             >
-              <div>
+              <div className="text-start min-w-0">
                 <p className="font-medium text-stone-900">{g.title}</p>
                 {g.description && <p className="text-sm text-stone-600">{g.description}</p>}
-                <p className="text-xs text-stone-500 mt-0.5">Status: {g.status}</p>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {t('plans.goalStatus', {
+                    status: t(`plans.status.${g.status}`, {
+                      defaultValue: g.status.replace(/_/g, ' '),
+                    }),
+                  })}
+                </p>
               </div>
-              {g.status !== 'achieved' && (
+              {g.status === 'achieved' ? (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
+                  <CheckCircle2 className="size-3.5" /> {t('plans.achieved')}
+                </span>
+              ) : (
                 <button
                   type="button"
                   onClick={() => void onAchieveGoal(g.id)}
                   className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800"
                 >
-                  <CheckCircle2 className="size-3.5" /> Achieved
+                  <CheckCircle2 className="size-3.5" /> {t('plans.markAchieved')}
                 </button>
               )}
             </li>
           ))}
           {(plan.goals?.length ?? 0) === 0 && (
-            <p className="text-sm text-stone-500">No goals on this plan.</p>
+            <p className="text-sm text-stone-500">{t('plans.noGoals')}</p>
           )}
         </ul>
       </section>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-900 mb-3">Services</h3>
+        <h3 className="font-semibold text-stone-900 mb-3">{t('plans.services')}</h3>
         <ul className="space-y-2">
           {(plan.items ?? []).map((item) => (
             <li key={item.id} className="rounded-lg border border-stone-100 px-3 py-2 text-sm">
-              <span className="font-medium text-stone-900">{item.serviceType}</span>
+              <span className="font-medium text-stone-900">
+                {t(`plans.serviceTypes.${item.serviceType}`, {
+                  defaultValue: item.serviceType.replace(/_/g, ' '),
+                })}
+              </span>
               {(item.frequency || item.duration) && (
                 <span className="text-stone-600">
                   {' '}
-                  · {[item.frequency, item.duration].filter(Boolean).join(' · ')}
+                  · {localizeFrequencyLine([item.frequency, item.duration].filter(Boolean).join(' · '))}
                 </span>
               )}
               {item.unitCost != null && (
                 <span className="text-stone-500">
                   {' '}
-                  · {item.currency ?? 'QAR'} {String(item.unitCost)}
+                  · {localizeFrequencyLine(`${item.currency ?? 'QAR'} ${String(item.unitCost)}`)}
                 </span>
               )}
             </li>
           ))}
           {(plan.items?.length ?? 0) === 0 && (
-            <p className="text-sm text-stone-500">No service items.</p>
+            <p className="text-sm text-stone-500">{t('plans.noServices')}</p>
           )}
         </ul>
       </section>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-900 mb-3">Approval log</h3>
+        <h3 className="font-semibold text-stone-900 mb-3">{t('plans.approvalLog')}</h3>
         <ul className="space-y-2">
           {(plan.approvalLogs ?? []).map((log) => (
             <li key={log.id} className="text-sm text-stone-700 border-b border-stone-50 pb-2">
-              <span className="font-medium">{log.action}</span>
+              <span className="font-medium">
+                {t(`plans.actions.${log.action}`, {
+                  defaultValue: log.action.replace(/_/g, ' '),
+                })}
+              </span>
               <span className="text-stone-500">
                 {' '}
-                · {new Date(log.createdAt).toLocaleString()}
+                · {new Date(log.createdAt).toLocaleString(dateLocale)}
               </span>
               {log.notes && <p className="text-stone-600 mt-0.5">{log.notes}</p>}
             </li>
           ))}
           {(plan.approvalLogs?.length ?? 0) === 0 && (
-            <p className="text-sm text-stone-500">No approval events yet.</p>
+            <p className="text-sm text-stone-500">{t('plans.noApprovals')}</p>
           )}
         </ul>
       </section>

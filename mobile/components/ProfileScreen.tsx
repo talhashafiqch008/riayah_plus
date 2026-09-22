@@ -10,12 +10,15 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Card, Input } from './ui';
 import { FAMILY, FAMILY_HERO_COLORS, familyCardStyle } from './family/FamilyChrome';
 import { apiClient } from '../lib/api/client';
 import { apiErrorMessage } from '../lib/format';
 import { useAuthStore } from '../stores/authStore';
+import { familyEnumLabel } from '../lib/familyLanguage';
+import { navBackIcon, navForwardIcon } from '../lib/rtlIcons';
 
 const NAVY = '#1B2E3C';
 const TEAL = '#0D9488';
@@ -124,7 +127,7 @@ function ActionRow({
         >
           {label}
         </Text>
-        {!danger ? <Ionicons name="chevron-forward" size={16} color="#D6D3D1" /> : null}
+        {!danger ? <Ionicons name={navForwardIcon()} size={16} color="#D6D3D1" /> : null}
       </Pressable>
     </Animated.View>
   );
@@ -196,7 +199,23 @@ function organizationDisplayName(
   return fallback?.trim() || null;
 }
 
-export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
+type ProfileI18nNs = 'family' | 'clinical' | 'support' | 'coordinator' | 'org';
+
+function profileKey(ns: ProfileI18nNs, leaf: string) {
+  return ns === 'family' ? `mobile.common.profile.${leaf}` : `mobile.profile.${leaf}`;
+}
+
+export function ProfileScreen({
+  tone = 'navy',
+  i18nNs,
+}: {
+  tone?: ProfileTone;
+  i18nNs?: ProfileI18nNs;
+}) {
+  const ns: ProfileI18nNs | undefined = i18nNs ?? (tone === 'family' ? 'family' : undefined);
+  const { t } = useTranslation(ns ?? 'family');
+  const localized = Boolean(ns);
+  const pk = (leaf: string) => (ns ? profileKey(ns, leaf) : leaf);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [editing, setEditing] = useState(false);
@@ -223,7 +242,9 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.page }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Text style={{ fontSize: 14, color: colors.muted }}>Not signed in.</Text>
+          <Text style={{ fontSize: 14, color: colors.muted }}>
+            {localized ? t(pk('notSignedIn')) : 'Not signed in.'}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -232,7 +253,12 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
   const save = async () => {
     const trimmed = name.trim();
     if (trimmed.length < 2) {
-      Alert.alert('Invalid name', 'Please enter at least 2 characters.');
+      Alert.alert(
+        localized ? t(pk('invalidName')) : 'Invalid name',
+        localized
+          ? t(pk('invalidNameHint'))
+          : 'Please enter at least 2 characters.',
+      );
       return;
     }
     setSaving(true);
@@ -242,17 +268,31 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
       setName(trimmed);
       setEditing(false);
     } catch (e) {
-      Alert.alert('Could not save', apiErrorMessage(e));
+      Alert.alert(
+        localized ? t(pk('saveFailed')) : 'Could not save',
+        apiErrorMessage(e),
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const confirmLogout = () => {
-    Alert.alert('Sign out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
-    ]);
+    Alert.alert(
+      localized ? t(pk('signOut')) : 'Sign out',
+      localized ? t(pk('signOutConfirm')) : 'Are you sure?',
+      [
+        {
+          text: localized ? t(pk('cancel')) : 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: localized ? t(pk('signOut')) : 'Sign out',
+          style: 'destructive',
+          onPress: () => void logout(),
+        },
+      ],
+    );
   };
 
   return (
@@ -290,7 +330,7 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
               backgroundColor: 'rgba(255,255,255,0.1)',
             }}
           >
-            <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.85)" />
+            <Ionicons name={navBackIcon()} size={22} color="rgba(255,255,255,0.85)" />
           </Pressable>
           <Pressable
             onPress={() => (editing ? void save() : setEditing(true))}
@@ -305,7 +345,17 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
             }}
           >
             <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' }}>
-              {editing ? (saving ? 'Saving…' : 'Save') : 'Edit'}
+              {editing
+                ? saving
+                  ? localized
+                    ? t(pk('saving'))
+                    : 'Saving…'
+                  : localized
+                    ? t(pk('save'))
+                    : 'Save'
+                : localized
+                  ? t(pk('edit'))
+                  : 'Edit'}
             </Text>
           </Pressable>
         </View>
@@ -335,7 +385,7 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
             }}
           >
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' }}>
-              {user.role.replace(/_/g, ' ')}
+              {localized ? familyEnumLabel('role', user.role) : user.role.replace(/_/g, ' ')}
             </Text>
           </View>
         </View>
@@ -348,19 +398,31 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
       >
         <View style={{ gap: 12, paddingHorizontal: 16, paddingTop: 20 }}>
           <View style={{ overflow: 'hidden', ...colors.cardStyle }}>
-            <InfoRow tone={tone} label="Email" value={user.email} icon="mail-outline" />
             <InfoRow
               tone={tone}
-              label="Role"
-              value={user.role.replace(/_/g, ' ')}
+              label={localized ? t(pk('email')) : 'Email'}
+              value={user.email}
+              icon="mail-outline"
+            />
+            <InfoRow
+              tone={tone}
+              label={localized ? t(pk('role')) : 'Role'}
+              value={
+                localized ? familyEnumLabel('role', user.role) : user.role.replace(/_/g, ' ')
+              }
               icon="shield-checkmark-outline"
             />
             {user.organizationId ? (
               <InfoRow
                 tone={tone}
-                label="Organization"
+                label={localized ? t(pk('organization')) : 'Organization'}
                 value={
-                  organizationName ?? (meQuery.isLoading ? 'Loading…' : '—')
+                  organizationName ??
+                  (meQuery.isLoading
+                    ? localized
+                      ? t(pk('loading'))
+                      : 'Loading…'
+                    : '—')
                 }
                 icon="business-outline"
                 isLast
@@ -371,7 +433,7 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
           {editing ? (
             <Card shadow={false}>
               <Input
-                label="Display name"
+                label={localized ? t(pk('displayName')) : 'Display name'}
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
@@ -384,13 +446,13 @@ export function ProfileScreen({ tone = 'navy' }: { tone?: ProfileTone }) {
             <ActionRow
               tone={tone}
               icon="key-outline"
-              label="Change Password"
+              label={localized ? t(pk('changePassword')) : 'Change Password'}
               onPress={() => router.push('/(auth)/forgot-password')}
             />
             <ActionRow
               tone={tone}
               icon="log-out-outline"
-              label="Sign Out"
+              label={localized ? t(pk('signOut')) : 'Sign Out'}
               onPress={confirmLogout}
               danger
               isLast

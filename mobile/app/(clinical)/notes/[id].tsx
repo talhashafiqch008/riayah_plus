@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import { getEpisode } from '../../../lib/api/care';
@@ -22,6 +23,7 @@ import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { toastError } from '../../../lib/toast';
 
 export default function ClinicalEpisodeNotesScreen() {
+  const { t } = useTranslation('clinical');
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [content, setContent] = useState('');
@@ -43,7 +45,7 @@ export default function ClinicalEpisodeNotesScreen() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!id) throw new Error('Missing episode');
-      if (!content.trim()) throw new Error('Note content is required');
+      if (!content.trim()) throw new Error(t('notes.contentRequired'));
       return createClinicalNote({
         episodeId: id,
         content: content.trim(),
@@ -55,22 +57,22 @@ export default function ClinicalEpisodeNotesScreen() {
       setFormError(null);
       setContent('');
       await queryClient.invalidateQueries({ queryKey: ['clinical-notes', id] });
-      toast.show('Note saved', { type: 'success' });
+      toast.show(t('notes.saved'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Create failed');
+      const msg = apiErrorMessage(e, t('notes.createFailed'));
       setFormError(msg);
-      toastError(toast, e, 'Create failed');
+      toastError(toast, e, t('notes.createFailed'));
     },
   });
 
   const notes = notesQuery.data ?? [];
-  const title = episodeQuery.data?.title ?? 'Episode notes';
+  const episodeTitle = episodeQuery.data?.title ?? t('notes.episodeTitle');
 
   if (notesQuery.isLoading && episodeQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Episode notes" showBack />
+        <ScreenHeader title={t('notes.episodeTitle')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -79,12 +81,12 @@ export default function ClinicalEpisodeNotesScreen() {
   if (notesQuery.isError) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Episode notes" showBack />
+        <ScreenHeader title={t('notes.episodeTitle')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load notes"
+          title={t('notes.notesLoadError')}
           subtitle={apiErrorMessage(notesQuery.error)}
-          action={{ label: 'Try again', onPress: () => void notesQuery.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void notesQuery.refetch() }}
         />
       </SafeAreaView>
     );
@@ -92,7 +94,7 @@ export default function ClinicalEpisodeNotesScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Episode notes" subtitle={title} showBack />
+      <ScreenHeader title={t('notes.episodeTitle')} subtitle={episodeTitle} showBack />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -112,7 +114,9 @@ export default function ClinicalEpisodeNotesScreen() {
           }
         >
           <Card className="mb-4" shadow>
-            <Text className="text-sm font-semibold text-stone-900">Add an immutable note</Text>
+            <Text className="text-sm font-semibold text-stone-900">
+              {t('mobile.detail.addImmutableNote')}
+            </Text>
             {formError ? (
               <View className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
                 <Text className="text-sm text-red-700">{formError}</Text>
@@ -122,7 +126,7 @@ export default function ClinicalEpisodeNotesScreen() {
               <Input
                 value={content}
                 onChangeText={setContent}
-                placeholder="Add an immutable clinical note…"
+                placeholder={t('notes.placeholder')}
                 multiline
               />
               <Pressable
@@ -136,7 +140,7 @@ export default function ClinicalEpisodeNotesScreen() {
                   size={22}
                   color={isPrivate ? '#0D9488' : '#A8A29E'}
                 />
-                <Text className="text-sm text-stone-700">Private (hidden from coordinator)</Text>
+                <Text className="text-sm text-stone-700">{t('notes.private')}</Text>
               </Pressable>
               <Button
                 isLoading={createMutation.isPending}
@@ -145,22 +149,20 @@ export default function ClinicalEpisodeNotesScreen() {
                   createMutation.mutate();
                 }}
               >
-                Save note
+                {t('notes.save')}
               </Button>
             </View>
           </Card>
 
           {notes.length === 0 ? (
-            <Text className="py-6 text-center text-sm text-stone-500">
-              No notes yet for this episode.
-            </Text>
+            <Text className="py-6 text-center text-sm text-stone-500">{t('notes.emptyNotes')}</Text>
           ) : (
             notes.map((n) => (
               <Card key={n.id} className="mb-3" shadow={false}>
                 <View className="flex-row flex-wrap items-start justify-between gap-2">
                   <Text className="text-xs text-stone-500">
-                    {n.author?.name ?? 'Author'}
-                    {n.isPrivate ? ' · private' : ''}
+                    {n.author?.name ?? t('notes.author')}
+                    {n.isPrivate ? ` · ${t('notes.privateTag')}` : ''}
                   </Text>
                   <Text className="text-xs text-stone-500">{formatDateTime(n.createdAt)}</Text>
                 </View>

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import {
@@ -34,6 +35,7 @@ const emptyGoal = (): GoalInput => ({ title: '', description: '', measurement: '
 const emptyItem = (): ItemInput => ({ serviceType: '', frequency: '', duration: '' });
 
 export default function CoordinatorNewCarePlanScreen() {
+  const { t } = useTranslation('coordinator');
   const { episodeId: episodeIdParam } = useLocalSearchParams<{ episodeId?: string }>();
   const episodeId = Array.isArray(episodeIdParam) ? episodeIdParam[0] : episodeIdParam;
   const toast = useToast();
@@ -43,6 +45,9 @@ export default function CoordinatorNewCarePlanScreen() {
   const [goals, setGoals] = useState<GoalInput[]>([emptyGoal()]);
   const [items, setItems] = useState<ItemInput[]>([emptyItem()]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const episodeStatusLabel = (status: string) =>
+    t(`episodes.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
 
   const episodeQuery = useQuery({
     queryKey: ['coordinator-episode', episodeId],
@@ -66,14 +71,18 @@ export default function CoordinatorNewCarePlanScreen() {
   useEffect(() => {
     const ep = episodeQuery.data;
     if (ep && !title) {
-      setTitle(ep.title ? `Care plan — ${ep.title}` : 'Care plan');
+      setTitle(
+        ep.title
+          ? t('plans.builder.carePlanPrefix', { title: ep.title })
+          : t('plans.builder.carePlanDefault'),
+      );
     }
-  }, [episodeQuery.data, title]);
+  }, [episodeQuery.data, title, t]);
 
   const createMutation = useMutation({
     mutationFn: () => {
-      if (!episodeId) throw new Error('Pick an episode');
-      if (!title.trim()) throw new Error('Title is required');
+      if (!episodeId) throw new Error(t('plans.builder.pickEpisodeRequired'));
+      if (!title.trim()) throw new Error(t('plans.builder.titleRequired'));
       return createCarePlan({
         episodeId,
         title: title.trim(),
@@ -85,11 +94,11 @@ export default function CoordinatorNewCarePlanScreen() {
     onSuccess: (plan) => {
       setFormError(null);
       queryClient.invalidateQueries({ queryKey: ['coordinator-care-plans'] });
-      toast.show('Care plan created', { type: 'success' });
+      toast.show(t('plans.builder.created'), { type: 'success' });
       router.replace(`/(coordinator)/plans/${plan.id}`);
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Failed to create plan');
+      const msg = apiErrorMessage(e, t('plans.builder.createFailed'));
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
     },
@@ -97,7 +106,7 @@ export default function CoordinatorNewCarePlanScreen() {
 
   const aiMutation = useMutation({
     mutationFn: async () => {
-      if (!episodeId) throw new Error('Pick an episode');
+      if (!episodeId) throw new Error(t('plans.builder.pickEpisodeRequired'));
       await triggerAiCarePlanDraft(episodeId);
       const plans = await listCarePlans({ episodeId });
       return plans.find((p) => p.status === 'draft' && p.isCurrentVersion !== false) ?? null;
@@ -105,13 +114,13 @@ export default function CoordinatorNewCarePlanScreen() {
     onSuccess: (draft) => {
       queryClient.invalidateQueries({ queryKey: ['coordinator-care-plans'] });
       if (draft) {
-        toast.show('AI draft ready', { type: 'success' });
+        toast.show(t('plans.builder.aiReady'), { type: 'success' });
         router.replace(`/(coordinator)/plans/${draft.id}`);
       } else {
-        toast.show('Draft may still be processing — check Care Plans list', { type: 'normal' });
+        toast.show(t('plans.builder.aiProcessing'), { type: 'normal' });
       }
     },
-    onError: (e) => toastError(toast, e, 'AI draft failed'),
+    onError: (e) => toastError(toast, e, t('plans.builder.aiFailed')),
   });
 
   const approveSummaryMutation = useMutation({
@@ -121,23 +130,23 @@ export default function CoordinatorNewCarePlanScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-intake-summary', episodeId] });
-      toast.show('AI intake summary approved', { type: 'success' });
+      toast.show(t('plans.builder.summaryApproved'), { type: 'success' });
     },
-    onError: (e) => toastError(toast, e, 'Approve failed'),
+    onError: (e) => toastError(toast, e, t('plans.builder.approveFailed')),
   });
 
   if (!episodeId) {
     const episodes = episodesQuery.data?.data ?? [];
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="New care plan" showBack />
+        <ScreenHeader title={t('plans.builder.title')} showBack />
         {episodesQuery.isLoading ? (
           <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <Text className="mb-3 text-sm text-stone-500">Choose an episode to build a plan</Text>
+            <Text className="mb-3 text-sm text-stone-500">{t('plans.pickEpisode')}</Text>
             {episodes.length === 0 ? (
-              <EmptyState icon="heart-outline" title="No episodes found" />
+              <EmptyState icon="heart-outline" title={t('plans.noEpisodes')} />
             ) : (
               episodes.map((ep) => (
                 <Card
@@ -148,9 +157,11 @@ export default function CoordinatorNewCarePlanScreen() {
                   }
                   shadow={false}
                 >
-                  <Text className="font-medium text-stone-900">{ep.title ?? 'Episode'}</Text>
+                  <Text className="font-medium text-stone-900">
+                    {ep.title ?? t('mobile.detail.episodeFallback')}
+                  </Text>
                   <Text className="mt-0.5 text-xs capitalize text-stone-500">
-                    {(ep.status ?? '').replace(/_/g, ' ')}
+                    {episodeStatusLabel(ep.status ?? '')}
                   </Text>
                 </Card>
               ))
@@ -166,8 +177,8 @@ export default function CoordinatorNewCarePlanScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="New care plan"
-        subtitle={episodeQuery.data?.title ?? 'Episode'}
+        title={t('plans.builder.title')}
+        subtitle={episodeQuery.data?.title ?? t('mobile.detail.episodeFallback')}
         showBack
       />
       <KeyboardAvoidingView
@@ -187,9 +198,11 @@ export default function CoordinatorNewCarePlanScreen() {
           {summary ? (
             <Card className="mb-4 border border-teal-100 bg-teal-50/50" shadow={false}>
               <View className="flex-row items-center justify-between">
-                <Text className="font-semibold text-stone-900">AI intake summary</Text>
+                <Text className="font-semibold text-stone-900">{t('plans.builder.aiSummary')}</Text>
                 <Text className="text-xs font-semibold uppercase text-teal-800">
-                  {summary.status}
+                  {t(`mobile.detail.summaryStatus.${summary.status}`, {
+                    defaultValue: summary.status.replace(/_/g, ' '),
+                  })}
                 </Text>
               </View>
               {summary.clinicalImpressions ? (
@@ -211,7 +224,7 @@ export default function CoordinatorNewCarePlanScreen() {
                     isLoading={approveSummaryMutation.isPending}
                     onPress={() => approveSummaryMutation.mutate()}
                   >
-                    Approve summary
+                    {t('plans.builder.approveSummary')}
                   </Button>
                 </View>
               ) : null}
@@ -219,9 +232,9 @@ export default function CoordinatorNewCarePlanScreen() {
           ) : null}
 
           <Card shadow>
-            <Input label="Title" value={title} onChangeText={setTitle} />
+            <Input label={t('plans.builder.fieldTitle')} value={title} onChangeText={setTitle} />
             <View className="mt-3">
-              <Text className="mb-1 text-sm text-stone-700">Notes</Text>
+              <Text className="mb-1 text-sm text-stone-700">{t('plans.builder.fieldNotes')}</Text>
               <TextInput
                 value={notes}
                 onChangeText={setNotes}
@@ -234,15 +247,15 @@ export default function CoordinatorNewCarePlanScreen() {
             </View>
 
             <View className="mt-5 flex-row items-center justify-between">
-              <Text className="font-semibold text-stone-900">Goals</Text>
+              <Text className="font-semibold text-stone-900">{t('plans.builder.goals')}</Text>
               <Pressable onPress={() => setGoals((g) => [...g, emptyGoal()])}>
-                <Text className="text-sm font-semibold text-teal-700">Add</Text>
+                <Text className="text-sm font-semibold text-teal-700">{t('plans.builder.add')}</Text>
               </Pressable>
             </View>
             {goals.map((g, i) => (
               <View key={i} className="mt-2 rounded-xl border border-stone-100 p-3">
                 <Input
-                  placeholder="Goal title"
+                  placeholder={t('plans.builder.goalTitle')}
                   value={g.title}
                   onChangeText={(v) =>
                     setGoals((rows) => rows.map((r, j) => (j === i ? { ...r, title: v } : r)))
@@ -250,7 +263,7 @@ export default function CoordinatorNewCarePlanScreen() {
                 />
                 <View className="mt-2">
                   <Input
-                    placeholder="Measurement"
+                    placeholder={t('plans.builder.measurement')}
                     value={g.measurement ?? ''}
                     onChangeText={(v) =>
                       setGoals((rows) =>
@@ -261,7 +274,7 @@ export default function CoordinatorNewCarePlanScreen() {
                 </View>
                 <View className="mt-2">
                   <Input
-                    placeholder="Description"
+                    placeholder={t('plans.builder.description')}
                     value={g.description ?? ''}
                     onChangeText={(v) =>
                       setGoals((rows) =>
@@ -280,15 +293,15 @@ export default function CoordinatorNewCarePlanScreen() {
             ))}
 
             <View className="mt-5 flex-row items-center justify-between">
-              <Text className="font-semibold text-stone-900">Services</Text>
+              <Text className="font-semibold text-stone-900">{t('plans.builder.services')}</Text>
               <Pressable onPress={() => setItems((rows) => [...rows, emptyItem()])}>
-                <Text className="text-sm font-semibold text-teal-700">Add</Text>
+                <Text className="text-sm font-semibold text-teal-700">{t('plans.builder.add')}</Text>
               </Pressable>
             </View>
             {items.map((item, i) => (
               <View key={i} className="mt-2 rounded-xl border border-stone-100 p-3">
                 <Input
-                  placeholder="Service type"
+                  placeholder={t('plans.builder.serviceType')}
                   value={item.serviceType}
                   onChangeText={(v) =>
                     setItems((rows) =>
@@ -298,7 +311,7 @@ export default function CoordinatorNewCarePlanScreen() {
                 />
                 <View className="mt-2">
                   <Input
-                    placeholder="Frequency"
+                    placeholder={t('plans.builder.frequency')}
                     value={item.frequency ?? ''}
                     onChangeText={(v) =>
                       setItems((rows) =>
@@ -309,7 +322,7 @@ export default function CoordinatorNewCarePlanScreen() {
                 </View>
                 <View className="mt-2">
                   <Input
-                    placeholder="Duration"
+                    placeholder={t('plans.builder.duration')}
                     value={item.duration ?? ''}
                     onChangeText={(v) =>
                       setItems((rows) =>
@@ -320,7 +333,7 @@ export default function CoordinatorNewCarePlanScreen() {
                 </View>
                 <View className="mt-2">
                   <Input
-                    placeholder="Unit cost"
+                    placeholder={t('plans.builder.unitCost')}
                     value={item.unitCost != null ? String(item.unitCost) : ''}
                     keyboardType="decimal-pad"
                     onChangeText={(v) =>
@@ -346,7 +359,7 @@ export default function CoordinatorNewCarePlanScreen() {
                 isLoading={createMutation.isPending}
                 onPress={() => {
                   if (!title.trim()) {
-                    const msg = 'Title is required';
+                    const msg = t('plans.builder.titleRequired');
                     setFormError(msg);
                     toast.show(msg, { type: 'danger' });
                     return;
@@ -354,14 +367,14 @@ export default function CoordinatorNewCarePlanScreen() {
                   createMutation.mutate();
                 }}
               >
-                Create draft
+                {t('plans.builder.createDraft')}
               </Button>
               <Button
                 variant="secondary"
                 isLoading={aiMutation.isPending}
                 onPress={() => aiMutation.mutate()}
               >
-                Generate AI Draft
+                {t('plans.builder.generateAi')}
               </Button>
             </View>
           </Card>

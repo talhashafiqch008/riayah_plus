@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ToastProvider, useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Chip, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import {
@@ -34,6 +35,7 @@ function InviteCoordinatorForm({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation('org');
   const toast = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -43,14 +45,14 @@ function InviteCoordinatorForm({
     mutationFn: () => createOrgCoordinator({ name: name.trim(), email: email.trim() }),
     onSuccess: () => {
       setFormError(null);
-      toast.show('Coordinator invited. Magic link email sent.', { type: 'success', duration: 4000 });
+      toast.show(t('coordinators.invitedToast'), { type: 'success', duration: 4000 });
       setName('');
       setEmail('');
       onCreated();
       onClose();
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Invite failed');
+      const msg = apiErrorMessage(e, t('coordinators.inviteFailed'));
       setFormError(msg);
       toast.show(msg, { type: 'danger', duration: 5000 });
     },
@@ -59,13 +61,13 @@ function InviteCoordinatorForm({
   const submit = () => {
     setFormError(null);
     if (name.trim().length < 2) {
-      const msg = 'Full name is required';
+      const msg = t('mobile.coordinators.nameRequired');
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
       return;
     }
     if (!email.trim()) {
-      const msg = 'Email is required';
+      const msg = t('mobile.coordinators.emailRequired');
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
       return;
@@ -76,7 +78,7 @@ function InviteCoordinatorForm({
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
       <View className="flex-row items-center justify-between border-b border-stone-100 px-4 py-3">
-        <Text className="text-lg font-semibold text-stone-900">Invite coordinator</Text>
+        <Text className="text-lg font-semibold text-stone-900">{t('coordinators.inviteTitle')}</Text>
         <Pressable
           onPress={() => {
             setFormError(null);
@@ -101,17 +103,22 @@ function InviteCoordinatorForm({
             </View>
           ) : null}
           <View className="gap-3">
-            <Input label="Full name" value={name} onChangeText={setName} placeholder="Full name" />
             <Input
-              label="Email"
+              label={t('coordinators.fullName')}
+              value={name}
+              onChangeText={setName}
+              placeholder={t('coordinators.fullName')}
+            />
+            <Input
+              label={t('coordinators.email')}
               value={email}
               onChangeText={setEmail}
-              placeholder="Email"
+              placeholder={t('coordinators.email')}
               autoCapitalize="none"
               keyboardType="email-address"
             />
             <Button isLoading={inviteMutation.isPending} onPress={submit}>
-              Send invite
+              {t('coordinators.sendInvite')}
             </Button>
           </View>
         </ScrollView>
@@ -121,6 +128,7 @@ function InviteCoordinatorForm({
 }
 
 export default function OrgCoordinatorsScreen() {
+  const { t } = useTranslation('org');
   const toast = useToast();
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
@@ -137,9 +145,9 @@ export default function OrgCoordinatorsScreen() {
     setActionId(id);
     try {
       await resendOrgCoordinatorInvite(id);
-      toast.show('Invite resent', { type: 'success' });
+      toast.show(t('coordinators.resentToast'), { type: 'success' });
     } catch (e) {
-      toastError(toast, e, 'Resend failed');
+      toastError(toast, e, t('coordinators.resendFailed'));
     } finally {
       setActionId(null);
     }
@@ -149,13 +157,16 @@ export default function OrgCoordinatorsScreen() {
     setActionId(c.id);
     try {
       await updateOrgCoordinator(c.id, { isActive: !c.isActive });
-      toast.show(c.isActive ? 'Coordinator deactivated' : 'Coordinator activated', {
-        type: 'success',
-      });
+      toast.show(
+        c.isActive
+          ? t('mobile.coordinators.deactivatedToast')
+          : t('mobile.coordinators.activatedToast'),
+        { type: 'success' },
+      );
       await qc.invalidateQueries({ queryKey: ['org-coordinators'] });
       await qc.invalidateQueries({ queryKey: ['org-dashboard'] });
     } catch (e) {
-      toastError(toast, e, 'Update failed');
+      toastError(toast, e, t('coordinators.updateFailed'));
     } finally {
       setActionId(null);
     }
@@ -164,8 +175,8 @@ export default function OrgCoordinatorsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Coordinators"
-        subtitle="Invite and activate coordinators"
+        title={t('coordinators.title')}
+        subtitle={t('mobile.coordinators.subtitle')}
         showBack={false}
         rightAction={{ icon: 'person-add-outline', onPress: () => setModalOpen(true) }}
       />
@@ -175,9 +186,9 @@ export default function OrgCoordinatorsScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load coordinators"
+          title={t('mobile.coordinators.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -193,19 +204,17 @@ export default function OrgCoordinatorsScreen() {
           }
           ListHeaderComponent={
             <View className="mb-4">
-              <Text className="text-sm text-stone-500">
-                Invite care coordinators to your organization.
-              </Text>
+              <Text className="text-sm text-stone-500">{t('coordinators.description')}</Text>
               <Button className="mt-3" onPress={() => setModalOpen(true)}>
-                Invite coordinator
+                {t('coordinators.inviteTitle')}
               </Button>
             </View>
           }
           ListEmptyComponent={
             <EmptyState
               icon="person-add-outline"
-              title="No coordinators yet"
-              subtitle="Send an invite to add a care coordinator."
+              title={t('mobile.coordinators.emptyTitle')}
+              subtitle={t('mobile.coordinators.emptyHint')}
             />
           }
           renderItem={({ item }) => (
@@ -220,11 +229,11 @@ export default function OrgCoordinatorsScreen() {
                   <Text className="mt-0.5 text-sm text-stone-500">{item.email}</Text>
                   <View className="mt-2 flex-row flex-wrap gap-2">
                     <Chip
-                      label={item.isActive ? 'Active' : 'Inactive'}
+                      label={item.isActive ? t('common.active') : t('common.inactive')}
                       tone={item.isActive ? 'green' : 'stone'}
                     />
                     {item.mustSetPassword ? (
-                      <Chip label="Awaiting password setup" tone="amber" />
+                      <Chip label={t('coordinators.awaitingPassword')} tone="amber" />
                     ) : null}
                   </View>
                 </View>
@@ -240,7 +249,7 @@ export default function OrgCoordinatorsScreen() {
                       isLoading={actionId === item.id}
                       onPress={() => void resend(item.id)}
                     >
-                      Resend invite
+                      {t('coordinators.resendInvite')}
                     </Button>
                   </View>
                 ) : null}
@@ -252,7 +261,7 @@ export default function OrgCoordinatorsScreen() {
                     isLoading={actionId === item.id}
                     onPress={() => void toggleActive(item)}
                   >
-                    {item.isActive ? 'Deactivate' : 'Activate'}
+                    {item.isActive ? t('coordinators.deactivate') : t('coordinators.activate')}
                   </Button>
                 </View>
               </View>

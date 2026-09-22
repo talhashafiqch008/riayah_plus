@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Input } from './ui';
 
 export type SelectOption = {
@@ -11,12 +12,12 @@ export type SelectOption = {
 
 export function SelectDropdown({
   label,
-  placeholder = 'Select…',
+  placeholder,
   options,
   value,
   onChange,
   searchable = true,
-  emptyText = 'No options available.',
+  emptyText,
 }: {
   label: string;
   placeholder?: string;
@@ -26,6 +27,9 @@ export function SelectDropdown({
   searchable?: boolean;
   emptyText?: string;
 }) {
+  const { t } = useTranslation('common');
+  const resolvedPlaceholder = placeholder ?? t('select.placeholder');
+  const resolvedEmptyText = emptyText ?? t('select.empty');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -58,7 +62,7 @@ export function SelectDropdown({
           className={`flex-1 pr-2 text-sm ${selected ? 'text-stone-800' : 'text-stone-400'}`}
           numberOfLines={2}
         >
-          {selected ? selected.label : placeholder}
+          {selected ? selected.label : resolvedPlaceholder}
         </Text>
         <Ionicons name="chevron-down" size={16} color="#A8A29E" />
       </Pressable>
@@ -78,7 +82,7 @@ export function SelectDropdown({
             {searchable ? (
               <View className="px-4 pt-3">
                 <Input
-                  placeholder="Search…"
+                  placeholder={t('select.search')}
                   value={search}
                   onChangeText={setSearch}
                   autoCorrect={false}
@@ -93,7 +97,7 @@ export function SelectDropdown({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ padding: 12, paddingBottom: 32 }}
               ListEmptyComponent={
-                <Text className="p-4 text-sm text-stone-500">{emptyText}</Text>
+                <Text className="p-4 text-sm text-stone-500">{resolvedEmptyText}</Text>
               }
               renderItem={({ item: o }) => {
                 const isSelected = value === o.id;

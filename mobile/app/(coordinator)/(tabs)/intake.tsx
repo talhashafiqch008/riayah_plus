@@ -11,6 +11,7 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Avatar,
@@ -21,6 +22,7 @@ import {
 } from '../../../components/ui';
 import { apiClient } from '../../../lib/api/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 type UiFilter = 'pending' | 'in_review' | 'approved' | 'rejected' | 'all';
 type UrgencyFilter = '' | 'urgent' | 'high' | 'medium' | 'low';
@@ -45,22 +47,6 @@ interface QueueResponse {
   limit: number;
 }
 
-const FILTERS: { key: UiFilter; label: string }[] = [
-  { key: 'pending', label: 'Pending' },
-  { key: 'in_review', label: 'In Review' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'rejected', label: 'Rejected' },
-  { key: 'all', label: 'All' },
-];
-
-const URGENCY_FILTERS: { key: UrgencyFilter; label: string }[] = [
-  { key: '', label: 'All urgency' },
-  { key: 'urgent', label: 'Urgent' },
-  { key: 'high', label: 'High' },
-  { key: 'medium', label: 'Medium' },
-  { key: 'low', label: 'Low' },
-];
-
 function apiStatusForFilter(filter: UiFilter): string | undefined {
   switch (filter) {
     case 'pending':
@@ -75,15 +61,23 @@ function apiStatusForFilter(filter: UiFilter): string | undefined {
   }
 }
 
-function careTypeLabel(item: IntakeQueueItem): string {
+function careTypeLabel(
+  item: IntakeQueueItem,
+  careRequestLabel: string,
+  formatService: (serviceId: string) => string,
+): string {
   const interests = item.serviceInterests ?? [];
   if (interests.length > 0) {
-    return interests
-      .slice(0, 2)
-      .map((s) => s.replace(/_/g, ' '))
-      .join(', ');
+    return interests.slice(0, 2).map(formatService).join(', ');
   }
-  return item.careUnit?.name ?? 'Care request';
+  return item.careUnit?.name ?? careRequestLabel;
+}
+
+function intakeStatusLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  status: string,
+) {
+  return t(`intake.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
 }
 
 function isUrgent(level?: string | null): boolean {
@@ -134,8 +128,33 @@ async function fetchQueue(filter: UiFilter, urgency: UrgencyFilter): Promise<Que
 }
 
 export default function CoordinatorIntakeQueueScreen() {
+  const { t } = useTranslation('coordinator');
   const [filter, setFilter] = useState<UiFilter>('pending');
   const [urgency, setUrgency] = useState<UrgencyFilter>('');
+
+  const filters = useMemo(
+    () =>
+      [
+        { key: 'pending' as const, label: t('mobile.detail.filterPending') },
+        { key: 'in_review' as const, label: t('mobile.detail.filterInReview') },
+        { key: 'approved' as const, label: t('mobile.detail.filterApproved') },
+        { key: 'rejected' as const, label: t('mobile.detail.filterRejected') },
+        { key: 'all' as const, label: t('common.all') },
+      ] as const,
+    [t],
+  );
+
+  const urgencyFilters = useMemo(
+    () =>
+      [
+        { key: '' as UrgencyFilter, label: t('intake.allUrgency') },
+        { key: 'urgent' as UrgencyFilter, label: t('intake.urgency.urgent') },
+        { key: 'high' as UrgencyFilter, label: t('intake.urgency.high') },
+        { key: 'medium' as UrgencyFilter, label: t('intake.urgency.medium') },
+        { key: 'low' as UrgencyFilter, label: t('intake.urgency.low') },
+      ] as const,
+    [t],
+  );
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['intake-queue', filter, urgency],
@@ -144,15 +163,25 @@ export default function CoordinatorIntakeQueueScreen() {
 
   const items = data?.data ?? [];
   const emptySubtitle = useMemo(() => {
-    const label = FILTERS.find((f) => f.key === filter)?.label ?? 'this filter';
-    return filter === 'all'
-      ? 'No intake requests yet.'
-      : `No ${label.toLowerCase()} intakes.`;
-  }, [filter]);
+    if (filter === 'all') {
+      return t('mobile.detail.intakeEmptyAll');
+    }
+    const label = filters.find((f) => f.key === filter)?.label ?? '';
+    return t('mobile.detail.intakeEmptyFilter', { filter: label.toLowerCase() });
+  }, [filter, filters, t]);
+
+  const careRequestLabel = t('mobile.detail.careRequest');
+  const formatService = (serviceId: string) =>
+    t(`intake.services.${serviceId}`, { defaultValue: serviceId.replace(/_/g, ' ') });
+  const forwardIcon = navForwardIcon();
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Intake Queue" subtitle="Review submitted care requests" showBack={false} />
+      <ScreenHeader
+        title={t('intake.title')}
+        subtitle={t('mobile.detail.intakeListSubtitle')}
+        showBack={false}
+      />
 
       <View className="border-b border-stone-200 bg-white">
         <ScrollView
@@ -166,7 +195,7 @@ export default function CoordinatorIntakeQueueScreen() {
             gap: 8,
           }}
         >
-          {FILTERS.map((f) => {
+          {filters.map((f) => {
             const active = filter === f.key;
             return (
               <Pressable
@@ -198,7 +227,7 @@ export default function CoordinatorIntakeQueueScreen() {
             gap: 8,
           }}
         >
-          {URGENCY_FILTERS.map((f) => {
+          {urgencyFilters.map((f) => {
             const active = urgency === f.key;
             return (
               <Pressable
@@ -227,9 +256,9 @@ export default function CoordinatorIntakeQueueScreen() {
       ) : isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load"
+          title={t('common.failedLoad')}
           subtitle={apiErrorMessage(error)}
-          action={{ label: 'Try again', onPress: () => void refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void refetch() }}
         />
       ) : (
         <FlatList
@@ -244,14 +273,10 @@ export default function CoordinatorIntakeQueueScreen() {
             />
           }
           ListEmptyComponent={
-            <EmptyState
-              icon="file-tray-outline"
-              title="Nothing here"
-              subtitle={emptySubtitle}
-            />
+            <EmptyState icon="file-tray-outline" title={t('common.empty')} subtitle={emptySubtitle} />
           }
           renderItem={({ item }) => {
-            const patientName = item.careRecipient?.name ?? 'Unknown patient';
+            const patientName = item.careRecipient?.name ?? t('patientDetail.unknown');
             const submitted = item.submittedAt ?? item.createdAt;
             return (
               <Card
@@ -264,14 +289,17 @@ export default function CoordinatorIntakeQueueScreen() {
                     <Text className="font-medium text-stone-900" numberOfLines={1}>
                       {patientName}
                     </Text>
-                    <Text className="text-sm capitalize text-stone-400" numberOfLines={1}>
-                      {careTypeLabel(item)}
+                    <Text className="text-sm text-stone-400" numberOfLines={1}>
+                      {careTypeLabel(item, careRequestLabel, formatService)}
                     </Text>
                   </View>
                   <View className="shrink-0">
-                    <StatusBadge status={item.status} />
+                    <StatusBadge
+                      status={item.status}
+                      label={intakeStatusLabel(t, item.status)}
+                    />
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="#A8A29E" />
+                  <Ionicons name={forwardIcon} size={18} color="#A8A29E" />
                 </View>
                 <View className="mt-2 flex-row items-center gap-3">
                   <View className="flex-row items-center gap-1">
@@ -282,7 +310,11 @@ export default function CoordinatorIntakeQueueScreen() {
                   </View>
                   {isUrgent(item.urgencyLevel) ? (
                     <View className="rounded-full bg-amber-50 px-2 py-0.5">
-                      <Text className="text-xs font-medium text-amber-600">Urgent</Text>
+                      <Text className="text-xs font-medium text-amber-600">
+                        {t(`intake.urgency.${item.urgencyLevel}`, {
+                          defaultValue: item.urgencyLevel?.replace(/_/g, ' ') ?? '',
+                        })}
+                      </Text>
                     </View>
                   ) : null}
                 </View>

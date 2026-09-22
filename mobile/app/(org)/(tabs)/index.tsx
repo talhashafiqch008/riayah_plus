@@ -1,67 +1,82 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { RoleHome } from '../../../components/shell/RoleHome';
 import { getOrgDashboard } from '../../../lib/api/org';
 
-const NEXT_STEPS = [
-  'Assign coordinators to new families',
-  'Invite clinical and support staff',
-  'Route pending care requests',
-];
-
-const QUICK_LINKS = [
-  {
-    name: 'Pending requests',
-    href: '/(org)/requests',
-    hint: 'Route unassigned care requests',
-    icon: 'file-tray-outline' as const,
-  },
-  {
-    name: 'Families',
-    href: '/(org)/families',
-    hint: 'Assign a primary coordinator',
-    icon: 'people-outline' as const,
-  },
-  {
-    name: 'Coordinators',
-    href: '/(org)/coordinators',
-    hint: 'Invite and activate coordinators',
-    icon: 'person-add-outline' as const,
-  },
-  {
-    name: 'Visit GPS',
-    href: '/(org)/gps',
-    hint: 'Staff check-ins and check-outs',
-    icon: 'location-outline' as const,
-  },
-] as const;
-
 export default function OrgHomeScreen() {
+  const { t } = useTranslation('org');
+
   const query = useQuery({
     queryKey: ['org-dashboard'],
     queryFn: getOrgDashboard,
   });
 
-  const stats = [
-    {
-      label: 'Families',
-      value: query.data?.stats.families ?? '—',
-      accent: 'teal' as const,
-    },
-    {
-      label: 'Coordinators',
-      value: query.data?.stats.coordinators ?? '—',
-      accent: 'stone' as const,
-    },
-    {
-      label: 'Pending\nrequests',
-      value: query.data?.stats.pendingIntakes ?? '—',
-      accent: 'amber' as const,
-    },
-  ];
+  const stats = useMemo(
+    () => [
+      {
+        label: t('mobile.home.statsFamilies'),
+        value: query.data?.stats.families ?? '—',
+        accent: 'teal' as const,
+      },
+      {
+        label: t('mobile.home.statsCoordinators'),
+        value: query.data?.stats.coordinators ?? '—',
+        accent: 'stone' as const,
+      },
+      {
+        label: t('mobile.home.statsPending'),
+        value: query.data?.stats.pendingIntakes ?? '—',
+        accent: 'amber' as const,
+      },
+    ],
+    [t, query.data],
+  );
+
+  const nextSteps = useMemo(
+    () => [
+      t('dashboard.steps.assignCoordinators'),
+      t('dashboard.steps.inviteStaff'),
+      t('dashboard.steps.routePending'),
+    ],
+    [t],
+  );
+
+  const quickLinks = useMemo(
+    () =>
+      [
+        {
+          name: t('nav.pending'),
+          href: '/(org)/requests',
+          hint: t('mobile.home.pendingHint'),
+          icon: 'file-tray-outline' as const,
+        },
+        {
+          name: t('nav.families'),
+          href: '/(org)/families',
+          hint: t('mobile.home.familiesHint'),
+          icon: 'people-outline' as const,
+        },
+        {
+          name: t('nav.coordinators'),
+          href: '/(org)/coordinators',
+          hint: t('mobile.home.coordinatorsHint'),
+          icon: 'person-add-outline' as const,
+        },
+        {
+          name: t('mobile.home.visitGps'),
+          href: '/(org)/gps',
+          hint: t('mobile.home.gpsHint'),
+          icon: 'location-outline' as const,
+        },
+      ] as const,
+    [t],
+  );
 
   return (
     <RoleHome
-      tagline="Families, staff, and care requests — in one place."
+      i18nNs="org"
+      tagline={t('mobile.home.tagline')}
       notificationsHref="/(org)/notifications"
       profileHref="/(org)/profile"
       stats={stats}
@@ -70,8 +85,8 @@ export default function OrgHomeScreen() {
       isError={query.isError}
       onRefresh={() => void query.refetch()}
       onRetry={() => void query.refetch()}
-      nextSteps={NEXT_STEPS}
-      quickLinks={QUICK_LINKS}
+      nextSteps={nextSteps}
+      quickLinks={quickLinks}
     />
   );
 }

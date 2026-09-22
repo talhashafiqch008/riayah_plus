@@ -3,6 +3,7 @@ import { ActivityIndicator, Linking, ScrollView, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Button, StatusBadge } from '../../../components/ui';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
@@ -19,6 +20,7 @@ import {
 } from '../../../lib/api/invoices';
 
 export default function FamilyInvoiceDetailScreen() {
+  const { t } = useTranslation('family');
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -35,7 +37,7 @@ export default function FamilyInvoiceDetailScreen() {
           if (confirmed.data) next = confirmed.data;
           else if (confirmed.paid || confirmed.alreadyPaid) next = await getInvoice(String(id));
           if (confirmed.paid && !confirmed.alreadyPaid) {
-            toast.show('Payment received', { type: 'success' });
+            toast.show(t('invoiceDetail.paymentReceived'), { type: 'success' });
           }
         } catch {
           /* PayTabs query is best-effort after hosted checkout */
@@ -43,11 +45,11 @@ export default function FamilyInvoiceDetailScreen() {
       }
       setInvoice(next);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load document'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('invoiceDetail.loadError')), { type: 'danger' });
     } finally {
       setLoading(false);
     }
-  }, [id, toast]);
+  }, [id, t, toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,7 +63,7 @@ export default function FamilyInvoiceDetailScreen() {
     try {
       const result = await payInvoice(invoice.id);
       if (result.alreadyPaid) {
-        toast.show('This invoice is already paid', { type: 'success' });
+        toast.show(t('invoiceDetail.alreadyPaid'), { type: 'success' });
         await load();
         return;
       }
@@ -69,16 +71,13 @@ export default function FamilyInvoiceDetailScreen() {
         await Linking.openURL(result.paymentUrl);
         return;
       }
-      toast.show('Payment could not be started', { type: 'danger' });
+      toast.show(t('invoiceDetail.paymentStartFailed'), { type: 'danger' });
     } catch (e: unknown) {
       const err = e as { response?: { status?: number } };
       if (err.response?.status === 503) {
-        toast.show(
-          'Online payment is not available yet. Your care team can take payment another way.',
-          { type: 'danger', duration: 5000 },
-        );
+        toast.show(t('invoiceDetail.paymentUnavailable'), { type: 'danger', duration: 5000 });
       } else {
-        toast.show(apiErrorMessage(e, 'Payment failed'), { type: 'danger' });
+        toast.show(apiErrorMessage(e, t('invoiceDetail.paymentFailed')), { type: 'danger' });
       }
     } finally {
       setBusy(false);
@@ -91,7 +90,7 @@ export default function FamilyInvoiceDetailScreen() {
     try {
       await downloadInvoicePdf(invoice.id, invoice.invoiceNumber);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Could not download PDF'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('invoiceDetail.pdfFailed')), { type: 'danger' });
     } finally {
       setBusy(false);
     }
@@ -103,8 +102,8 @@ export default function FamilyInvoiceDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
       <FamilyTabHero
-        title={isQuotation ? 'Quotation' : 'Invoice'}
-        subtitle={invoice?.invoiceNumber ?? 'Billing document'}
+        title={isQuotation ? t('invoiceDetail.quotation') : t('invoiceDetail.invoice')}
+        subtitle={invoice?.invoiceNumber ?? t('invoiceDetail.billingDocument')}
         showBack
       />
 
@@ -125,15 +124,17 @@ export default function FamilyInvoiceDetailScreen() {
           </View>
 
           {invoice.dueDate ? (
-            <Text className="mb-4 text-sm text-stone-500">Due {formatDate(invoice.dueDate)}</Text>
+            <Text className="mb-4 text-sm text-stone-500">
+              {t('invoiceDetail.dueDate', { date: formatDate(invoice.dueDate) })}
+            </Text>
           ) : null}
 
           <View className="mb-4 rounded-2xl border border-stone-200 bg-white p-4">
             <Text className="mb-3 text-xs font-semibold uppercase tracking-wide text-stone-400">
-              Line items
+              {t('invoiceDetail.lineItems')}
             </Text>
             {lines.length === 0 ? (
-              <Text className="text-sm text-stone-500">No line items</Text>
+              <Text className="text-sm text-stone-500">{t('invoiceDetail.noLineItems')}</Text>
             ) : (
               lines.map((line, idx) => (
                 <View
@@ -156,19 +157,19 @@ export default function FamilyInvoiceDetailScreen() {
             )}
             <View className="mt-3 border-t border-stone-100 pt-3">
               <View className="flex-row justify-between">
-                <Text className="text-sm text-stone-500">Subtotal</Text>
+                <Text className="text-sm text-stone-500">{t('invoiceDetail.subtotal')}</Text>
                 <Text className="text-sm text-stone-700">
                   {formatMoney(invoice.subtotal, invoice.currency)}
                 </Text>
               </View>
               <View className="mt-1 flex-row justify-between">
-                <Text className="text-sm text-stone-500">Tax</Text>
+                <Text className="text-sm text-stone-500">{t('invoiceDetail.tax')}</Text>
                 <Text className="text-sm text-stone-700">
                   {formatMoney(invoice.taxAmount, invoice.currency)}
                 </Text>
               </View>
               <View className="mt-2 flex-row justify-between">
-                <Text className="text-sm font-semibold text-stone-900">Total</Text>
+                <Text className="text-sm font-semibold text-stone-900">{t('invoiceDetail.total')}</Text>
                 <Text className="text-sm font-semibold text-stone-900">
                   {formatMoney(invoice.total, invoice.currency)}
                 </Text>
@@ -182,11 +183,11 @@ export default function FamilyInvoiceDetailScreen() {
 
           <View className="gap-3">
             <Button variant="secondary" isLoading={busy} onPress={() => void onPdf()}>
-              Download PDF
+              {t('invoiceDetail.downloadPdf')}
             </Button>
             {canPayInvoice(invoice) ? (
               <Button isLoading={busy} onPress={() => void onPay()}>
-                Pay now
+                {t('invoiceDetail.payNow')}
               </Button>
             ) : null}
           </View>

@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip, EmptyState, Input } from '../../../components/ui';
 import {
@@ -30,10 +31,13 @@ import {
 } from '../../../components/family/FamilyChrome';
 import { listCareUnits, type CareUnit } from '../../../lib/api/care';
 import { apiErrorMessage } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
-function locationLine(unit: CareUnit): string {
-  const place = [unit.city, unit.country].filter(Boolean).join(', ') || 'No location';
-  return unit.primaryCaregiverName ? `${place} · Caregiver: ${unit.primaryCaregiverName}` : place;
+function locationLine(unit: CareUnit, noLocation: string, caregiverPrefix: string): string {
+  const place = [unit.city, unit.country].filter(Boolean).join(', ') || noLocation;
+  return unit.primaryCaregiverName
+    ? `${place} · ${caregiverPrefix}: ${unit.primaryCaregiverName}`
+    : place;
 }
 
 function SkeletonCard() {
@@ -47,7 +51,7 @@ function SkeletonCard() {
       -1,
       false,
     );
-  }, []);
+  }, [shimmer]);
   const style = useAnimatedStyle(() => ({ opacity: shimmer.value }));
   return (
     <Animated.View
@@ -60,6 +64,7 @@ function SkeletonCard() {
 }
 
 function CareUnitCard({ item }: { item: CareUnit }) {
+  const { t } = useTranslation('family');
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -99,20 +104,29 @@ function CareUnitCard({ item }: { item: CareUnit }) {
               {item.name}
             </Text>
             <Text style={{ marginTop: 2, fontSize: 14, color: FAMILY.stone500 }}>
-              {locationLine(item)}
+              {locationLine(item, t('careUnit.location'), t('careUnit.accountHolder'))}
             </Text>
             <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              <Chip label={`${patientCount} ${patientCount === 1 ? 'person' : 'people'}`} />
-              <Chip label={`${requests} request${requests === 1 ? '' : 's'}`} tone="amber" />
+              <Chip
+                label={`${patientCount} ${patientCount === 1 ? t('careUnit.person') : t('careUnit.people')}`}
+              />
+              <Chip
+                label={`${requests} ${requests === 1 ? t('episodes.journey') : t('episodes.journeys')}`}
+                tone="amber"
+              />
               {journeys > 0 ? (
                 <Chip
-                  label={`${journeys} care journey${journeys === 1 ? '' : 's'}`}
+                  label={
+                    journeys === 1
+                      ? t('mobile.common.journeyCount', { count: journeys })
+                      : t('mobile.common.journeyCount_other', { count: journeys })
+                  }
                   tone="green"
                 />
               ) : null}
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+          <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
         </View>
       </Pressable>
     </Animated.View>
@@ -120,6 +134,7 @@ function CareUnitCard({ item }: { item: CareUnit }) {
 }
 
 export default function FamilyCareUnitListScreen() {
+  const { t } = useTranslation('family');
   const [search, setSearch] = useState('');
 
   const query = useQuery({
@@ -133,8 +148,8 @@ export default function FamilyCareUnitListScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
       <FamilyTabHero
-        title="My Care Unit"
-        subtitle="Household, care recipients and requests"
+        title={t('careUnit.listTitle')}
+        subtitle={t('careUnit.listDescription')}
         showBack
       />
 
@@ -148,7 +163,7 @@ export default function FamilyCareUnitListScreen() {
         }}
       >
         <Input
-          placeholder="Search care units…"
+          placeholder={t('careUnit.searchPlaceholder')}
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
@@ -165,9 +180,9 @@ export default function FamilyCareUnitListScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load care units"
+          title={t('careUnit.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -194,17 +209,19 @@ export default function FamilyCareUnitListScreen() {
                   fontVariant: ['tabular-nums'],
                 }}
               >
-                {total} unit{total === 1 ? '' : 's'}
+                {t(total === 1 ? 'careUnit.unitCount' : 'careUnit.unitCount_plural', {
+                  count: total,
+                })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon="people-outline"
-              title="No care unit yet"
-              subtitle="Complete onboarding to create your household and care request."
+              title={t('careUnit.empty')}
+              subtitle={t('careUnit.listDescription')}
               action={{
-                label: 'Start a care request',
+                label: t('dashboard.startCareRequest'),
                 onPress: () => router.push('/(onboarding)/step-1-care-unit'),
               }}
             />

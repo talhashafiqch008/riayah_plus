@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Card, StatusBadge } from '../ui';
 import { formatTime } from '../../lib/format';
 
@@ -22,12 +23,21 @@ interface SessionCardProps {
 }
 
 export function SessionCard({ session, onPress, variant = 'family' }: SessionCardProps) {
+  const { t } = useTranslation('common');
+
   const displayName =
     variant === 'staff'
-      ? session.clientName ?? session.client?.name ?? 'Client'
-      : session.providerName ?? session.provider?.name ?? 'Provider';
+      ? session.clientName ?? session.client?.name ?? t('sessionCard.client')
+      : session.providerName ?? session.provider?.name ?? t('sessionCard.provider');
 
-  const typeLabel = session.serviceType ?? session.type ?? 'Session';
+  const rawType = session.serviceType ?? session.type;
+  const typeLabel = rawType
+    ? t(`sessionType.${rawType}`, { defaultValue: rawType.replace(/_/g, ' ') })
+    : t('sessionCard.session');
+
+  const statusLabel = t(`sessionStatus.${session.status}`, {
+    defaultValue: session.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+  });
 
   return (
     <Card onPress={onPress} className="mb-2 mx-4" shadow>
@@ -40,7 +50,7 @@ export function SessionCard({ session, onPress, variant = 'family' }: SessionCar
             {displayName}
           </Text>
           <Text className="mt-0.5 text-sm capitalize text-stone-400" numberOfLines={1}>
-            {typeLabel.replace(/_/g, ' ')}
+            {typeLabel}
           </Text>
           {session.notes ? (
             <Text className="mt-1 text-xs text-stone-300" numberOfLines={2}>
@@ -48,7 +58,7 @@ export function SessionCard({ session, onPress, variant = 'family' }: SessionCar
             </Text>
           ) : null}
         </View>
-        <StatusBadge status={session.status} />
+        <StatusBadge status={session.status} label={statusLabel} />
       </View>
     </Card>
   );

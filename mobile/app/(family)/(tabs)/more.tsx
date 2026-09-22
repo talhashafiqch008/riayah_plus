@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -7,6 +8,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../../../components/ui';
 import {
@@ -17,6 +19,7 @@ import {
   familyReleaseSpring,
 } from '../../../components/family/FamilyChrome';
 import { useAuthStore } from '../../../stores/authStore';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 type MoreLink = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -24,72 +27,6 @@ type MoreLink = {
   description: string;
   href: string;
 };
-
-const SECTIONS: { title: string; links: MoreLink[] }[] = [
-  {
-    title: 'My care',
-    links: [
-      {
-        icon: 'people-outline',
-        label: 'My care unit',
-        description: 'Household, people needing care, and their requests',
-        href: '/(family)/care-unit',
-      },
-      {
-        icon: 'add-circle-outline',
-        label: 'New care request',
-        description: 'Start a care request for someone in your household',
-        href: '/(onboarding)/step-1-care-unit',
-      },
-      {
-        icon: 'folder-outline',
-        label: 'Documents',
-        description: 'Reports and files shared with your care team',
-        href: '/(family)/documents',
-      },
-    ],
-  },
-  {
-    title: 'Communication',
-    links: [
-      {
-        icon: 'chatbubble-outline',
-        label: 'Messages',
-        description: 'Talk to your care team',
-        href: '/(family)/messages',
-      },
-      {
-        icon: 'videocam-outline',
-        label: 'Video visits',
-        description: 'Join remote care sessions',
-        href: '/(family)/telehealth',
-      },
-      {
-        icon: 'notifications-outline',
-        label: 'Notifications',
-        description: 'Updates about your care journey',
-        href: '/(family)/notifications',
-      },
-    ],
-  },
-  {
-    title: 'Account',
-    links: [
-      {
-        icon: 'person-outline',
-        label: 'Profile & settings',
-        description: 'Your details and account preferences',
-        href: '/(family)/profile',
-      },
-      {
-        icon: 'receipt-outline',
-        label: 'Billing',
-        description: 'Quotations, invoices, and pay online',
-        href: '/(family)/invoices',
-      },
-    ],
-  },
-];
 
 function SectionRow({ link, isLast }: { link: MoreLink; isLast: boolean }) {
   const scale = useSharedValue(1);
@@ -105,7 +42,7 @@ function SectionRow({ link, isLast }: { link: MoreLink; isLast: boolean }) {
         onPressOut={() => {
           scale.value = withSpring(1, familyReleaseSpring);
         }}
-        onPress={() => router.push(link.href)}
+        onPress={() => router.push(link.href as never)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -134,26 +71,96 @@ function SectionRow({ link, isLast }: { link: MoreLink; isLast: boolean }) {
             {link.description}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color="#D6D3D1" />
+        <Ionicons name={navForwardIcon()} size={16} color="#D6D3D1" />
       </Pressable>
     </Animated.View>
   );
 }
 
 export default function FamilyMoreScreen() {
+  const { t } = useTranslation('family');
   const user = useAuthStore((s) => s.user);
   const heroScale = useSharedValue(1);
   const heroAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: heroScale.value }] }));
 
+  const sections = useMemo(
+    () => [
+      {
+        title: t('mobile.more.myCare'),
+        links: [
+          {
+            icon: 'people-outline' as const,
+            label: t('mobile.more.careUnit'),
+            description: t('mobile.more.careUnitDesc'),
+            href: '/(family)/care-unit',
+          },
+          {
+            icon: 'add-circle-outline' as const,
+            label: t('mobile.more.newRequest'),
+            description: t('mobile.more.newRequestDesc'),
+            href: '/(onboarding)/step-1-care-unit',
+          },
+          {
+            icon: 'folder-outline' as const,
+            label: t('nav.documents'),
+            description: t('mobile.more.documentsDesc'),
+            href: '/(family)/documents',
+          },
+        ],
+      },
+      {
+        title: t('mobile.more.communication'),
+        links: [
+          {
+            icon: 'chatbubble-outline' as const,
+            label: t('nav.messages'),
+            description: t('mobile.more.messagesDesc'),
+            href: '/(family)/messages',
+          },
+          {
+            icon: 'videocam-outline' as const,
+            label: t('nav.telehealth'),
+            description: t('mobile.more.videoDesc'),
+            href: '/(family)/telehealth',
+          },
+          {
+            icon: 'notifications-outline' as const,
+            label: t('mobile.home.notifications'),
+            description: t('mobile.more.notificationsDesc'),
+            href: '/(family)/notifications',
+          },
+        ],
+      },
+      {
+        title: t('mobile.more.account'),
+        links: [
+          {
+            icon: 'person-outline' as const,
+            label: t('mobile.more.profile'),
+            description: t('mobile.more.profileDesc'),
+            href: '/(family)/profile',
+          },
+          {
+            icon: 'receipt-outline' as const,
+            label: t('nav.billing'),
+            description: t('mobile.more.billingDesc'),
+            href: '/(family)/invoices',
+          },
+        ],
+      },
+    ],
+    [t],
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
       <FamilyTabHero
-        title={user?.name ?? 'My account'}
+        title={user?.name ?? t('mobile.more.myAccount')}
         subtitle={user?.email}
         right={
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open profile"
+            accessibilityLabel={t('mobile.more.openProfile')}
             onPressIn={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               heroScale.value = withSpring(0.97, familyPressSpring);
@@ -171,7 +178,7 @@ export default function FamilyMoreScreen() {
       />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <View key={section.title} style={{ marginBottom: 8 }}>
             <Text
               style={{

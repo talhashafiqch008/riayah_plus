@@ -4,6 +4,7 @@ import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { apiErrorMessage } from '../../lib/format';
 import {
@@ -40,9 +41,15 @@ function mimeFromUri(uri: string): { mimeType: string; ext: string } {
 type Props = {
   historyHref: string;
   compact?: boolean;
+  i18nNs?: 'clinical' | 'family' | 'coordinator';
 };
 
-export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
+export function VoiceRecordWidget({
+  historyHref,
+  compact = false,
+  i18nNs = 'clinical',
+}: Props) {
+  const { t } = useTranslation(i18nNs);
   const toast = useToast();
   const recordingRef = useRef<Audio.Recording | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -76,7 +83,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         setSelectedPatientKey(rows[0]?.id ?? '');
       } catch (e: unknown) {
         if (!cancelled) {
-          toast.show(apiErrorMessage(e, 'Failed to load patients'), { type: 'danger' });
+          toast.show(apiErrorMessage(e, t('voice.toasts.loadPatientsFailed')), { type: 'danger' });
         }
       } finally {
         if (!cancelled) setLoadingPatients(false);
@@ -91,18 +98,18 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         void rec.stopAndUnloadAsync().catch(() => undefined);
       }
     };
-  }, [clearTimer, toast]);
+  }, [clearTimer, t, toast]);
 
   const startRecording = async () => {
     if (isRecording || uploading) return;
     if (!selectedRef.current) {
-      toast.show('Choose an assigned patient before recording.', { type: 'danger' });
+      toast.show(t('voice.toasts.choosePatient'), { type: 'danger' });
       return;
     }
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
-        toast.show('Microphone permission is required to record.', { type: 'danger' });
+        toast.show(t('voice.toasts.micRequired'), { type: 'danger' });
         return;
       }
 
@@ -125,7 +132,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
       }, 1000);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Could not start recording'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('voice.toasts.startFailed')), { type: 'danger' });
       setIsRecording(false);
     }
   };
@@ -140,17 +147,19 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
     setUploading(true);
 
     try {
-      if (!patient) throw new Error('Choose an assigned patient before recording.');
+      if (!patient) throw new Error(t('voice.toasts.choosePatient'));
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recording.getURI();
-      if (!uri) throw new Error('No audio file was produced.');
+      if (!uri) throw new Error(t('voice.toasts.noAudio'));
 
       const status = await recording.getStatusAsync();
+      const durationMs =
+        'durationMillis' in status && typeof status.durationMillis === 'number'
+          ? status.durationMillis
+          : null;
       const durationSeconds =
-        status.isLoaded && typeof status.durationMillis === 'number'
-          ? Math.round(status.durationMillis / 1000)
-          : elapsedRef.current;
+        durationMs != null ? Math.round(durationMs / 1000) : elapsedRef.current;
 
       const { mimeType, ext } = mimeFromUri(uri);
       await uploadVoiceRecording({
@@ -163,10 +172,10 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         episodeId: patient.episodeId,
       });
       await deleteTempFile(uri);
-      toast.show('Voice recording saved', { type: 'success' });
+      toast.show(t('voice.toasts.saved'), { type: 'success' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to save recording'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('voice.toasts.saveFailed')), { type: 'danger' });
     } finally {
       setUploading(false);
       setElapsed(0);
@@ -193,6 +202,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
   };
 
   const canRecord = Boolean(selectedPatient) && !loadingPatients;
+  const elapsedLabel = formatDuration(elapsed);
 
   return (
     <View
@@ -211,18 +221,20 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: STONE_900 }}>Voice note</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: STONE_900 }}>
+            {t('voice.widgetTitle')}
+          </Text>
           <Text style={{ marginTop: 2, fontSize: 12, color: STONE_500 }}>
             {uploading
-              ? 'Saving…'
+              ? t('voice.saving')
               : isRecording
-                ? `Recording ${formatDuration(elapsed)}`
-                : 'Choose a patient, then record'}
+                ? t('voice.recordingElapsed', { time: elapsedLabel })
+                : t('voice.chooseThenRecord')}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open voice history"
+          accessibilityLabel={t('voice.openHistory')}
           onPress={() => router.push(historyHref as never)}
           hitSlop={8}
           style={{
@@ -232,7 +244,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
             backgroundColor: '#F0FDFA',
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: '700', color: TEAL }}>History</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: TEAL }}>{t('voice.history')}</Text>
         </Pressable>
       </View>
 
@@ -240,9 +252,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         {loadingPatients ? (
           <ActivityIndicator color={TEAL} style={{ paddingVertical: 12 }} />
         ) : patients.length === 0 ? (
-          <Text style={{ fontSize: 12, color: AMBER }}>
-            Only patients on your active or validated care episodes appear here.
-          </Text>
+          <Text style={{ fontSize: 12, color: AMBER }}>{t('voice.patientHint')}</Text>
         ) : (
           <ScrollView nestedScrollEnabled>
             {patients.map((p) => {
@@ -277,7 +287,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
         {!isRecording ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Start voice recording"
+            accessibilityLabel={t('voice.startAria')}
             disabled={uploading || !canRecord}
             onPress={() => void startRecording()}
             style={{
@@ -297,7 +307,9 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
             ) : (
               <>
                 <Ionicons name="mic" size={18} color={WHITE} />
-                <Text style={{ color: WHITE, fontWeight: '700', fontSize: 14 }}>Record now</Text>
+                <Text style={{ color: WHITE, fontWeight: '700', fontSize: 14 }}>
+                  {t('voice.recordNow')}
+                </Text>
               </>
             )}
           </Pressable>
@@ -305,7 +317,7 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Stop and save recording"
+              accessibilityLabel={t('voice.stopAria')}
               onPress={() => void stopAndSave()}
               style={{
                 flex: 1,
@@ -320,12 +332,12 @@ export function VoiceRecordWidget({ historyHref, compact = false }: Props) {
             >
               <Ionicons name="stop" size={18} color={WHITE} />
               <Text style={{ color: WHITE, fontWeight: '700', fontSize: 14 }}>
-                Stop & save · {formatDuration(elapsed)}
+                {t('voice.stopSaveElapsed', { time: elapsedLabel })}
               </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancel recording"
+              accessibilityLabel={t('voice.cancelAria')}
               onPress={() => void cancelRecording()}
               style={{
                 paddingHorizontal: 14,

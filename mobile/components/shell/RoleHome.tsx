@@ -25,6 +25,8 @@ import Animated, {
 import { Avatar } from '../ui';
 import { greetingForNow } from '../../lib/format';
 import { useAuthStore } from '../../stores/authStore';
+import { useTranslation } from 'react-i18next';
+import { navArrowForwardIcon } from '../../lib/rtlIcons';
 import {
   ROLE,
   ROLE_HERO_COLORS,
@@ -50,6 +52,8 @@ export type RoleHomeLink = {
 };
 
 export type RoleHomeProps = {
+  /** When set, shell chrome (retry, quick access, a11y) uses this namespace. */
+  i18nNs?: 'clinical' | 'support' | 'coordinator' | 'org';
   tagline: string;
   notificationsHref: string;
   profileHref: string;
@@ -60,6 +64,8 @@ export type RoleHomeProps = {
   onRefresh: () => void;
   onRetry: () => void;
   nextSteps: string[];
+  nextStepsTitle?: string;
+  quickAccessTitle?: string;
   cta?: { label: string; onPress: () => void };
   quickLinks: readonly RoleHomeLink[];
   /** Optional dashboard widget rendered above next steps (e.g. voice record). */
@@ -206,6 +212,7 @@ function QuickAction({
 }
 
 export function RoleHome({
+  i18nNs,
   tagline,
   notificationsHref,
   profileHref,
@@ -216,19 +223,32 @@ export function RoleHome({
   onRefresh,
   onRetry,
   nextSteps,
+  nextStepsTitle,
+  quickAccessTitle,
   cta,
   quickLinks,
   topWidget,
 }: RoleHomeProps) {
+  const { t, i18n } = useTranslation(i18nNs ?? 'clinical');
   const user = useAuthStore((s) => s.user);
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const firstName =
+    user?.name?.split(' ')[0] ??
+    (i18nNs ? t('mobile.shell.fallbackName') : 'there');
   const greeting = greetingForNow();
-  const hour = new Date().getHours();
-  const arabicGreeting = hour < 12 ? 'صباح الخير' : 'مساء الخير';
+  const isArabic = i18n.language?.startsWith('ar');
 
   const reduceMotion = useReducedMotion();
   const ctaScale = useSharedValue(1);
   const ctaAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: ctaScale.value }] }));
+
+  const labelNotifications = i18nNs ? t('mobile.shell.notifications') : 'Notifications';
+  const labelProfile = i18nNs ? t('mobile.shell.profile') : 'Profile';
+  const labelNextSteps =
+    nextStepsTitle ?? (i18nNs ? t('dashboard.nextStepsTitle') : 'Suggested next steps');
+  const labelQuickAccess =
+    quickAccessTitle ?? (i18nNs ? t('mobile.shell.quickAccess') : 'Quick access');
+  const loadRetryPrefix = i18nNs ? t('mobile.shell.loadRetryPrefix') : 'Could not load — ';
+  const loadRetryAction = i18nNs ? t('mobile.shell.retry') : 'tap to retry';
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
@@ -277,7 +297,11 @@ export function RoleHome({
 
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-3">
-              <Text className="mb-1 text-right text-[13px] text-white/40">{arabicGreeting}</Text>
+              {!isArabic ? (
+                <Text className="mb-1 text-right text-[13px] text-white/40">
+                  {new Date().getHours() < 12 ? 'صباح الخير' : 'مساء الخير'}
+                </Text>
+              ) : null}
               <Text className="text-[13px] font-medium text-white/70">{greeting},</Text>
               <Text
                 className="mt-0.5 text-[28px] font-extrabold leading-9 text-white"
@@ -293,7 +317,7 @@ export function RoleHome({
             <View className="flex-row items-center gap-3 pt-3">
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Notifications"
+                accessibilityLabel={labelNotifications}
                 onPress={() => router.push(notificationsHref as never)}
                 hitSlop={10}
                 className="h-[38px] w-[38px] items-center justify-center rounded-full"
@@ -303,7 +327,7 @@ export function RoleHome({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Profile"
+                accessibilityLabel={labelProfile}
                 onPress={() => router.push(profileHref as never)}
                 hitSlop={10}
               >
@@ -328,7 +352,8 @@ export function RoleHome({
         {isError ? (
           <Pressable onPress={onRetry} className="mt-3 items-center">
             <Text className="text-xs text-stone-400">
-              Could not load — <Text className="font-semibold text-teal-600">tap to retry</Text>
+              {loadRetryPrefix}
+              <Text className="font-semibold text-teal-600">{loadRetryAction}</Text>
             </Text>
           </Pressable>
         ) : null}
@@ -338,12 +363,12 @@ export function RoleHome({
         <View className="mt-5 px-4">
           <View style={[{ padding: 16 }, roleCardStyle]}>
             <Text className="mb-3 text-[10px] font-bold uppercase tracking-[2.5px] text-stone-400">
-              Suggested next steps
+              {labelNextSteps}
             </Text>
             <View className="gap-3">
               {nextSteps.map((step) => (
                 <View key={step} className="flex-row items-start gap-2">
-                  <Ionicons name="arrow-forward" size={16} color={ROLE.teal} />
+                  <Ionicons name={navArrowForwardIcon()} size={16} color={ROLE.teal} />
                   <Text className="flex-1 text-sm text-stone-600">{step}</Text>
                 </View>
               ))}
@@ -373,7 +398,7 @@ export function RoleHome({
 
         <View className="mt-7 px-4">
           <Text className="mb-3 text-[10px] font-bold uppercase tracking-[2.5px] text-stone-400">
-            Quick access
+            {labelQuickAccess}
           </Text>
           <View className="flex-row flex-wrap gap-3">
             {quickLinks.map((link, index) => (

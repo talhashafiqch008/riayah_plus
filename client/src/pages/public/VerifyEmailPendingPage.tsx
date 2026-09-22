@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Mail, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { resendVerificationEmail } from '@/lib/api/auth';
 import { isApiError } from '@/lib/errors';
 
 export default function VerifyEmailPendingPage() {
+  const { t } = useTranslation('auth');
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') ?? '';
   const [resending, setResending] = useState(false);
@@ -13,7 +15,7 @@ export default function VerifyEmailPendingPage() {
 
   const handleResend = async () => {
     if (!email) {
-      toast.error('No email address provided.');
+      toast.error(t('verifyPending.noEmail'));
       return;
     }
 
@@ -21,12 +23,12 @@ export default function VerifyEmailPendingPage() {
     try {
       await resendVerificationEmail(email);
       setResent(true);
-      toast.success('Verification email sent. Please check your inbox.');
+      toast.success(t('verifyPending.emailSentToast'));
     } catch (error: unknown) {
       if (isApiError(error)) {
-        toast.error(error.message || 'Failed to resend verification email.');
+        toast.error(error.message || t('verifyPending.emailResendFailed'));
       } else {
-        toast.error('Failed to resend verification email.');
+        toast.error(t('verifyPending.emailResendFailed'));
       }
     } finally {
       setResending(false);
@@ -40,18 +42,14 @@ export default function VerifyEmailPendingPage() {
           <div className="mx-auto mb-4 size-16 rounded-full bg-teal-100 flex items-center justify-center">
             <Mail className="size-8 text-teal-600" />
           </div>
-          <h2 className="text-2xl font-semibold text-stone-900 mb-2">Verify Your Email</h2>
-          <p className="text-stone-600 mb-2">
-            We sent a verification link to
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900 mb-2">{t('verifyPending.checkEmail')}</h2>
+          <p className="text-stone-600 mb-2">{t('verifyPending.sentEmailLead')}</p>
           {email ? (
             <p className="font-medium text-stone-900 mb-6">{email}</p>
           ) : (
-            <p className="text-stone-500 mb-6">your email address</p>
+            <p className="text-stone-500 mb-6">{t('verifyPending.sentEmailFallback')}</p>
           )}
-          <p className="text-sm text-stone-500 mb-6">
-            Click the link in the email to activate your account, then log in.
-          </p>
+          <p className="text-sm text-stone-500 mb-6">{t('verifyPending.sentEmailHint')}</p>
 
           {email && (
             <button
@@ -61,7 +59,7 @@ export default function VerifyEmailPendingPage() {
               className="mb-6 inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100 disabled:opacity-60"
             >
               <RefreshCw className={`size-4 ${resending ? 'animate-spin' : ''}`} />
-              {resent ? 'Send again' : 'Resend verification email'}
+              {resent ? t('verifyPending.sendAgain') : t('verifyPending.resendEmail')}
             </button>
           )}
 
@@ -70,7 +68,7 @@ export default function VerifyEmailPendingPage() {
             className="inline-flex items-center text-teal-600 hover:text-teal-700 font-medium"
           >
             <ArrowLeft className="mr-2 size-4" />
-            Back to Login
+            {t('verifyPending.backToLogin')}
           </Link>
         </div>
       </div>

@@ -203,6 +203,7 @@ export class AuthController {
         onboardingStatus: user.onboardingStatus,
         twoFactorEnabled: user.twoFactorEnabled,
         organizationId: user.organizationId,
+        uiLanguage: user.uiLanguage,
         organization: user.organization
           ? { id: user.organization.id, name: user.organization.name }
           : null,
@@ -271,6 +272,7 @@ export class AuthController {
         role: user.role,
         twoFactorEnabled: user.twoFactorEnabled,
         organizationId: user.organizationId,
+        uiLanguage: user.uiLanguage,
         organization: user.organization
           ? { id: user.organization.id, name: user.organization.name }
           : null,

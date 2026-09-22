@@ -4,8 +4,10 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { Avatar, Button } from '../ui';
 import { useAuthStore } from '../../stores/authStore';
+import { navForwardIcon } from '../../lib/rtlIcons';
 import {
   ROLE,
   RoleTabHero,
@@ -64,7 +66,7 @@ function SectionRow({ link, isLast }: { link: RoleMoreLink; isLast: boolean }) {
             {link.description}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color="#D6D3D1" />
+        <Ionicons name={navForwardIcon()} size={16} color="#D6D3D1" />
       </Pressable>
     </Animated.View>
   );
@@ -74,32 +76,41 @@ export function RoleMoreScreen({
   sections,
   profileHref,
   showSignOut,
+  i18nNs,
 }: {
   sections: { title: string; links: RoleMoreLink[] }[];
   profileHref: string;
   showSignOut?: boolean;
+  i18nNs?: 'clinical' | 'support' | 'coordinator' | 'org';
 }) {
+  const { t } = useTranslation(i18nNs ?? 'clinical');
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const heroScale = useSharedValue(1);
   const heroAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: heroScale.value }] }));
 
+  const myAccount = i18nNs ? t('mobile.shell.myAccount') : 'My account';
+  const openProfile = i18nNs ? t('mobile.shell.openProfile') : 'Open profile';
+  const signOut = i18nNs ? t('layout.signOut') : 'Sign out';
+  const signOutConfirm = i18nNs ? t('mobile.shell.signOutConfirm') : 'Are you sure?';
+  const cancel = i18nNs ? t('mobile.shell.signOutCancel') : 'Cancel';
+
   const confirmLogout = () => {
-    Alert.alert('Sign out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
+    Alert.alert(signOut, signOutConfirm, [
+      { text: cancel, style: 'cancel' },
+      { text: signOut, style: 'destructive', onPress: () => void logout() },
     ]);
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: ROLE.stone50 }} edges={['top']}>
       <RoleTabHero
-        title={user?.name ?? 'My account'}
+        title={user?.name ?? myAccount}
         subtitle={user?.email}
         right={
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open profile"
+            accessibilityLabel={openProfile}
             onPressIn={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               heroScale.value = withSpring(0.97, rolePressSpring);
@@ -147,7 +158,7 @@ export function RoleMoreScreen({
         {showSignOut ? (
           <View style={{ marginTop: 16 }}>
             <Button variant="destructive" onPress={confirmLogout}>
-              Sign Out
+              {signOut}
             </Button>
           </View>
         ) : null}

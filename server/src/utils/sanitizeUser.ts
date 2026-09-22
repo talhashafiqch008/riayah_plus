@@ -40,6 +40,7 @@ export const ADMIN_USER_SELECT = {
   organizationId: true,
   assignedCoordinatorId: true,
   twoFactorEnabled: true,
+  uiLanguage: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,

@@ -70,8 +70,9 @@ const PLACEHOLDER_PAGES: Record<string, { path: string; title: string; descripti
     { path: 'messages', title: 'Messages' },
   ],
   support: [
-    { path: 'notes', title: 'Shift Notes' },
-    { path: 'messages', title: 'Messages' },
+    // Shift Notes / Messages — placeholder until live APIs; hide for now
+    // { path: 'notes', title: 'Shift Notes' },
+    // { path: 'messages', title: 'Messages' },
   ],
 };
 

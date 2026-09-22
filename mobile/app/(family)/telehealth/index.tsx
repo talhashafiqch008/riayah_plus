@@ -10,9 +10,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { EmptyState, StatusBadge } from '../../../components/ui';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
-import { apiErrorMessage, formatDateTime } from '../../../lib/format';
+import { apiErrorMessage } from '../../../lib/format';
+import { familySessionStatusLabel, formatFamilyDateTime } from '../../../lib/familyLanguage';
 import { listSessions, type CareSession } from '../../../lib/api/scheduling';
 
 function isJoinable(session: CareSession): boolean {
@@ -20,6 +22,7 @@ function isJoinable(session: CareSession): boolean {
 }
 
 export default function FamilyTelehealthListScreen() {
+  const { t } = useTranslation('family');
   const toast = useToast();
   const [sessions, setSessions] = useState<CareSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,12 +33,12 @@ export default function FamilyTelehealthListScreen() {
       const rows = await listSessions();
       setSessions(rows.filter((s) => s.type === 'telehealth'));
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load video sessions'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('telehealth.loadError')), { type: 'danger' });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [t, toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,7 +57,11 @@ export default function FamilyTelehealthListScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Video visits" subtitle="Join remote care sessions" showBack />
+      <FamilyTabHero
+        title={t('telehealth.title')}
+        subtitle={t('telehealth.description')}
+        showBack
+      />
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={FAMILY.teal} />
@@ -77,10 +84,10 @@ export default function FamilyTelehealthListScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="videocam-outline"
-              title="No video visits ready"
-              subtitle="When a telehealth appointment is booked, it will appear here so you can join."
+              title={t('telehealth.empty')}
+              subtitle={t('telehealth.description')}
               action={{
-                label: 'Back to appointments',
+                label: t('bookSession.back'),
                 onPress: () => router.replace('/(family)/bookings'),
               }}
             />
@@ -92,15 +99,23 @@ export default function FamilyTelehealthListScreen() {
             >
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-base font-semibold text-stone-900">Video visit</Text>
-                  <Text className="mt-1 text-sm text-stone-600">{formatDateTime(item.scheduledAt)}</Text>
+                  <Text className="text-base font-semibold text-stone-900">
+                    {t('telehealth.title')}
+                  </Text>
+                  <Text className="mt-1 text-sm text-stone-600">
+                    {formatFamilyDateTime(item.scheduledAt)}
+                  </Text>
                   {item.provider?.name ? (
-                    <Text className="mt-1 text-xs text-stone-400">With {item.provider.name}</Text>
+                    <Text className="mt-1 text-xs text-stone-400">
+                      {t('mobile.common.withProvider', { name: item.provider.name })}
+                    </Text>
                   ) : null}
                 </View>
-                <StatusBadge status={item.status} />
+                <StatusBadge status={item.status} label={familySessionStatusLabel(item.status)} />
               </View>
-              <Text className="mt-3 text-sm font-semibold text-teal-700">Join visit</Text>
+              <Text className="mt-3 text-sm font-semibold text-teal-700">
+                {t('telehealth.joinWaitingRoom')}
+              </Text>
             </Pressable>
           )}
         />

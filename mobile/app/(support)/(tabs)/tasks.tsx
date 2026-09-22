@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -23,13 +24,6 @@ import { completeTask, listMyTasks, type Task } from '../../../lib/api/shifts';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
 import { toastError } from '../../../lib/toast';
-
-const STATUS_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'completed', label: 'Completed' },
-] as const;
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -53,10 +47,21 @@ function taskContext(task: Task) {
 }
 
 export default function SupportTasksScreen() {
+  const { t } = useTranslation('support');
   const toast = useToast();
   const [status, setStatus] = useState('');
   const [evidenceById, setEvidenceById] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+
+  const filters = useMemo(
+    () => [
+      { value: '', label: t('common.all') },
+      { value: 'pending', label: t('tasks.status.pending') },
+      { value: 'in_progress', label: t('tasks.status.in_progress') },
+      { value: 'completed', label: t('tasks.status.completed') },
+    ],
+    [t],
+  );
 
   const query = useQuery({
     queryKey: ['support-tasks', status],
@@ -69,32 +74,32 @@ export default function SupportTasksScreen() {
       if (text && isHttpUrl(text)) {
         return completeTask(task.id, { completionEvidence: text });
       }
-      return completeTask(task.id, { notes: text || 'Completed on shift' });
+      return completeTask(task.id, { notes: text || t('tasks.defaultNotes') });
     },
     onSuccess: async () => {
       setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ['support-tasks'] });
       await queryClient.invalidateQueries({ queryKey: ['support-shell-stats'] });
-      toast.show('Task completed', { type: 'success' });
+      toast.show(t('tasks.completedToast'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Complete failed');
+      const msg = apiErrorMessage(e, t('tasks.completeFailed'));
       setFormError(msg);
-      toastError(toast, e, 'Complete failed');
+      toastError(toast, e, t('tasks.completeFailed'));
     },
   });
 
   const tasks = query.data?.data ?? [];
   const filtered = useMemo(() => {
     if (!status) return tasks;
-    return tasks.filter((t) => t.status === status);
+    return tasks.filter((row) => row.status === status);
   }, [tasks, status]);
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Tasks"
-        subtitle="Complete assigned care tasks"
+        title={t('tasks.title')}
+        subtitle={t('tasks.description')}
         showBack={false}
         rightAction={{
           icon: 'time-outline',
@@ -103,16 +108,14 @@ export default function SupportTasksScreen() {
       />
 
       <View className="border-b border-stone-100 bg-white pb-3">
-        <Text className="px-4 pt-3 text-sm text-stone-500">
-          Complete assigned care tasks. Add optional notes, or paste an evidence URL.
-        </Text>
+        <Text className="px-4 pt-3 text-sm text-stone-500">{t('tasks.description')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-3"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
-          {STATUS_FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -138,9 +141,9 @@ export default function SupportTasksScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load tasks"
+          title={t('tasks.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <ScrollView
@@ -163,8 +166,8 @@ export default function SupportTasksScreen() {
           {filtered.length === 0 ? (
             <EmptyState
               icon="checkmark-circle-outline"
-              title="No tasks assigned to you yet"
-              subtitle="Ask your coordinator to assign episode tasks or book a session with task assignment."
+              title={t('tasks.empty')}
+              subtitle={t('tasks.emptyHint')}
             />
           ) : (
             filtered.map((task) => {
@@ -184,15 +187,22 @@ export default function SupportTasksScreen() {
                       ) : null}
                       {ctx?.assigner || ctx?.coordinator ? (
                         <Text className="mt-0.5 text-xs text-stone-500">
-                          Assigned by {ctx.assigner || ctx.coordinator}
-                          {ctx.dueAt ? ` · Due ${formatDateTime(ctx.dueAt)}` : ''}
+                          {t('tasks.assignedBy', { name: ctx.assigner || ctx.coordinator })}
+                          {ctx.dueAt
+                            ? ` · ${t('tasks.due', { date: formatDateTime(ctx.dueAt) })}`
+                            : ''}
                         </Text>
                       ) : null}
                       {task.description ? (
                         <Text className="mt-2 text-sm text-stone-600">{task.description}</Text>
                       ) : null}
                     </View>
-                    <StatusBadge status={task.status} label={task.status.replace(/_/g, ' ')} />
+                    <StatusBadge
+                      status={task.status}
+                      label={t(`tasks.status.${task.status}`, {
+                        defaultValue: task.status.replace(/_/g, ' '),
+                      })}
+                    />
                   </View>
 
                   {task.status !== 'completed' ? (
@@ -200,7 +210,7 @@ export default function SupportTasksScreen() {
                       <Input
                         value={evidenceById[task.id] ?? ''}
                         onChangeText={(v) => setEvidenceById((m) => ({ ...m, [task.id]: v }))}
-                        placeholder="Notes or evidence URL (optional)"
+                        placeholder={t('tasks.evidencePlaceholder')}
                       />
                       <Button
                         isLoading={completing}
@@ -209,14 +219,14 @@ export default function SupportTasksScreen() {
                           completeMutation.mutate(task);
                         }}
                       >
-                        Complete
+                        {t('tasks.complete')}
                       </Button>
                     </View>
                   ) : null}
 
                   {task.completionEvidence ? (
                     <Text className="mt-2 text-xs text-stone-500">
-                      Evidence: {task.completionEvidence}
+                      {t('tasks.evidence')}: {task.completionEvidence}
                     </Text>
                   ) : null}
                 </Card>

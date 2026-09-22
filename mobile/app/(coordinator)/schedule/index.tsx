@@ -10,18 +10,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, Input, ScreenHeader, StatusBadge } from '../../../components/ui';
 import { SelectDropdown } from '../../../components/SelectDropdown';
 import { listEpisodes, type CareEpisode } from '../../../lib/api/care';
 import {
   bookRecurringSessions,
   bookSession,
-  dayOfWeekLabel,
   listAvailability,
   listScheduleStaff,
   listSessions,
   replaceAvailability,
-  scheduleStaffRoleLabel,
   type AvailabilitySlot,
   type ScheduleStaffOption,
 } from '../../../lib/api/scheduling';
@@ -36,13 +35,7 @@ const DEFAULT_SLOTS: SlotDraft[] = [
 
 const TIME_SLOTS = ['09:00', '11:00', '14:00', '16:00'];
 
-const SESSION_TYPES: { id: SessionType; label: string }[] = [
-  { id: 'telehealth', label: 'Telehealth (video call)' },
-  { id: 'in_person', label: 'In-person' },
-  { id: 'home_visit', label: 'Home visit' },
-];
-
-function nextFourteenDays() {
+function nextFourteenDays(locale: string) {
   const out: { iso: string; day: string; date: string }[] = [];
   const now = new Date();
   for (let i = 0; i < 14; i++) {
@@ -50,7 +43,7 @@ function nextFourteenDays() {
     d.setDate(now.getDate() + i);
     out.push({
       iso: d.toISOString().slice(0, 10),
-      day: d.toLocaleDateString('en-AU', { weekday: 'short' }),
+      day: d.toLocaleDateString(locale, { weekday: 'short' }),
       date: String(d.getDate()),
     });
   }
@@ -64,22 +57,47 @@ function combineDateAndTime(dateIso: string, hhmm: string): string {
   return d.toISOString();
 }
 
-function episodeOptionLabel(ep: CareEpisode): string {
-  const patient = ep.careRecipient?.name || ep.patient?.name;
-  const status = (ep.status ?? '').replace(/_/g, ' ');
-  return patient
-    ? `${ep.title ?? 'Episode'} · ${patient} (${status})`
-    : `${ep.title ?? 'Episode'} (${status})`;
-}
-
-function staffOptionLabel(s: ScheduleStaffOption): string {
-  const langs = s.languages?.length ? ` · ${s.languages.slice(0, 2).join(', ')}` : '';
-  return `${s.name} · ${scheduleStaffRoleLabel(s.role ?? '')}${langs}`;
-}
-
 export default function CoordinatorScheduleScreen() {
+  const { t, i18n } = useTranslation('coordinator');
   const toast = useToast();
-  const days = useMemo(() => nextFourteenDays(), []);
+  const days = useMemo(() => nextFourteenDays(i18n.language), [i18n.language]);
+
+  const sessionTypes = useMemo(
+    (): { id: SessionType; label: string }[] => [
+      { id: 'telehealth', label: t('schedule.telehealthVideo') },
+      { id: 'in_person', label: t('schedule.inPerson') },
+      { id: 'home_visit', label: t('schedule.homeVisit') },
+    ],
+    [t],
+  );
+
+  const episodeStatusLabel = (status: string) =>
+    t(`episodes.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+
+  const sessionStatusLabel = (status: string) =>
+    t(`schedule.sessionStatus.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+
+  const sessionTypeLabel = (type: string) => {
+    if (type === 'telehealth') return t('schedule.telehealth');
+    if (type === 'in_person') return t('schedule.inPerson');
+    if (type === 'home_visit') return t('schedule.homeVisit');
+    return type.replace(/_/g, ' ');
+  };
+
+  const staffRoleLabel = (role: string) =>
+    t(`mobile.detail.staffRoles.${role}`, { defaultValue: role.replace(/_/g, ' ') });
+
+  const episodeOptionLabel = (ep: CareEpisode): string => {
+    const patient = ep.careRecipient?.name || ep.patient?.name;
+    const status = episodeStatusLabel(ep.status ?? '');
+    const title = ep.title ?? t('mobile.detail.episodeFallback');
+    return patient ? `${title} · ${patient} (${status})` : `${title} (${status})`;
+  };
+
+  const staffOptionLabel = (s: ScheduleStaffOption): string => {
+    const langs = s.languages?.length ? ` · ${s.languages.slice(0, 2).join(', ')}` : '';
+    return `${s.name} · ${staffRoleLabel(s.role ?? '')}${langs}`;
+  };
 
   const [providerId, setProviderId] = useState('');
   const [episodeId, setEpisodeId] = useState('');
@@ -111,7 +129,7 @@ export default function CoordinatorScheduleScreen() {
         id: ep.id,
         label: episodeOptionLabel(ep),
       })),
-    [episodes],
+    [episodes, t],
   );
 
   const staffOptions = useMemo(
@@ -165,16 +183,16 @@ export default function CoordinatorScheduleScreen() {
 
   const saveAvailMutation = useMutation({
     mutationFn: () => {
-      if (!providerId) throw new Error('Select a staff member');
+      if (!providerId) throw new Error(t('schedule.toasts.selectStaff'));
       return replaceAvailability(providerId, slots);
     },
     onSuccess: async () => {
       setFormError(null);
       await availabilityQuery.refetch();
-      toast.show('Saved availability', { type: 'success' });
+      toast.show(t('schedule.toasts.savedAvailabilityShort'), { type: 'success' });
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Save failed');
+      const msg = apiErrorMessage(e, t('schedule.toasts.saveFailed'));
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
     },
@@ -183,7 +201,7 @@ export default function CoordinatorScheduleScreen() {
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!episodeId || !providerId || !date || !time) {
-        throw new Error('Select episode, staff, date, and time');
+        throw new Error(t('schedule.toasts.selectBookFieldsMobile'));
       }
       const scheduledAt = combineDateAndTime(date, time);
       const durationMinutes = Number(duration) || 60;
@@ -212,23 +230,25 @@ export default function CoordinatorScheduleScreen() {
       setFormError(null);
       await sessionsQuery.refetch();
       if (result && 'created' in result) {
-        toast.show(`Created ${result.created} session(s)`, { type: 'success' });
+        toast.show(t('schedule.toasts.createdSessions', { count: result.created }), {
+          type: 'success',
+        });
         if (result.skipped.length) {
-          toast.show(`${result.skipped.length} occurrence(s) skipped (conflict)`, {
+          toast.show(t('schedule.toasts.skippedOccurrences', { count: result.skipped.length }), {
             type: 'warning',
           });
         }
       } else {
         toast.show(
           assignTasks
-            ? 'Session booked — pending tasks assigned to this worker'
-            : 'Session booked',
+            ? t('schedule.toasts.sessionBookedTasks')
+            : t('schedule.toasts.sessionBooked'),
           { type: 'success' },
         );
       }
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Booking failed');
+      const msg = apiErrorMessage(e, t('schedule.toasts.bookingFailed'));
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
     },
@@ -240,7 +260,7 @@ export default function CoordinatorScheduleScreen() {
   if (bootLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Schedule" />
+        <ScreenHeader title={t('schedule.title')} />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -249,12 +269,12 @@ export default function CoordinatorScheduleScreen() {
   if (staffQuery.isError) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Schedule" />
+        <ScreenHeader title={t('schedule.title')} />
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load schedule"
+          title={t('mobile.schedule.loadErrorTitle')}
           subtitle={apiErrorMessage(staffQuery.error)}
-          action={{ label: 'Try again', onPress: () => void staffQuery.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void staffQuery.refetch() }}
         />
       </SafeAreaView>
     );
@@ -262,7 +282,7 @@ export default function CoordinatorScheduleScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Schedule" />
+      <ScreenHeader title={t('schedule.title')} />
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         refreshControl={
@@ -278,9 +298,7 @@ export default function CoordinatorScheduleScreen() {
           />
         }
       >
-        <Text className="mb-4 text-sm text-stone-500">
-          Set staff availability and book care sessions — pick people and episodes from your org.
-        </Text>
+        <Text className="mb-4 text-sm text-stone-500">{t('schedule.description')}</Text>
 
         {formError ? (
           <View className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
@@ -289,21 +307,18 @@ export default function CoordinatorScheduleScreen() {
         ) : null}
 
         <Card shadow>
-          <Text className="font-semibold text-stone-900">Staff availability</Text>
+          <Text className="font-semibold text-stone-900">{t('mobile.schedule.staffAvailability')}</Text>
           <View className="mt-3">
             {staff.length === 0 ? (
-              <Text className="text-sm text-amber-700">
-                No schedulable staff in your organization yet. Invite support or clinical staff from
-                the Org portal.
-              </Text>
+              <Text className="text-sm text-amber-700">{t('mobile.schedule.noSchedulableStaff')}</Text>
             ) : (
               <SelectDropdown
-                label="Staff member"
-                placeholder="Select staff…"
+                label={t('mobile.schedule.staffMember')}
+                placeholder={t('mobile.schedule.selectStaff')}
                 options={staffOptions}
                 value={providerId}
                 onChange={setProviderId}
-                emptyText="No staff match that search."
+                emptyText={t('mobile.schedule.noStaffSearch')}
               />
             )}
           </View>
@@ -315,7 +330,7 @@ export default function CoordinatorScheduleScreen() {
             {slots.map((s, i) => (
               <View key={i} className="rounded-xl border border-stone-100 p-3">
                 <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                  Day
+                  {t('mobile.schedule.day')}
                 </Text>
                 <ScrollView
                   horizontal
@@ -341,7 +356,7 @@ export default function CoordinatorScheduleScreen() {
                             selected ? 'font-medium text-teal-700' : 'text-stone-600'
                           }`}
                         >
-                          {dayOfWeekLabel(d)}
+                          {t(`schedule.days.${d}`)}
                         </Text>
                       </Pressable>
                     );
@@ -350,26 +365,26 @@ export default function CoordinatorScheduleScreen() {
                 <View className="mt-2 flex-row gap-2">
                   <View className="flex-1">
                     <Input
-                      label="Start"
+                      label={t('mobile.schedule.start')}
                       value={s.startTime}
                       onChangeText={(v) =>
                         setSlots((rows) =>
                           rows.map((r, j) => (j === i ? { ...r, startTime: v } : r)),
                         )
                       }
-                      placeholder="09:00"
+                      placeholder={t('mobile.schedule.timePlaceholderStart')}
                     />
                   </View>
                   <View className="flex-1">
                     <Input
-                      label="End"
+                      label={t('mobile.schedule.end')}
                       value={s.endTime}
                       onChangeText={(v) =>
                         setSlots((rows) =>
                           rows.map((r, j) => (j === i ? { ...r, endTime: v } : r)),
                         )
                       }
-                      placeholder="17:00"
+                      placeholder={t('mobile.schedule.timePlaceholderEnd')}
                     />
                   </View>
                 </View>
@@ -383,7 +398,7 @@ export default function CoordinatorScheduleScreen() {
                 ])
               }
             >
-              <Text className="text-sm font-medium text-teal-700">+ Add row</Text>
+              <Text className="text-sm font-medium text-teal-700">{t('mobile.schedule.addRow')}</Text>
             </Pressable>
           </View>
 
@@ -394,50 +409,48 @@ export default function CoordinatorScheduleScreen() {
               isLoading={availabilityQuery.isFetching}
               onPress={() => void availabilityQuery.refetch()}
             >
-              Reload slots
+              {t('mobile.schedule.reloadSlots')}
             </Button>
             <Button
               disabled={!providerId}
               isLoading={saveAvailMutation.isPending}
               onPress={() => saveAvailMutation.mutate()}
             >
-              Save slots
+              {t('mobile.schedule.saveSlots')}
             </Button>
           </View>
         </Card>
 
         <Card className="mt-4" shadow>
-          <Text className="font-semibold text-stone-900">Book session</Text>
+          <Text className="font-semibold text-stone-900">{t('schedule.bookSession')}</Text>
 
           <View className="mt-3 gap-4">
             {episodes.length === 0 ? (
-              <Text className="text-sm text-amber-700">
-                No episodes yet. Complete intake review to create a care journey first.
-              </Text>
+              <Text className="text-sm text-amber-700">{t('mobile.schedule.noEpisodesYet')}</Text>
             ) : (
               <SelectDropdown
-                label="Care episode"
-                placeholder="Select episode…"
+                label={t('mobile.schedule.careEpisode')}
+                placeholder={t('mobile.schedule.selectEpisode')}
                 options={episodeOptions}
                 value={episodeId}
                 onChange={setEpisodeId}
-                emptyText="No episodes match that search."
+                emptyText={t('mobile.schedule.noEpisodesSearch')}
               />
             )}
 
             <SelectDropdown
-              label="Assign to staff"
-              placeholder="Select staff…"
+              label={t('mobile.schedule.assignToStaff')}
+              placeholder={t('mobile.schedule.selectStaff')}
               options={staffOptions}
               value={providerId}
               onChange={setProviderId}
-              emptyText="No staff match that search."
+              emptyText={t('mobile.schedule.noStaffSearch')}
             />
 
             <SelectDropdown
-              label="Session type"
-              placeholder="Select type…"
-              options={SESSION_TYPES}
+              label={t('schedule.sessionType')}
+              placeholder={t('mobile.schedule.selectType')}
+              options={sessionTypes}
               value={sessionType}
               onChange={(id) => setSessionType(id as SessionType)}
               searchable={false}
@@ -445,7 +458,7 @@ export default function CoordinatorScheduleScreen() {
           </View>
 
           <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Date
+            {t('mobile.detail.date')}
           </Text>
           <ScrollView
             horizontal
@@ -478,7 +491,7 @@ export default function CoordinatorScheduleScreen() {
           </ScrollView>
 
           <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Time
+            {t('mobile.detail.time')}
           </Text>
           <View className="flex-row flex-wrap gap-2">
             {TIME_SLOTS.map((t) => {
@@ -504,7 +517,7 @@ export default function CoordinatorScheduleScreen() {
           <View className="mt-4 flex-row gap-3">
             <View className="flex-1">
               <Input
-                label="Duration (min)"
+                label={t('schedule.duration')}
                 value={duration}
                 onChangeText={setDuration}
                 keyboardType="number-pad"
@@ -512,7 +525,7 @@ export default function CoordinatorScheduleScreen() {
             </View>
             <View className="flex-1">
               <Input
-                label="Weekly occurrences"
+                label={t('schedule.weeklyOccurrences')}
                 value={recurCount}
                 onChangeText={setRecurCount}
                 keyboardType="number-pad"
@@ -532,7 +545,7 @@ export default function CoordinatorScheduleScreen() {
               {assignTasks ? <Text className="text-xs font-bold text-white">✓</Text> : null}
             </View>
             <Text className="flex-1 text-sm text-stone-700">
-              Assign pending episode tasks to this worker
+              {t('schedule.assignTasks')}
             </Text>
           </Pressable>
 
@@ -542,38 +555,38 @@ export default function CoordinatorScheduleScreen() {
               isLoading={bookMutation.isPending}
               onPress={() => bookMutation.mutate()}
             >
-              Book
+              {t('schedule.book')}
             </Button>
             <Button
               variant="secondary"
               disabled={!episodeId}
               onPress={() => void sessionsQuery.refetch()}
             >
-              Refresh sessions
+              {t('mobile.schedule.refreshSessions')}
             </Button>
           </View>
 
           <Text className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Sessions
+            {t('mobile.schedule.sessions')}
           </Text>
           {!episodeId ? (
-            <Text className="text-sm text-stone-500">Select an episode to see sessions.</Text>
+            <Text className="text-sm text-stone-500">{t('mobile.schedule.selectEpisodeForSessions')}</Text>
           ) : sessionsQuery.isLoading ? (
             <ActivityIndicator color="#0D9488" />
           ) : (sessionsQuery.data ?? []).length === 0 ? (
-            <Text className="text-sm text-stone-500">
-              No sessions booked for this episode yet.
-            </Text>
+            <Text className="text-sm text-stone-500">{t('mobile.schedule.noSessionsForEpisode')}</Text>
           ) : (
             (sessionsQuery.data ?? []).map((s) => (
               <View key={s.id} className="border-t border-stone-100 py-2">
                 <View className="flex-row items-start justify-between gap-2">
                   <Text className="flex-1 font-medium text-stone-900">
                     {formatDateTime(s.scheduledAt)}
-                    {s.durationMinutes ? ` · ${s.durationMinutes}m` : ''}
-                    {s.type ? ` · ${s.type.replace(/_/g, ' ')}` : ''}
+                    {s.durationMinutes
+                      ? ` · ${t('mobile.schedule.durationSuffix', { minutes: s.durationMinutes })}`
+                      : ''}
+                    {s.type ? ` · ${sessionTypeLabel(s.type)}` : ''}
                   </Text>
-                  <StatusBadge status={s.status} />
+                  <StatusBadge status={s.status} label={sessionStatusLabel(s.status)} />
                 </View>
                 {s.provider?.name ? (
                   <Text className="mt-0.5 text-sm text-stone-500">{s.provider.name}</Text>

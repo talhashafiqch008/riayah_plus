@@ -2,6 +2,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { useNotificationEcho } from '@/hooks/useEcho';
 import { deleteNotification, getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '@/lib/api';
+import { localizeNotification } from '@/lib/localizeNotification';
+import i18n from '@/i18n/config';
 import toast from 'react-hot-toast';
 
 interface Notification {
@@ -39,7 +41,17 @@ export function NotificationProvider({ children, userId }: { children: ReactNode
  setNotifications(prev => [notification, ...prev].slice(0, 20));
  setUnreadCount(data.unreadCount);
 
- const message = notification.body || notification.title || 'New notification';
+ const tCommon = i18n.getFixedT(i18n.language, 'common');
+ const localized = localizeNotification(
+ {
+ title: notification.title,
+ body: notification.body,
+ type: notification.type,
+ data: notification.data,
+ },
+ tCommon,
+ );
+ const message = localized.body || localized.title || tCommon('notificationsUi.newNotification');
  toast.success(message, {
  duration: 4000,
  position: 'top-right',
@@ -47,7 +59,7 @@ export function NotificationProvider({ children, userId }: { children: ReactNode
  });
 
  if ('Notification' in window && Notification.permission === 'granted') {
- new Notification(notification.title || 'Raiyah Notification', {
+ new Notification(localized.title || tCommon('notificationsUi.raiyahNotification'), {
  body: message,
  icon: '/logo.png',
  badge: '/logo.png',
@@ -92,7 +104,7 @@ export function NotificationProvider({ children, userId }: { children: ReactNode
  prev.map(n => ({ ...n, is_read: 1 }))
  );
  setUnreadCount(0);
- toast.success('All notifications marked as read');
+ toast.success(i18n.t('notificationsUi.allMarkedRead', { ns: 'common' }));
  } catch (error) {
  console.error('Failed to mark all as read:', error);
  }
@@ -108,7 +120,7 @@ export function NotificationProvider({ children, userId }: { children: ReactNode
  setUnreadCount(prev => Math.max(0, prev - 1));
  }
 
- toast.success('Notification deleted');
+ toast.success(i18n.t('notificationsUi.deleted', { ns: 'common' }));
  } catch (error) {
  console.error('Failed to delete notification:', error);
  }

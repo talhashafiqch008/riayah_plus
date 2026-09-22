@@ -1,11 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Phone, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { sendOtp, verifyPhoneOtp } from '@/lib/api/auth';
 import { isApiError } from '@/lib/errors';
 
 export default function VerifyPhonePendingPage() {
+  const { t } = useTranslation('auth');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const phone = searchParams.get('phone') ?? '';
@@ -16,20 +18,20 @@ export default function VerifyPhonePendingPage() {
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault();
     if (!phone) {
-      toast.error('Missing phone number.');
+      toast.error(t('verifyPending.missingPhone'));
       return;
     }
     if (otp.trim().length < 4) {
-      toast.error('Enter the SMS verification code.');
+      toast.error(t('verifyPending.enterSmsCode'));
       return;
     }
     setLoading(true);
     try {
       await verifyPhoneOtp(phone, otp.trim());
-      toast.success('Phone verified. Please sign in.');
+      toast.success(t('verifyPending.phoneVerifiedToast'));
       navigate(`/login?portal=family&phone=${encodeURIComponent(phone)}`, { replace: true });
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Invalid or expired code.');
+      toast.error(isApiError(error) ? error.message : t('verifyPending.invalidOrExpiredCode'));
     } finally {
       setLoading(false);
     }
@@ -40,9 +42,9 @@ export default function VerifyPhonePendingPage() {
     setResending(true);
     try {
       await sendOtp(phone);
-      toast.success('A new SMS code was sent.');
+      toast.success(t('verifyPending.smsResentToast'));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not resend code.');
+      toast.error(isApiError(error) ? error.message : t('verifyPending.smsResendFailed'));
     } finally {
       setResending(false);
     }
@@ -55,18 +57,18 @@ export default function VerifyPhonePendingPage() {
           <div className="mx-auto mb-4 size-16 rounded-full bg-teal-100 flex items-center justify-center">
             <Phone className="size-8 text-teal-600" />
           </div>
-          <h2 className="text-2xl font-semibold text-stone-900 mb-2">Verify Your Phone</h2>
-          <p className="text-stone-600 mb-2">We sent a 6-digit SMS code to</p>
+          <h2 className="text-2xl font-semibold text-stone-900 mb-2">{t('verifyPending.checkPhone')}</h2>
+          <p className="text-stone-600 mb-2">{t('verifyPending.sentPhoneLead')}</p>
           {phone ? (
             <p className="font-medium text-stone-900 mb-6">{phone}</p>
           ) : (
-            <p className="text-stone-500 mb-6">your phone</p>
+            <p className="text-stone-500 mb-6">{t('verifyPending.sentPhoneFallback')}</p>
           )}
 
           <form onSubmit={handleVerify} className="space-y-4 text-left">
             <div>
               <label htmlFor="phone-otp" className="block text-sm font-medium text-stone-700 mb-1">
-                SMS code
+                {t('verifyPending.smsCode')}
               </label>
               <input
                 id="phone-otp"
@@ -76,7 +78,7 @@ export default function VerifyPhonePendingPage() {
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 className="w-full px-3 py-2.5 border border-stone-300 rounded-lg text-sm tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-teal-500"
-                placeholder="••••••"
+                placeholder={t('verifyPending.smsPlaceholder')}
               />
             </div>
             <button
@@ -84,7 +86,7 @@ export default function VerifyPhonePendingPage() {
               disabled={loading}
               className="w-full py-2.5 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50"
             >
-              {loading ? 'Verifying…' : 'Verify phone'}
+              {loading ? t('verifyPending.verifying') : t('verifyPending.verifyPhone')}
             </button>
           </form>
 
@@ -96,7 +98,7 @@ export default function VerifyPhonePendingPage() {
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100 disabled:opacity-60"
             >
               <RefreshCw className={`size-4 ${resending ? 'animate-spin' : ''}`} />
-              Resend SMS code
+              {t('verifyPending.resendSms')}
             </button>
           )}
 
@@ -105,7 +107,7 @@ export default function VerifyPhonePendingPage() {
             className="mt-6 inline-flex items-center text-teal-600 hover:text-teal-700 font-medium"
           >
             <ArrowLeft className="mr-2 size-4" />
-            Back to Login
+            {t('verifyPending.backToLogin')}
           </Link>
         </div>
       </div>

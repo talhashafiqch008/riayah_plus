@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   Plus,
@@ -63,11 +64,13 @@ function splitName(name?: string): { firstName: string; lastName: string } {
   };
 }
 
-function roleDisplay(role: string) {
-  return role.replace(/_/g, ' ').toUpperCase();
+function roleLabel(role: string, t: (key: string, opts?: { defaultValue?: string }) => string) {
+  return t(`staff.roles.${role}`, { defaultValue: role.replace(/_/g, ' ') });
 }
 
 export default function OrgStaffPage() {
+  const { t, i18n } = useTranslation('org');
+  const dateLocale = (i18n.language || '').toLowerCase().startsWith('ar') ? 'ar' : undefined;
   const [staff, setStaff] = useState<OrgStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,12 +91,12 @@ export default function OrgStaffPage() {
     try {
       setStaff(await listOrgStaff());
     } catch (error) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load staff');
+      toast.error(isApiError(error) ? error.message : t('staff.loadError'));
       setStaff([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -132,11 +135,11 @@ export default function OrgStaffPage() {
 
   const validate = () => {
     const next: Record<string, string> = {};
-    if (!firstName.trim()) next.firstName = 'First name is required';
-    if (!lastName.trim()) next.lastName = 'Last name is required';
-    if (!email.trim()) next.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = 'Invalid email format';
-    if (!role) next.role = 'Role is required';
+    if (!firstName.trim()) next.firstName = t('staff.firstNameRequired');
+    if (!lastName.trim()) next.lastName = t('staff.lastNameRequired');
+    if (!email.trim()) next.email = t('staff.emailRequired');
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = t('staff.emailInvalid');
+    if (!role) next.role = t('staff.roleRequired');
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -152,12 +155,12 @@ export default function OrgStaffPage() {
         phone: phone.trim() || undefined,
         role,
       });
-      toast.success('Staff invited. Magic link email sent.');
+      toast.success(t('staff.invitedToast'));
       setModalOpen(false);
       resetForm();
       await load();
     } catch (error) {
-      toast.error(isApiError(error) ? error.message : 'Failed to create staff member');
+      toast.error(isApiError(error) ? error.message : t('staff.createFailed'));
     } finally {
       setSaving(false);
     }
@@ -176,15 +179,15 @@ export default function OrgStaffPage() {
       {member.mustSetPassword && (
         <button
           type="button"
-          title="Resend invite"
+          title={t('staff.resendInvite')}
           disabled={actionId === member.id}
           onClick={async () => {
             setActionId(member.id);
             try {
               await resendOrgStaffInvite(member.id);
-              toast.success('Invite resent');
+              toast.success(t('staff.resentToast'));
             } catch (error) {
-              toast.error(isApiError(error) ? error.message : 'Resend failed');
+              toast.error(isApiError(error) ? error.message : t('staff.resendFailed'));
             } finally {
               setActionId(null);
             }
@@ -196,16 +199,16 @@ export default function OrgStaffPage() {
       )}
       <button
         type="button"
-        title={member.isActive ? 'Deactivate' : 'Activate'}
+        title={member.isActive ? t('staff.deactivate') : t('staff.activate')}
         disabled={actionId === member.id}
         onClick={async () => {
           setActionId(member.id);
           try {
             await updateOrgStaff(member.id, { isActive: !member.isActive });
-            toast.success(member.isActive ? 'Staff deactivated' : 'Staff activated');
+            toast.success(member.isActive ? t('staff.deactivatedToast') : t('staff.activatedToast'));
             await load();
           } catch (error) {
-            toast.error(isApiError(error) ? error.message : 'Update failed');
+            toast.error(isApiError(error) ? error.message : t('staff.updateFailed'));
           } finally {
             setActionId(null);
           }
@@ -220,17 +223,17 @@ export default function OrgStaffPage() {
   return (
     <RolePageShell>
       <RolePageHeader
-        title="Staff Management"
-        description="Manage clinical and support staff for your organization"
+        title={t('staff.title')}
+        description={t('staff.description')}
         actions={
           <>
             <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
               <RefreshCw className="size-4" />
-              Refresh
+              {t('staff.refresh')}
             </button>
             <button type="button" onClick={() => setModalOpen(true)} className={btnPrimaryClass}>
               <Plus className="size-4" />
-              Add Staff
+              {t('staff.addStaff')}
             </button>
           </>
         }
@@ -241,7 +244,7 @@ export default function OrgStaffPage() {
           <Search className="mr-2 size-5 shrink-0 text-stone-400" />
           <input
             type="search"
-            placeholder="Search staff…"
+            placeholder={t('staff.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-transparent text-base focus:outline-none sm:text-sm"
@@ -260,7 +263,9 @@ export default function OrgStaffPage() {
                   : 'border border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
               }`}
             >
-              {filterRole.replace(/_/g, ' ')}
+              {filterRole === 'ALL'
+                ? t('staff.filterAll')
+                : roleLabel(filterRole.toLowerCase(), t)}
             </button>
           ))}
         </div>
@@ -269,8 +274,8 @@ export default function OrgStaffPage() {
       {filteredStaff.length === 0 ? (
         <div className="rounded-2xl border border-stone-200 bg-white py-12 text-center shadow-sm">
           <UserX className="mx-auto mb-4 size-12 text-stone-400" />
-          <h3 className="mb-2 text-lg font-semibold text-stone-900">No staff found</h3>
-          <p className="text-sm text-stone-500">Try adjusting your search or filters</p>
+          <h3 className="mb-2 text-lg font-semibold text-stone-900">{t('staff.emptyTitle')}</h3>
+          <p className="text-sm text-stone-500">{t('staff.emptyHint')}</p>
         </div>
       ) : (
         <>
@@ -298,7 +303,7 @@ export default function OrgStaffPage() {
                         </p>
                         <p className="truncate text-sm text-stone-500">{member.email}</p>
                         {member.mustSetPassword && (
-                          <p className="mt-0.5 text-xs text-amber-700">Awaiting password setup</p>
+                          <p className="mt-0.5 text-xs text-amber-700">{t('staff.awaitingPassword')}</p>
                         )}
                       </div>
                     </div>
@@ -306,7 +311,7 @@ export default function OrgStaffPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-                      {roleDisplay(member.role)}
+                      {roleLabel(member.role, t)}
                     </span>
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -315,11 +320,12 @@ export default function OrgStaffPage() {
                           : 'bg-stone-100 text-stone-600'
                       }`}
                     >
-                      {member.isActive ? 'Active' : 'Inactive'}
+                      {member.isActive ? t('common.active') : t('common.inactive')}
                     </span>
                     <span className="text-xs text-stone-400">
-                      Joined{' '}
-                      {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : '—'}
+                      {member.createdAt
+                        ? t('staff.joined', { date: new Date(member.createdAt).toLocaleDateString(dateLocale) })
+                        : '—'}
                     </span>
                   </div>
                 </li>
@@ -334,22 +340,22 @@ export default function OrgStaffPage() {
                 <thead className="bg-stone-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500 lg:px-6">
-                      Staff Member
+                      {t('staff.colMember')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500 lg:px-6">
-                      Role
+                      {t('staff.colRole')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500 lg:px-6">
-                      Email
+                      {t('staff.colEmail')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500 lg:px-6">
-                      Status
+                      {t('staff.colStatus')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500 lg:px-6">
-                      Joined
+                      {t('staff.colJoined')}
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-stone-500 lg:px-6">
-                      Actions
+                      {t('staff.colActions')}
                     </th>
                   </tr>
                 </thead>
@@ -373,14 +379,14 @@ export default function OrgStaffPage() {
                                 {member.name || member.email}
                               </div>
                               {member.mustSetPassword && (
-                                <div className="text-xs text-amber-700">Awaiting password setup</div>
+                                <div className="text-xs text-amber-700">{t('staff.awaitingPassword')}</div>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-4 py-4 lg:px-6">
                           <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
-                            {roleDisplay(member.role)}
+                            {roleLabel(member.role, t)}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-4 text-sm text-stone-500 lg:px-6">
@@ -394,12 +400,12 @@ export default function OrgStaffPage() {
                                 : 'bg-stone-100 text-stone-600'
                             }`}
                           >
-                            {member.isActive ? 'Active' : 'Inactive'}
+                            {member.isActive ? t('common.active') : t('common.inactive')}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-4 text-sm text-stone-500 lg:px-6">
                           {member.createdAt
-                            ? new Date(member.createdAt).toLocaleDateString()
+                            ? new Date(member.createdAt).toLocaleDateString(dateLocale)
                             : '—'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-4 text-right lg:px-6">
@@ -420,22 +426,22 @@ export default function OrgStaffPage() {
           <button
             type="button"
             className="absolute inset-0 bg-stone-900/50"
-            aria-label="Close"
+            aria-label={t('staff.close')}
             onClick={closeModal}
           />
           <div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-stone-200 bg-white shadow-xl sm:rounded-2xl">
             <div className="flex items-start justify-between gap-3 px-4 pb-2 pt-5 sm:px-6 sm:pt-6">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-stone-900 sm:text-xl">Add Staff Member</h2>
+                <h2 className="text-lg font-semibold text-stone-900 sm:text-xl">{t('staff.modalTitle')}</h2>
                 <p className="mt-1 text-sm text-stone-500">
-                  Invite clinical or support staff. A magic-link email lets them set a password.
+                  {t('staff.modalHint')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeModal}
                 className="shrink-0 rounded-xl p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
-                aria-label="Close modal"
+                aria-label={t('staff.closeModal')}
               >
                 <X className="size-4" />
               </button>
@@ -445,7 +451,7 @@ export default function OrgStaffPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-stone-700">
-                    First Name <span className="text-red-500">*</span>
+                    {t('staff.firstName')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     value={firstName}
@@ -462,7 +468,7 @@ export default function OrgStaffPage() {
 
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-stone-700">
-                    Last Name <span className="text-red-500">*</span>
+                    {t('staff.lastName')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     value={lastName}
@@ -477,7 +483,7 @@ export default function OrgStaffPage() {
 
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-stone-700">
-                    Email <span className="text-red-500">*</span>
+                    {t('staff.email')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -490,7 +496,7 @@ export default function OrgStaffPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-stone-700">Phone</label>
+                  <label className="mb-1.5 block text-sm font-medium text-stone-700">{t('staff.phone')}</label>
                   <input
                     type="tel"
                     value={phone}
@@ -502,7 +508,7 @@ export default function OrgStaffPage() {
 
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium text-stone-700">
-                    Role <span className="text-red-500">*</span>
+                    {t('staff.role')} <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={role}
@@ -511,14 +517,13 @@ export default function OrgStaffPage() {
                   >
                     {STAFF_ROLE_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+{t(`staff.roles.${opt.value}`, { defaultValue: opt.label })}
                       </option>
                     ))}
                   </select>
                   {errors.role && <p className="mt-1 text-sm text-red-500">{errors.role}</p>}
                   <p className="mt-1 text-xs text-stone-400">
-                    Clinical roles appear in the assessment clinician list. Support workers use the
-                    support portal.
+                    {t('staff.roleHint')}
                   </p>
                 </div>
               </div>
@@ -528,17 +533,17 @@ export default function OrgStaffPage() {
                   {saving ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
-                      Sending invite…
+                      {t('staff.sendingInvite')}
                     </>
                   ) : (
                     <>
                       <Plus className="size-4" />
-                      Create Staff Member
+                      {t('staff.create')}
                     </>
                   )}
                 </button>
                 <button type="button" onClick={closeModal} className={btnSecondaryClass}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>

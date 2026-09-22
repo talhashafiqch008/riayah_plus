@@ -4,6 +4,7 @@ export default function ClinicalMessagesScreen() {
   return (
     <MessagesInbox
       basePath="/(clinical)/messages"
+      i18nNs="clinical"
       canStartStaffThreads
     />
   );

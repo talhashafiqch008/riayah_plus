@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState, StatusBadge } from '../../../components/ui';
 import {
@@ -30,10 +31,12 @@ import {
   familyReleaseSpring,
 } from '../../../components/family/FamilyChrome';
 import { listEpisodes } from '../../../lib/api/care';
-import { apiErrorMessage, formatDate } from '../../../lib/format';
+import { apiErrorMessage } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 import {
-  FAMILY_EPISODE_STATUS_FILTERS,
+  familyEpisodeStatusFilters,
   familyEpisodeStatusLabel,
+  formatFamilyDate,
 } from '../../../lib/familyLanguage';
 
 type Episode = {
@@ -57,7 +60,7 @@ function SkeletonCard() {
       -1,
       false,
     );
-  }, []);
+  }, [shimmer]);
   const style = useAnimatedStyle(() => ({ opacity: shimmer.value }));
   return (
     <Animated.View
@@ -70,6 +73,7 @@ function SkeletonCard() {
 }
 
 function EpisodeCard({ item }: { item: Episode }) {
+  const { t } = useTranslation('family');
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -107,7 +111,7 @@ function EpisodeCard({ item }: { item: Episode }) {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                 <Text style={{ fontWeight: '700', color: FAMILY.stone900, letterSpacing: -0.2 }}>
-                  {item.title ?? 'Care journey'}
+                  {item.title ?? t('episodes.untitled')}
                 </Text>
                 {item.status ? (
                   <StatusBadge
@@ -117,8 +121,10 @@ function EpisodeCard({ item }: { item: Episode }) {
                 ) : null}
               </View>
               <Text style={{ marginTop: 2, fontSize: 14, color: FAMILY.stone500 }}>
-                {item.careRecipient?.name ?? item.patient?.name ?? 'Care recipient'}
-                {item.createdAt ? ` · Started ${formatDate(item.createdAt)}` : ''}
+                {item.careRecipient?.name ?? item.patient?.name ?? t('mobile.common.careRecipient')}
+                {item.createdAt
+                  ? ` · ${t('mobile.common.started', { date: formatFamilyDate(item.createdAt) })}`
+                  : ''}
               </Text>
               {item.reasonForCare ? (
                 <Text
@@ -129,7 +135,7 @@ function EpisodeCard({ item }: { item: Episode }) {
                 </Text>
               ) : null}
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#D6D3D1" style={{ marginTop: 2 }} />
+            <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" style={{ marginTop: 2 }} />
           </View>
         </View>
       </Pressable>
@@ -138,7 +144,9 @@ function EpisodeCard({ item }: { item: Episode }) {
 }
 
 export default function FamilyEpisodesScreen() {
+  const { t } = useTranslation('family');
   const [status, setStatus] = useState('');
+  const filters = familyEpisodeStatusFilters();
 
   const query = useQuery({
     queryKey: ['family-episodes', status],
@@ -150,7 +158,10 @@ export default function FamilyEpisodesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Care Journey" subtitle="Your care from request to active support" />
+      <FamilyTabHero
+        title={t('episodes.title')}
+        subtitle={t('mobile.common.journeysSubtitle')}
+      />
 
       <View style={{ borderBottomWidth: 1, borderBottomColor: FAMILY.stone200, backgroundColor: FAMILY.white }}>
         <ScrollView
@@ -158,7 +169,7 @@ export default function FamilyEpisodesScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8 }}
         >
-          {FAMILY_EPISODE_STATUS_FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -197,9 +208,9 @@ export default function FamilyEpisodesScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load care journeys"
+          title={t('episodes.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -226,17 +237,19 @@ export default function FamilyEpisodesScreen() {
                   fontVariant: ['tabular-nums'],
                 }}
               >
-                {total} care journey{total === 1 ? '' : 's'}
+                {t(total === 1 ? 'mobile.common.journeyCount' : 'mobile.common.journeyCount_other', {
+                  count: total,
+                })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon="heart-outline"
-              title="No care journeys yet"
-              subtitle="After you submit a care request, your care team will start one."
+              title={t('episodes.empty')}
+              subtitle={t('mobile.common.journeysEmptyHint')}
               action={{
-                label: 'Start a care request',
+                label: t('dashboard.startCareRequest'),
                 onPress: () => router.push('/(onboarding)/step-1-care-unit'),
               }}
             />

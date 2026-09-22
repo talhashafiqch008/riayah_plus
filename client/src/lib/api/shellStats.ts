@@ -6,6 +6,7 @@ import { listIntakeQueue } from './intake';
 import { getUnreadNotificationCount } from './notifications';
 import { listSessions } from './scheduling';
 import { client } from './client';
+import { getOrgDashboard } from './org';
 
 export type ShellStat = { label: string; value: string; /** i18n key under family.stats.* when present */ id?: string };
 
@@ -79,6 +80,8 @@ export async function fetchShellStats(shellKey: string): Promise<ShellStat[]> {
       return fetchPatientStats();
     case 'support':
       return fetchSupportStats();
+    case 'org':
+      return fetchOrgStats();
     default:
       return [];
   }
@@ -137,9 +140,9 @@ async function fetchCoordinatorStats(): Promise<ShellStat[]> {
   ]);
 
   return [
-    { label: 'Pending intake', value: String(submitted + underReview) },
-    { label: 'Active episodes', value: String(activeEpisodes) },
-    { label: 'Plans awaiting review', value: String(plansAwaiting) },
+    { id: 'pendingIntake', label: 'Pending intake', value: String(submitted + underReview) },
+    { id: 'activeEpisodes', label: 'Active episodes', value: String(activeEpisodes) },
+    { id: 'plansAwaiting', label: 'Plans awaiting review', value: String(plansAwaiting) },
   ];
 }
 
@@ -155,9 +158,9 @@ async function fetchClinicalStats(): Promise<ShellStat[]> {
   const notesDue = rows.filter((a) => new Date(a.scheduledAt).getTime() < now.getTime()).length;
 
   return [
-    { label: "Today's sessions", value: String(todaySessions) },
-    { label: 'Assigned patients', value: String(assignedPatients) },
-    { label: 'Notes due', value: String(notesDue) },
+    { id: 'todaysSessions', label: "Today's sessions", value: String(todaySessions) },
+    { id: 'assignedPatients', label: 'Assigned patients', value: String(assignedPatients) },
+    { id: 'notesDue', label: 'Notes due', value: String(notesDue) },
   ];
 }
 
@@ -218,8 +221,30 @@ async function fetchSupportStats(): Promise<ShellStat[]> {
   ]);
 
   return [
-    { label: 'Shifts this week', value: String(shiftsThisWeek) },
-    { label: 'Open tasks', value: String(openTasks) },
-    { label: 'Notes pending', value: String(notesPending) },
+    { id: 'shiftsThisWeek', label: 'Shifts this week', value: String(shiftsThisWeek) },
+    { id: 'openTasks', label: 'Open tasks', value: String(openTasks) },
+    { id: 'notesPending', label: 'Notes pending', value: String(notesPending) },
   ];
+}
+
+async function fetchOrgStats(): Promise<ShellStat[]> {
+  try {
+    const dash = await getOrgDashboard();
+    const stats = dash?.stats ?? dash ?? {};
+    return [
+      { id: 'families', label: 'Families', value: String(stats.families ?? 0) },
+      { id: 'coordinators', label: 'Coordinators', value: String(stats.coordinators ?? 0) },
+      {
+        id: 'pendingRequests',
+        label: 'Pending requests',
+        value: String(stats.pendingIntakes ?? stats.pendingRequests ?? 0),
+      },
+    ];
+  } catch {
+    return [
+      { id: 'families', label: 'Families', value: '0' },
+      { id: 'coordinators', label: 'Coordinators', value: '0' },
+      { id: 'pendingRequests', label: 'Pending requests', value: '0' },
+    ];
+  }
 }

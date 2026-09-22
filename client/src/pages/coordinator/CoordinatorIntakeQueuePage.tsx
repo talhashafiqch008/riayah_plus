@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Loader2, RefreshCw, ClipboardCheck, HeartHandshake } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -22,33 +23,35 @@ import {
 import {
   buildCoordinatorNextActions,
   nextUrgencyLevel,
-  queueHintForIntake,
+  queueHintIdForIntake,
+  type CoordinatorNextAction,
 } from '@/lib/coordinatorIntakeNextActions';
+import {
+  localizeAccountTypeLabel,
+  localizeChip,
+  localizeGeneratedLabel,
+  localizeStoredNarrative,
+} from '@/lib/localizeStoredEnglish';
+import { familyDateLocale, familyEnumLabel } from '@/lib/familyLanguage';
 
-const DOC_REQUEST_TYPES = [
-  { value: 'medical_report', label: 'Medical report' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'prior_assessment', label: 'Prior assessment' },
-  { value: 'insurance', label: 'Insurance' },
-  { value: 'other', label: 'Other' },
-];
+const DOC_REQUEST_TYPE_VALUES = [
+  'medical_report',
+  'referral',
+  'prior_assessment',
+  'insurance',
+  'other',
+] as const;
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
-  { value: 'submitted', label: 'Submitted' },
-  { value: 'under_review', label: 'Under review' },
-  { value: 'validated', label: 'Validated' },
-  { value: 'episode_created', label: 'Episode created' },
-  { value: 'withdrawn', label: 'Withdrawn' },
-];
+const STATUS_VALUES = [
+  '',
+  'submitted',
+  'under_review',
+  'validated',
+  'episode_created',
+  'withdrawn',
+] as const;
 
-const URGENCY_FILTERS = [
-  { value: '', label: 'All urgency' },
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
+const URGENCY_VALUES = ['', 'urgent', 'high', 'medium', 'low'] as const;
 
 const CONCERN_OPTIONS = [
   'falls risk',
@@ -70,13 +73,13 @@ const URGENCY_INDICATOR_OPTIONS = [
 
 const RISK_FLAG_OPTIONS = ['falls', 'polypharmacy', 'isolation', 'wound_care', 'dysphagia'];
 
-const SERVICE_OPTIONS: { value: ServiceCategory; label: string }[] = [
-  { value: 'physiotherapy', label: 'Physiotherapy' },
-  { value: 'nursing', label: 'Nursing' },
-  { value: 'occupational_therapy', label: 'Occupational therapy' },
-  { value: 'speech_therapy', label: 'Speech therapy' },
-  { value: 'behavioral_support', label: 'Behavioral support' },
-  { value: 'companion_care', label: 'Companion care' },
+const SERVICE_VALUES: ServiceCategory[] = [
+  'physiotherapy',
+  'nursing',
+  'occupational_therapy',
+  'speech_therapy',
+  'behavioral_support',
+  'companion_care',
 ];
 
 function statusBadgeClass(status: string) {
@@ -135,7 +138,87 @@ function ChipToggle({
   );
 }
 
+function nextActionCopy(
+  action: CoordinatorNextAction,
+  intakeStatus: string,
+  t: (key: string, opts?: Record<string, string>) => string,
+): { label: string; description: string } {
+  if (action.id === 'review') {
+    if (intakeStatus === 'submitted') {
+      return {
+        label: t('intake.nextActions.review.labelSubmitted'),
+        description: t('intake.nextActions.review.descSubmitted'),
+      };
+    }
+    return {
+      label: t('intake.nextActions.review.labelUnderReview'),
+      description: t('intake.nextActions.review.descUnderReview'),
+    };
+  }
+  if (action.id === 'documents') {
+    return action.noDocumentsYet
+      ? {
+          label: t('intake.nextActions.documents.labelMissing'),
+          description: t('intake.nextActions.documents.descMissing'),
+        }
+      : {
+          label: t('intake.nextActions.documents.labelAdditional'),
+          description: t('intake.nextActions.documents.descAdditional'),
+        };
+  }
+  if (action.id === 'schedule') {
+    return {
+      label: t('intake.nextActions.schedule.label'),
+      description: t('intake.nextActions.schedule.description'),
+    };
+  }
+  const urgency = action.currentUrgency ?? 'medium';
+  const urgencyLabel = t(`intake.urgency.${urgency}`, { defaultValue: urgency });
+  const rank = urgency === 'high' ? 3 : urgency === 'urgent' ? 4 : urgency === 'low' ? 1 : 2;
+  return {
+    label: t('intake.nextActions.escalate.label'),
+    description:
+      rank < 3
+        ? t('intake.nextActions.escalate.descRaise', { urgency: urgencyLabel })
+        : t('intake.nextActions.escalate.descUrgent'),
+  };
+}
+
+const SUPPORT_EN_TO_ID: Record<string, string> = {
+  'Home Care': 'aged_care',
+  Disability: 'disability_support',
+  Babysitting: 'child_family',
+  Therapy: 'allied_health',
+  'Home Visit': 'home_support',
+};
+const GENDER_EN_TO_ID: Record<string, string> = {
+  'Female provider only': 'female_only',
+  'Male provider only': 'male_only',
+  'No preference': 'no_preference',
+};
+const CARE_LOCATION_EN_TO_ID: Record<string, string> = {
+  'In-person / at home': 'home',
+  Clinic: 'clinic',
+  Virtual: 'telehealth',
+  Flexible: 'flexible',
+  'In-person': 'home',
+};
+
+function localizeSummaryToken(group: string, raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  let slug = trimmed;
+  if (group === 'support' && SUPPORT_EN_TO_ID[trimmed]) slug = SUPPORT_EN_TO_ID[trimmed];
+  if (group === 'gender' && GENDER_EN_TO_ID[trimmed]) slug = GENDER_EN_TO_ID[trimmed];
+  if (group === 'careLocation' && CARE_LOCATION_EN_TO_ID[trimmed]) {
+    slug = CARE_LOCATION_EN_TO_ID[trimmed];
+  }
+  const translated = familyEnumLabel(group, slug);
+  return translated !== slug.replace(/_/g, ' ') ? translated : trimmed;
+}
+
 export default function CoordinatorIntakeQueuePage() {
+  const { t } = useTranslation('coordinator');
   const [status, setStatus] = useState('submitted');
   const [urgency, setUrgency] = useState('');
   const [rows, setRows] = useState<IntakeRecord[]>([]);
@@ -187,11 +270,11 @@ export default function CoordinatorIntakeQueuePage() {
       }
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load intake queue');
+      else toast.error(t('intake.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [status, urgency, selectedId]);
+  }, [status, urgency, selectedId, t]);
 
   useEffect(() => {
     void loadQueue();
@@ -218,7 +301,7 @@ export default function CoordinatorIntakeQueuePage() {
       }
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Failed to load intake');
+      else toast.error(t('intake.loadError'));
     } finally {
       setDetailLoading(false);
     }
@@ -233,7 +316,7 @@ export default function CoordinatorIntakeQueuePage() {
     setClaiming(true);
     try {
       await updateIntakeStatus(detail.id, 'under_review');
-      toast.success('Marked under review');
+      toast.success(t('intake.toasts.markedUnderReview'));
       const refreshed = await getIntake(detail.id);
       setDetail(refreshed);
       await loadQueue();
@@ -242,7 +325,7 @@ export default function CoordinatorIntakeQueuePage() {
       }, 80);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Could not update status');
+      else toast.error(t('intake.toasts.statusUpdateFailed'));
     } finally {
       setClaiming(false);
     }
@@ -252,18 +335,22 @@ export default function CoordinatorIntakeQueuePage() {
     if (!detail) return;
     const next = nextUrgencyLevel(detail.urgencyLevel);
     if (detail.urgencyLevel === 'urgent') {
-      toast('Already at urgent');
+      toast(t('intake.toasts.alreadyUrgent'));
       return;
     }
     setEscalating(true);
     try {
       const updated = await updateIntakeUrgency(detail.id, next);
       setDetail((prev) => (prev ? { ...prev, ...updated } : updated));
-      toast.success(`Urgency raised to ${next}`);
+      toast.success(
+        t('intake.toasts.urgencyRaised', {
+          level: t(`intake.urgency.${next}`, { defaultValue: next }),
+        }),
+      );
       await loadQueue();
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Could not escalate urgency');
+      else toast.error(t('intake.toasts.escalateFailed'));
     } finally {
       setEscalating(false);
     }
@@ -271,7 +358,7 @@ export default function CoordinatorIntakeQueuePage() {
 
   const handleRequestDocuments = async () => {
     if (!detail?.familyUser?.id) {
-      toast.error('No family user on this intake to notify');
+      toast.error(t('intake.toasts.noFamilyUser'));
       return;
     }
     setRequestingDocs(true);
@@ -281,12 +368,12 @@ export default function CoordinatorIntakeQueuePage() {
         documentType: docType,
         description: docNote.trim() || undefined,
       });
-      toast.success('Document request sent to family');
+      toast.success(t('intake.toasts.docRequestSent'));
       setShowDocRequest(false);
       setDocNote('');
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Could not send document request');
+      else toast.error(t('intake.toasts.docOpenFailed'));
     } finally {
       setRequestingDocs(false);
     }
@@ -313,15 +400,15 @@ export default function CoordinatorIntakeQueuePage() {
   const handleReview = async () => {
     if (!detail) return;
     if (keyConcerns.length === 0) {
-      toast.error('Select at least one key concern');
+      toast.error(t('intake.toasts.needConcern'));
       return;
     }
     if (urgencyIndicators.length === 0) {
-      toast.error('Select at least one urgency indicator');
+      toast.error(t('intake.toasts.needUrgency'));
       return;
     }
     if (suggestedServices.length === 0) {
-      toast.error('Select at least one suggested service');
+      toast.error(t('intake.toasts.needService'));
       return;
     }
 
@@ -338,14 +425,16 @@ export default function CoordinatorIntakeQueuePage() {
       });
       toast.success(
         createEpisode
-          ? `Episode created (${result.episode?.id?.slice(0, 8)}…)`
-          : 'Intake validated',
+          ? t('intake.toasts.episodeCreated', {
+              id: result.episode?.id?.slice(0, 8) ?? '',
+            })
+          : t('intake.toasts.validated'),
       );
       setDetail(result.intake);
       await loadQueue();
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error('Review failed');
+      else toast.error(t('intake.toasts.reviewFailed'));
     } finally {
       setReviewing(false);
     }
@@ -355,17 +444,15 @@ export default function CoordinatorIntakeQueuePage() {
     <div className="space-y-6 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">Intake Queue</h2>
-          <p className="mt-1 text-stone-600">
-            Review family submissions with guided clinical fields — not free text only.
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900">{t('intake.title')}</h2>
+          <p className="mt-1 text-stone-600">{t('intake.description')}</p>
         </div>
         <button
           type="button"
           onClick={() => void loadQueue()}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
         >
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {t('intake.refresh')}
         </button>
       </div>
 
@@ -375,9 +462,9 @@ export default function CoordinatorIntakeQueuePage() {
           onChange={(e) => setStatus(e.target.value)}
           className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
         >
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value || 'all'} value={o.value}>
-              {o.label}
+          {STATUS_VALUES.map((value) => (
+            <option key={value || 'all'} value={value}>
+              {value ? t(`intake.status.${value}`) : t('intake.allStatuses')}
             </option>
           ))}
         </select>
@@ -386,9 +473,9 @@ export default function CoordinatorIntakeQueuePage() {
           onChange={(e) => setUrgency(e.target.value)}
           className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
         >
-          {URGENCY_FILTERS.map((o) => (
-            <option key={o.value || 'all-u'} value={o.value}>
-              {o.label}
+          {URGENCY_VALUES.map((value) => (
+            <option key={value || 'all-u'} value={value}>
+              {value ? t(`intake.urgency.${value}`) : t('intake.allUrgency')}
             </option>
           ))}
         </select>
@@ -402,34 +489,40 @@ export default function CoordinatorIntakeQueuePage() {
               <Loader2 className="size-7 animate-spin text-teal-600" />
             </div>
           ) : rows.length === 0 ? (
-            <div className="p-8 text-center text-stone-500 text-sm">
-              No intakes match these filters. Submit one via Family Onboarding first.
-            </div>
+            <div className="p-8 text-center text-stone-500 text-sm">{t('intake.empty')}</div>
           ) : (
             <ul className="divide-y divide-stone-100">
               {rows.map((row) => {
                 const active = row.id === selectedId;
-                const hint = queueHintForIntake(row);
+                const hintId = queueHintIdForIntake(row);
+                const hint = hintId
+                  ? t(`intake.queueHint.${hintId}`, { defaultValue: hintId })
+                  : '';
                 return (
                   <li key={row.id}>
                     <button
                       type="button"
                       onClick={() => void openDetail(row.id)}
-                      className={`w-full text-left px-4 py-3 transition-colors ${
+                      className={`w-full text-start px-4 py-3 transition-colors ${
                         active ? 'bg-teal-50' : 'hover:bg-stone-50'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold text-stone-900 text-sm">
-                            {row.careRecipient?.name ?? 'Patient'}
+                            {localizeGeneratedLabel(
+                              row.careRecipient?.name ?? t('intake.detail.patient'),
+                            )}
                           </p>
                           <p className="text-xs text-stone-500 mt-0.5">
-                            {row.careUnit?.name ?? 'Care unit'} · {row.familyUser?.name ?? 'Family'}
+                            {localizeGeneratedLabel(
+                              row.careUnit?.name ?? t('intake.detail.careUnit'),
+                            )}{' '}
+                            · {row.familyUser?.name ?? t('intake.detail.family')}
                           </p>
                           {hint && (
                             <p className="text-[11px] font-semibold text-teal-700 mt-1">
-                              Next: {hint}
+                              {t('intake.queueHint.next', { hint })}
                             </p>
                           )}
                         </div>
@@ -437,18 +530,24 @@ export default function CoordinatorIntakeQueuePage() {
                           <span
                             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadgeClass(row.status)}`}
                           >
-                            {row.status.replace(/_/g, ' ')}
+                            {t(`intake.status.${row.status}`, {
+                              defaultValue: row.status.replace(/_/g, ' '),
+                            })}
                           </span>
                           {row.urgencyLevel && (
                             <span
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${urgencyBadgeClass(row.urgencyLevel as UrgencyLevel)}`}
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${urgencyBadgeClass(row.urgencyLevel)}`}
                             >
-                              {row.urgencyLevel}
+                              {t(`intake.urgency.${row.urgencyLevel}`, {
+                                defaultValue: row.urgencyLevel,
+                              })}
                             </span>
                           )}
                         </div>
                       </div>
-                      <p className="text-xs text-stone-600 mt-2 line-clamp-2">{row.reasonForCare}</p>
+                      <p className="text-xs text-stone-600 mt-2 line-clamp-2">
+                        {localizeStoredNarrative(row.reasonForCare)}
+                      </p>
                     </button>
                   </li>
                 );
@@ -461,7 +560,7 @@ export default function CoordinatorIntakeQueuePage() {
           {!selectedId && (
             <div className="h-full flex flex-col items-center justify-center text-center text-stone-500 py-16">
               <ClipboardCheck className="size-10 text-stone-300 mb-3" />
-              <p className="text-sm">Select an intake from the queue to review.</p>
+              <p className="text-sm">{t('intake.detail.selectPrompt')}</p>
             </div>
           )}
 
@@ -476,21 +575,25 @@ export default function CoordinatorIntakeQueuePage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <h3 className="text-lg font-semibold text-stone-900">
-                    {detail.careRecipient?.name}
+                    {localizeGeneratedLabel(detail.careRecipient?.name)}
                   </h3>
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadgeClass(detail.status)}`}
                   >
-                    {detail.status.replace(/_/g, ' ')}
+                    {t(`intake.status.${detail.status}`, {
+                      defaultValue: detail.status.replace(/_/g, ' '),
+                    })}
                   </span>
                 </div>
                 <p className="text-sm text-stone-600">
-                  {detail.careUnit?.name} · Family: {detail.familyUser?.name} (
-                  {detail.familyUser?.email})
+                  {localizeGeneratedLabel(detail.careUnit?.name)} · {t('intake.detail.family')}:{' '}
+                  {detail.familyUser?.name} ({detail.familyUser?.email})
                 </p>
                 {detail.submittedAt && (
                   <p className="text-xs text-stone-400 mt-1">
-                    Submitted {new Date(detail.submittedAt).toLocaleString()}
+                    {t('intake.detail.submitted', {
+                      date: new Date(detail.submittedAt).toLocaleString(familyDateLocale()),
+                    })}
                   </p>
                 )}
               </div>
@@ -498,20 +601,24 @@ export default function CoordinatorIntakeQueuePage() {
               {nextActions.length > 0 && (
                 <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 space-y-3">
                   <div>
-                    <p className="text-sm font-semibold text-stone-900">Next actions</p>
+                    <p className="text-sm font-semibold text-stone-900">
+                      {t('intake.nextActions.title')}
+                    </p>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      Clear steps for this request — keep using structured review for clinical detail.
+                      {t('intake.nextActions.subtitle')}
                     </p>
                   </div>
                   <ul className="space-y-2">
-                    {nextActions.map((action) => (
+                    {nextActions.map((action) => {
+                      const copy = nextActionCopy(action, detail.status, t);
+                      return (
                       <li
                         key={action.id}
                         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2.5"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-stone-900">{action.label}</p>
-                          <p className="text-xs text-stone-500 mt-0.5">{action.description}</p>
+                          <p className="text-sm font-medium text-stone-900">{copy.label}</p>
+                          <p className="text-xs text-stone-500 mt-0.5">{copy.description}</p>
                         </div>
                         {action.id === 'schedule' && detail.careEpisode?.id ? (
                           <Link
@@ -522,7 +629,7 @@ export default function CoordinatorIntakeQueuePage() {
                                 : 'border border-stone-200 text-stone-700 hover:bg-stone-50'
                             }`}
                           >
-                            Open episode
+                            {t('intake.actions.openEpisode')}
                             <ArrowRight className="size-3.5" />
                           </Link>
                         ) : (
@@ -547,44 +654,58 @@ export default function CoordinatorIntakeQueuePage() {
                               <ArrowRight className="size-3.5" />
                             )}
                             {action.id === 'review' && detail.status === 'submitted'
-                              ? 'Start review'
+                              ? t('intake.actions.markReviewed')
                               : action.id === 'review'
-                                ? 'Go to review'
+                                ? t('intake.actions.review')
                                 : action.id === 'documents'
-                                  ? 'Request docs'
+                                  ? t('intake.actions.requestDocs')
                                   : action.id === 'escalate'
-                                    ? `Raise to ${nextUrgencyLevel(detail.urgencyLevel)}`
-                                    : 'Continue'}
+                                    ? t('intake.actions.raiseTo', {
+                                        level: t(
+                                          `intake.urgency.${nextUrgencyLevel(detail.urgencyLevel)}`,
+                                          {
+                                            defaultValue: nextUrgencyLevel(detail.urgencyLevel),
+                                          },
+                                        ),
+                                      })
+                                    : t('common.open')}
                           </button>
                         )}
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
 
                   {showDocRequest && (
                     <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 space-y-3">
-                      <p className="text-xs font-semibold text-teal-900">Request document from family</p>
+                      <p className="text-xs font-semibold text-teal-900">
+                        {t('intake.detail.requestDocTitle')}
+                      </p>
                       <label className="block text-sm">
-                        <span className="text-xs font-semibold text-stone-500">Document type</span>
+                        <span className="text-xs font-semibold text-stone-500">
+                          {t('intake.detail.documentType')}
+                        </span>
                         <select
                           value={docType}
                           onChange={(e) => setDocType(e.target.value)}
                           className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm bg-white"
                         >
-                          {DOC_REQUEST_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
+                          {DOC_REQUEST_TYPE_VALUES.map((value) => (
+                            <option key={value} value={value}>
+                              {t(`intake.docTypes.${value}`)}
                             </option>
                           ))}
                         </select>
                       </label>
                       <label className="block text-sm">
-                        <span className="text-xs font-semibold text-stone-500">Note (optional)</span>
+                        <span className="text-xs font-semibold text-stone-500">
+                          {t('intake.detail.noteOptional')}
+                        </span>
                         <textarea
                           value={docNote}
                           onChange={(e) => setDocNote(e.target.value)}
                           className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm min-h-[64px] bg-white"
-                          placeholder="e.g. Please upload the latest discharge summary"
+                          placeholder={t('intake.detail.notePlaceholder')}
                         />
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -595,7 +716,7 @@ export default function CoordinatorIntakeQueuePage() {
                           className="rounded-xl bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                         >
                           {requestingDocs && <Loader2 className="size-3.5 animate-spin" />}
-                          Send request
+                          {t('intake.actions.sendRequest')}
                         </button>
                         <button
                           type="button"
@@ -603,7 +724,7 @@ export default function CoordinatorIntakeQueuePage() {
                           onClick={() => setShowDocRequest(false)}
                           className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-white"
                         >
-                          Cancel
+                          {t('intake.actions.cancel')}
                         </button>
                       </div>
                     </div>
@@ -619,74 +740,100 @@ export default function CoordinatorIntakeQueuePage() {
 
                 const rows: { label: string; value: string }[] = [
                   familySummary.accountType
-                    ? { label: 'Account type', value: familySummary.accountType }
+                    ? {
+                        label: t('intake.detail.fields.accountType'),
+                        value: localizeAccountTypeLabel(familySummary.accountType),
+                      }
                     : null,
                   familySummary.country
-                    ? { label: 'Location', value: familySummary.country }
+                    ? { label: t('intake.detail.fields.location'), value: familySummary.country }
                     : null,
                   familySummary.preferredLanguage
                     ? {
-                        label: 'Preferred language',
-                        value: familySummary.preferredLanguage,
+                        label: t('intake.detail.fields.preferredLanguage'),
+                        value: localizeChip(familySummary.preferredLanguage),
                       }
                     : null,
                   familySummary.supportCategories.length
                     ? {
-                        label: 'Support needed',
-                        value: familySummary.supportCategories.join(', '),
+                        label: t('intake.detail.fields.supportNeeded'),
+                        value: familySummary.supportCategories
+                          .map((c) => localizeSummaryToken('support', c))
+                          .join(', '),
                       }
                     : null,
                   familySummary.specificNeeds.length
                     ? {
-                        label: 'Specific needs',
-                        value: familySummary.specificNeeds.join(' · '),
+                        label: t('intake.detail.fields.specificNeeds'),
+                        value: familySummary.specificNeeds.map((n) => localizeChip(n)).join(' · '),
                       }
                     : null,
                   familySummary.practitionerGender
                     ? {
-                        label: 'Provider gender',
-                        value: familySummary.practitionerGender,
+                        label: t('intake.detail.fields.providerGender'),
+                        value: localizeSummaryToken('gender', familySummary.practitionerGender),
                       }
                     : null,
                   familySummary.providerLanguages.length
                     ? {
-                        label: 'Provider languages',
-                        value: familySummary.providerLanguages.join(', '),
+                        label: t('intake.detail.fields.providerLanguages'),
+                        value: familySummary.providerLanguages
+                          .map((l) => localizeChip(l))
+                          .join(', '),
                       }
                     : null,
                   familySummary.careLocation
-                    ? { label: 'Care location', value: familySummary.careLocation }
+                    ? {
+                        label: t('intake.detail.fields.careLocation'),
+                        value: localizeSummaryToken('careLocation', familySummary.careLocation),
+                      }
                     : null,
                   familySummary.address
-                    ? { label: 'Address', value: familySummary.address }
+                    ? { label: t('intake.detail.fields.address'), value: familySummary.address }
                     : null,
                   familySummary.scheduleType
-                    ? { label: 'Schedule', value: familySummary.scheduleType }
+                    ? {
+                        label: t('intake.detail.fields.schedule'),
+                        value: localizeSummaryToken('schedule', familySummary.scheduleType),
+                      }
                     : null,
                   familySummary.preferredDays.length
                     ? {
-                        label: 'Preferred days',
-                        value: familySummary.preferredDays.join(', '),
+                        label: t('intake.detail.fields.preferredDays'),
+                        value: familySummary.preferredDays
+                          .map((d) => localizeSummaryToken('day', d))
+                          .join(', '),
                       }
                     : null,
                   familySummary.preferredTimeSlots.length
                     ? {
-                        label: 'Preferred times',
-                        value: familySummary.preferredTimeSlots.join(', '),
+                        label: t('intake.detail.fields.preferredTimes'),
+                        value: familySummary.preferredTimeSlots
+                          .map((s) => localizeSummaryToken('time', s))
+                          .join(', '),
                       }
                     : null,
                   familySummary.startTiming
-                    ? { label: 'Start timing', value: familySummary.startTiming }
+                    ? {
+                        label: t('intake.detail.fields.startTiming'),
+                        value: familySummary.startTiming,
+                      }
                     : null,
                   familySummary.ndisPlanType
-                    ? { label: 'NDIS plan', value: familySummary.ndisPlanType }
+                    ? {
+                        label: t('intake.detail.fields.ndisPlan'),
+                        value: familySummary.ndisPlanType,
+                      }
                     : null,
                   familySummary.ndisNumber
-                    ? { label: 'NDIS number', value: familySummary.ndisNumber }
+                    ? {
+                        label: t('intake.detail.fields.ndisNumber'),
+                        value: familySummary.ndisNumber,
+                      }
                     : null,
                   familySummary.planManagerEmail
                     ? {
-                        label: 'Plan manager email',
+                        label: t('intake.detail.fields.planManagerEmail'),
                         value: familySummary.planManagerEmail,
                       }
                     : null,
@@ -700,11 +847,10 @@ export default function CoordinatorIntakeQueuePage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-teal-900">
-                          Family request summary
+                          {t('intake.detail.familySummaryTitle')}
                         </p>
                         <p className="text-xs text-teal-800/80 mt-0.5">
-                          From simple family onboarding — complete clinical fields below during
-                          review.
+                          {t('intake.detail.familySummaryHint')}
                         </p>
                       </div>
                     </div>
@@ -724,7 +870,7 @@ export default function CoordinatorIntakeQueuePage() {
                     {(detail.serviceInterests?.length ?? 0) > 0 && (
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80 mb-1.5">
-                          Mapped service interests
+                          {t('intake.detail.mappedServices')}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {detail.serviceInterests!.map((s) => (
@@ -732,7 +878,9 @@ export default function CoordinatorIntakeQueuePage() {
                               key={s}
                               className="rounded-full bg-white border border-teal-200 px-2.5 py-0.5 text-xs font-medium text-teal-900"
                             >
-                              {s.replace(/_/g, ' ')}
+                              {t(`intake.services.${s}`, {
+                                defaultValue: localizeChip(s),
+                              })}
                             </span>
                           ))}
                         </div>
@@ -744,23 +892,33 @@ export default function CoordinatorIntakeQueuePage() {
 
               <div className="grid gap-3 sm:grid-cols-2 text-sm">
                 <div className="rounded-xl bg-stone-50 p-3">
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Reason for care</p>
-                  <p className="text-stone-800">{detail.reasonForCare}</p>
+                  <p className="text-xs font-semibold text-stone-500 mb-1">
+                    {t('intake.detail.reasonForCare')}
+                  </p>
+                  <p className="text-stone-800">
+                    {localizeStoredNarrative(detail.reasonForCare)}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-stone-50 p-3">
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Diagnoses</p>
+                  <p className="text-xs font-semibold text-stone-500 mb-1">
+                    {t('intake.detail.diagnoses')}
+                  </p>
                   <p className="text-stone-800">
                     {detail.diagnoses?.includes(PENDING_DIAGNOSIS)
-                      ? 'Pending clinical review (family simple onboarding)'
+                      ? t('intake.pendingClinicalReview')
                       : detail.diagnoses?.join(', ') || '—'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-stone-50 p-3">
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Medical history</p>
+                  <p className="text-xs font-semibold text-stone-500 mb-1">
+                    {t('intake.detail.medicalHistory')}
+                  </p>
                   <p className="text-stone-800">{detail.medicalHistory || '—'}</p>
                 </div>
                 <div className="rounded-xl bg-stone-50 p-3">
-                  <p className="text-xs font-semibold text-stone-500 mb-1">Medications</p>
+                  <p className="text-xs font-semibold text-stone-500 mb-1">
+                    {t('intake.detail.medications')}
+                  </p>
                   <p className="text-stone-800">{detail.currentMeds || '—'}</p>
                 </div>
               </div>
@@ -768,7 +926,7 @@ export default function CoordinatorIntakeQueuePage() {
               {(detail.documents?.length ?? 0) > 0 && (
                 <div className="rounded-xl border border-stone-200 p-3">
                   <p className="text-xs font-semibold text-stone-500 mb-2">
-                    Intake documents ({detail.documents!.length})
+                    {t('intake.detail.documents', { count: detail.documents!.length })}
                   </p>
                   <ul className="space-y-2">
                     {detail.documents!.map((doc) => (
@@ -779,7 +937,9 @@ export default function CoordinatorIntakeQueuePage() {
                         <div className="min-w-0">
                           <p className="font-medium text-stone-900 truncate">{doc.name}</p>
                           <p className="text-xs text-stone-500">
-                            {(doc.category || 'other').replace(/_/g, ' ')}
+                            {t(`intake.docTypes.${doc.category || 'other'}`, {
+                              defaultValue: (doc.category || 'other').replace(/_/g, ' '),
+                            })}
                             {doc.size ? ` · ${Math.round(doc.size / 1024)} KB` : ''}
                           </p>
                         </div>
@@ -798,7 +958,7 @@ export default function CoordinatorIntakeQueuePage() {
                                 const errBody = (await res.json().catch(() => null)) as {
                                   message?: string;
                                 } | null;
-                                toast.error(errBody?.message || 'Could not open document');
+                                toast.error(errBody?.message || t('intake.toasts.docOpenFailed'));
                                 return;
                               }
 
@@ -820,7 +980,7 @@ export default function CoordinatorIntakeQueuePage() {
                                   window.open(body.data.url, '_blank', 'noopener,noreferrer');
                                   return;
                                 }
-                                toast.error('Document URL missing');
+                                toast.error(t('intake.toasts.docUrlMissing'));
                                 return;
                               }
 
@@ -836,11 +996,11 @@ export default function CoordinatorIntakeQueuePage() {
                               a.remove();
                               URL.revokeObjectURL(objectUrl);
                             } catch {
-                              toast.error('Could not open document');
+                              toast.error(t('intake.toasts.docOpenFailed'));
                             }
                           }}
                         >
-                          Open
+                          {t('intake.actions.open')}
                         </a>
                       </li>
                     ))}
@@ -851,7 +1011,7 @@ export default function CoordinatorIntakeQueuePage() {
                       onClick={() => setShowDocRequest(true)}
                       className="mt-3 text-xs font-semibold text-teal-700 hover:underline"
                     >
-                      Request another document from family
+                      {t('intake.detail.requestAnotherDoc')}
                     </button>
                   )}
                 </div>
@@ -860,16 +1020,18 @@ export default function CoordinatorIntakeQueuePage() {
               {(detail.documents?.length ?? 0) === 0 &&
                 (detail.status === 'submitted' || detail.status === 'under_review') && (
                   <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-3">
-                    <p className="text-sm font-medium text-stone-800">No documents attached</p>
+                    <p className="text-sm font-medium text-stone-800">
+                      {t('intake.detail.noDocuments')}
+                    </p>
                     <p className="text-xs text-stone-500 mt-1">
-                      Ask the family to upload what you need for review.
+                      {t('intake.detail.noDocumentsHint')}
                     </p>
                     <button
                       type="button"
                       onClick={() => setShowDocRequest(true)}
                       className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
                     >
-                      Request missing documents
+                      {t('intake.detail.requestMissingDocs')}
                       <ArrowRight className="size-3.5" />
                     </button>
                   </div>
@@ -878,7 +1040,7 @@ export default function CoordinatorIntakeQueuePage() {
               {(detail.consents?.length ?? 0) > 0 && (
                 <div className="rounded-xl border border-stone-200 p-3">
                   <p className="text-xs font-semibold text-stone-500 mb-2">
-                    Consents ({detail.consents!.length})
+                    {t('intake.detail.consents', { count: detail.consents!.length })}
                   </p>
                   <ul className="space-y-2">
                     {detail.consents!.map((c) => (
@@ -887,16 +1049,20 @@ export default function CoordinatorIntakeQueuePage() {
                         className="rounded-lg bg-stone-50 px-3 py-2 text-sm"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-stone-900 capitalize">
-                            {c.consentType.replace(/_/g, ' ')}
+                          <span className="font-semibold text-stone-900">
+                            {t(`intake.detail.consentTypes.${c.consentType}`, {
+                              defaultValue: c.consentType.replace(/_/g, ' '),
+                            })}
                           </span>
                           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                            {c.granted ? 'granted' : 'revoked'}
+                            {c.granted ? t('intake.detail.granted') : t('intake.detail.revoked')}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-stone-500">
                           {c.documentVersion ? `v${c.documentVersion}` : '—'}
-                          {c.grantedAt ? ` · ${new Date(c.grantedAt).toLocaleString()}` : ''}
+                          {c.grantedAt
+                            ? ` · ${new Date(c.grantedAt).toLocaleString(familyDateLocale())}`
+                            : ''}
                           {c.ipAddress ? ` · IP ${c.ipAddress}` : ''}
                           {c.signatureStatus ? ` · ${c.signatureStatus}` : ''}
                         </p>
@@ -913,21 +1079,25 @@ export default function CoordinatorIntakeQueuePage() {
                   onClick={() => void handleStartReview()}
                   className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50"
                 >
-                  {claiming ? 'Updating…' : 'Start review (mark under review)'}
+                  {claiming ? t('intake.detail.updating') : t('intake.actions.startReview')}
                 </button>
               )}
 
               {canReview ? (
                 <div ref={reviewSectionRef} className="space-y-4 border-t border-stone-100 pt-5">
-                  <h4 className="font-semibold text-stone-900">Structured review</h4>
+                  <h4 className="font-semibold text-stone-900">
+                    {t('intake.detail.structuredReview')}
+                  </h4>
 
                   <div>
-                    <p className="text-xs font-semibold text-stone-500 mb-2">Key concerns *</p>
+                    <p className="text-xs font-semibold text-stone-500 mb-2">
+                      {t('intake.detail.keyConcerns')}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {CONCERN_OPTIONS.map((c) => (
                         <ChipToggle
                           key={c}
-                          label={c}
+                          label={localizeChip(c)}
                           selected={keyConcerns.includes(c)}
                           onToggle={() => toggle(keyConcerns, c, setKeyConcerns)}
                         />
@@ -936,12 +1106,14 @@ export default function CoordinatorIntakeQueuePage() {
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-stone-500 mb-2">Urgency indicators *</p>
+                    <p className="text-xs font-semibold text-stone-500 mb-2">
+                      {t('intake.detail.urgencyIndicators')}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {URGENCY_INDICATOR_OPTIONS.map((c) => (
                         <ChipToggle
                           key={c}
-                          label={c.replace(/_/g, ' ')}
+                          label={localizeChip(c)}
                           selected={urgencyIndicators.includes(c)}
                           onToggle={() => toggle(urgencyIndicators, c, setUrgencyIndicators)}
                         />
@@ -951,27 +1123,29 @@ export default function CoordinatorIntakeQueuePage() {
 
                   <div>
                     <p className="text-xs font-semibold text-stone-500 mb-2">
-                      Suggested services *
+                      {t('intake.detail.suggestedServices')}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {SERVICE_OPTIONS.map((c) => (
+                      {SERVICE_VALUES.map((value) => (
                         <ChipToggle
-                          key={c.value}
-                          label={c.label}
-                          selected={suggestedServices.includes(c.value)}
-                          onToggle={() => toggle(suggestedServices, c.value, setSuggestedServices)}
+                          key={value}
+                          label={t(`intake.services.${value}`)}
+                          selected={suggestedServices.includes(value)}
+                          onToggle={() => toggle(suggestedServices, value, setSuggestedServices)}
                         />
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-stone-500 mb-2">Risk flags</p>
+                    <p className="text-xs font-semibold text-stone-500 mb-2">
+                      {t('intake.detail.riskFlags')}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {RISK_FLAG_OPTIONS.map((c) => (
                         <ChipToggle
                           key={c}
-                          label={c.replace(/_/g, ' ')}
+                          label={localizeChip(c)}
                           selected={riskFlags.includes(c)}
                           onToggle={() => toggle(riskFlags, c, setRiskFlags)}
                         />
@@ -981,13 +1155,13 @@ export default function CoordinatorIntakeQueuePage() {
 
                   <div>
                     <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
-                      Notes
+                      {t('intake.detail.notes')}
                     </label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm min-h-[72px]"
-                      placeholder="Additional structured comment — not a substitute for chips above"
+                      placeholder={t('intake.detail.notesPlaceholder')}
                     />
                   </div>
 
@@ -997,7 +1171,7 @@ export default function CoordinatorIntakeQueuePage() {
                       checked={createEpisode}
                       onChange={(e) => setCreateEpisode(e.target.checked)}
                     />
-                    Create care episode on validate
+                    {t('intake.detail.createEpisodeOnValidate')}
                   </label>
 
                   {createEpisode && (
@@ -1005,7 +1179,7 @@ export default function CoordinatorIntakeQueuePage() {
                       value={episodeTitle}
                       onChange={(e) => setEpisodeTitle(e.target.value)}
                       className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
-                      placeholder="Episode title (optional)"
+                      placeholder={t('intake.episodeTitlePlaceholder')}
                     />
                   )}
 
@@ -1017,10 +1191,10 @@ export default function CoordinatorIntakeQueuePage() {
                   >
                     {reviewing ? (
                       <>
-                        <Loader2 className="size-4 animate-spin" /> Submitting…
+                        <Loader2 className="size-4 animate-spin" /> {t('common.submit')}…
                       </>
                     ) : (
-                      'Submit structured review'
+                      t('intake.actions.validate')
                     )}
                   </button>
                 </div>
@@ -1030,15 +1204,19 @@ export default function CoordinatorIntakeQueuePage() {
                     detail.careEpisode?.id && (
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                        Linked episode
+                        {t('intake.detail.linkedEpisode')}
                       </p>
                       <p className="mt-1 font-medium text-stone-900">
-                        {detail.careEpisode?.title || 'Care episode'}
+                        {localizeGeneratedLabel(
+                          detail.careEpisode?.title || t('intake.careEpisode'),
+                        )}
                       </p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                         {detail.careEpisode?.status && (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-medium text-emerald-800">
-                            {detail.careEpisode.status.replace(/_/g, ' ')}
+                            {t(`episodes.status.${detail.careEpisode.status}`, {
+                              defaultValue: detail.careEpisode.status.replace(/_/g, ' '),
+                            })}
                           </span>
                         )}
                         <span className="font-mono text-stone-400">
@@ -1049,7 +1227,7 @@ export default function CoordinatorIntakeQueuePage() {
                         to={`/coordinator/episodes/${detail.careEpisode.id}`}
                         className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700"
                       >
-                        Schedule consultation
+                        {t('intake.actions.scheduleConsultation')}
                         <ArrowRight className="size-3.5" />
                       </Link>
                     </div>
@@ -1060,7 +1238,7 @@ export default function CoordinatorIntakeQueuePage() {
                   )}
 
                   {!['episode_created', 'validated'].includes(detail.status) && (
-                    <p className="text-stone-600">This intake is not open for review.</p>
+                    <p className="text-stone-600">{t('intake.detail.notOpen')}</p>
                   )}
                 </div>
               )}
@@ -1085,11 +1263,8 @@ function asStringList(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === 'string');
 }
 
-function formatChipLabel(value: string) {
-  return value.replace(/_/g, ' ');
-}
-
 function ReviewSummaryView({ summary }: { summary: Record<string, unknown> | ReviewSummary }) {
+  const { t } = useTranslation('coordinator');
   const data = summary as ReviewSummary;
   const keyConcerns = asStringList(data.keyConcerns);
   const urgencyIndicators = asStringList(data.urgencyIndicators);
@@ -1098,19 +1273,33 @@ function ReviewSummaryView({ summary }: { summary: Record<string, unknown> | Rev
   const notes = typeof data.notes === 'string' && data.notes.trim() ? data.notes.trim() : null;
 
   const sections: { label: string; values: string[]; tone: string }[] = [
-    { label: 'Key concerns', values: keyConcerns, tone: 'bg-teal-50 text-teal-800' },
     {
-      label: 'Urgency indicators',
+      label: t('intake.detail.keyConcerns').replace(/\s*\*$/, ''),
+      values: keyConcerns,
+      tone: 'bg-teal-50 text-teal-800',
+    },
+    {
+      label: t('intake.detail.urgencyIndicators').replace(/\s*\*$/, ''),
       values: urgencyIndicators,
       tone: 'bg-amber-50 text-amber-900',
     },
-    { label: 'Suggested services', values: services, tone: 'bg-sky-50 text-sky-900' },
-    { label: 'Risk flags', values: riskFlags, tone: 'bg-rose-50 text-rose-800' },
+    {
+      label: t('intake.detail.suggestedServices').replace(/\s*\*$/, ''),
+      values: services,
+      tone: 'bg-sky-50 text-sky-900',
+    },
+    {
+      label: t('intake.detail.riskFlags'),
+      values: riskFlags,
+      tone: 'bg-rose-50 text-rose-800',
+    },
   ];
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Review summary</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+        {t('intake.detail.reviewSummary')}
+      </p>
       {sections.map((section) => (
         <div key={section.label}>
           <p className="mb-1.5 text-xs font-semibold text-stone-500">{section.label}</p>
@@ -1121,7 +1310,7 @@ function ReviewSummaryView({ summary }: { summary: Record<string, unknown> | Rev
                   key={`${section.label}-${value}`}
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${section.tone}`}
                 >
-                  {formatChipLabel(value)}
+                  {t(`intake.services.${value}`, { defaultValue: localizeChip(value) })}
                 </span>
               ))}
             </div>
@@ -1132,7 +1321,7 @@ function ReviewSummaryView({ summary }: { summary: Record<string, unknown> | Rev
       ))}
       {notes && (
         <div>
-          <p className="mb-1 text-xs font-semibold text-stone-500">Notes</p>
+          <p className="mb-1 text-xs font-semibold text-stone-500">{t('intake.detail.notes')}</p>
           <p className="text-sm text-stone-700 whitespace-pre-wrap">{notes}</p>
         </div>
       )}

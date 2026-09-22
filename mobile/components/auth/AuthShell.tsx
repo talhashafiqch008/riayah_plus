@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import {
   ROLE,
   ROLE_HERO_COLORS,
@@ -30,13 +31,17 @@ interface AuthShellProps {
 }
 
 export function AuthShell({
-  kicker = 'Riayah Plus',
+  kicker,
   title,
   subtitle,
   showBack,
-  backLabel = 'Back',
+  backLabel,
   children,
 }: AuthShellProps) {
+  const { t } = useTranslation('auth');
+  const resolvedKicker = kicker ?? t('kicker.default');
+  const resolvedBack = backLabel ?? t('back');
+
   return (
     <View className="flex-1 bg-stone-50">
       <LinearGradient
@@ -53,10 +58,10 @@ export function AuthShell({
                 hitSlop={12}
                 className="mb-5 flex-row items-center gap-1 self-start"
                 accessibilityRole="button"
-                accessibilityLabel={backLabel}
+                accessibilityLabel={resolvedBack}
               >
                 <Ionicons name="chevron-back" size={20} color={ROLE.white} />
-                <Text className="text-sm font-semibold text-white">{backLabel}</Text>
+                <Text className="text-sm font-semibold text-white">{resolvedBack}</Text>
               </Pressable>
             ) : (
               <View className="mb-4 h-6" />
@@ -76,7 +81,7 @@ export function AuthShell({
             </View>
 
             <Text className="text-[11px] font-bold uppercase tracking-[2.5px] text-teal-100">
-              {kicker}
+              {resolvedKicker}
             </Text>
             <Text
               className="mt-2 text-[28px] font-extrabold text-white"

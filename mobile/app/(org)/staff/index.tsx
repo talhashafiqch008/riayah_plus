@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ToastProvider, useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Chip, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import {
@@ -36,8 +37,11 @@ function splitName(name?: string): { firstName: string; lastName: string } {
   return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
 }
 
-function roleDisplay(role: string) {
-  return role.replace(/_/g, ' ');
+function roleLabel(
+  role: string,
+  t: (key: string, opts?: { defaultValue?: string }) => string,
+) {
+  return t(`staff.roles.${role}`, { defaultValue: role.replace(/_/g, ' ') });
 }
 
 function InviteStaffForm({
@@ -47,6 +51,7 @@ function InviteStaffForm({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation('org');
   const toast = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -65,12 +70,12 @@ function InviteStaffForm({
       }),
     onSuccess: () => {
       setFormError(null);
-      toast.show('Staff invited. Magic link email sent.', { type: 'success', duration: 4000 });
+      toast.show(t('staff.invitedToast'), { type: 'success', duration: 4000 });
       onCreated();
       onClose();
     },
     onError: (e) => {
-      const msg = apiErrorMessage(e, 'Failed to create staff member');
+      const msg = apiErrorMessage(e, t('staff.createFailed'));
       setFormError(msg);
       toast.show(msg, { type: 'danger', duration: 5000 });
     },
@@ -79,19 +84,19 @@ function InviteStaffForm({
   const submit = () => {
     setFormError(null);
     if (!firstName.trim()) {
-      const msg = 'First name is required';
+      const msg = t('staff.firstNameRequired');
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
       return;
     }
     if (!lastName.trim()) {
-      const msg = 'Last name is required';
+      const msg = t('staff.lastNameRequired');
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
       return;
     }
     if (!email.trim()) {
-      const msg = 'Email is required';
+      const msg = t('staff.emailRequired');
       setFormError(msg);
       toast.show(msg, { type: 'danger' });
       return;
@@ -102,7 +107,7 @@ function InviteStaffForm({
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
       <View className="flex-row items-center justify-between border-b border-stone-100 px-4 py-3">
-        <Text className="text-lg font-semibold text-stone-900">Add staff</Text>
+        <Text className="text-lg font-semibold text-stone-900">{t('staff.addStaff')}</Text>
         <Pressable onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={24} color="#57534E" />
         </Pressable>
@@ -122,32 +127,32 @@ function InviteStaffForm({
           ) : null}
           <View className="gap-3">
             <Input
-              label="First name"
+              label={t('staff.firstName')}
               value={firstName}
               onChangeText={setFirstName}
-              placeholder="First name"
+              placeholder={t('staff.firstName')}
             />
             <Input
-              label="Last name"
+              label={t('staff.lastName')}
               value={lastName}
               onChangeText={setLastName}
-              placeholder="Last name"
+              placeholder={t('staff.lastName')}
             />
             <Input
-              label="Email"
+              label={t('staff.email')}
               value={email}
               onChangeText={setEmail}
-              placeholder="Email"
+              placeholder={t('staff.email')}
               autoCapitalize="none"
               keyboardType="email-address"
             />
             <Input
-              label="Phone (optional)"
+              label={t('mobile.staffDetail.phoneOptional')}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
             />
-            <Text className="text-sm text-stone-700">Role</Text>
+            <Text className="text-sm text-stone-700">{t('staff.role')}</Text>
             <View className="flex-row flex-wrap gap-2">
               {ORG_STAFF_ROLE_OPTIONS.map((opt) => {
                 const selected = role === opt.value;
@@ -164,14 +169,14 @@ function InviteStaffForm({
                         selected ? 'font-medium text-teal-700' : 'text-stone-600'
                       }`}
                     >
-                      {opt.label}
+                      {roleLabel(opt.value, t)}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
             <Button isLoading={inviteMutation.isPending} onPress={submit}>
-              Send invite
+              {t('mobile.staffDetail.sendInvite')}
             </Button>
           </View>
         </ScrollView>
@@ -181,6 +186,7 @@ function InviteStaffForm({
 }
 
 export default function OrgStaffScreen() {
+  const { t } = useTranslation('org');
   const toast = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
@@ -212,9 +218,9 @@ export default function OrgStaffScreen() {
     setActionId(id);
     try {
       await resendOrgStaffInvite(id);
-      toast.show('Invite resent', { type: 'success' });
+      toast.show(t('staff.resentToast'), { type: 'success' });
     } catch (e) {
-      toastError(toast, e, 'Resend failed');
+      toastError(toast, e, t('staff.resendFailed'));
     } finally {
       setActionId(null);
     }
@@ -224,10 +230,12 @@ export default function OrgStaffScreen() {
     setActionId(member.id);
     try {
       await updateOrgStaff(member.id, { isActive: !member.isActive });
-      toast.show(member.isActive ? 'Staff deactivated' : 'Staff activated', { type: 'success' });
+      toast.show(member.isActive ? t('staff.deactivatedToast') : t('staff.activatedToast'), {
+        type: 'success',
+      });
       await qc.invalidateQueries({ queryKey: ['org-staff'] });
     } catch (e) {
-      toastError(toast, e, 'Update failed');
+      toastError(toast, e, t('staff.updateFailed'));
     } finally {
       setActionId(null);
     }
@@ -236,18 +244,16 @@ export default function OrgStaffScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Staff"
-        subtitle="Clinical and support staff"
+        title={t('nav.staff')}
+        subtitle={t('mobile.staffDetail.subtitle')}
         showBack
         rightAction={{ icon: 'add', onPress: () => setModalOpen(true) }}
       />
 
       <View className="border-b border-stone-100 bg-white px-4 pb-3">
-        <Text className="mb-3 mt-3 text-sm text-stone-500">
-          Manage clinical and support staff for your organization.
-        </Text>
+        <Text className="mb-3 mt-3 text-sm text-stone-500">{t('staff.description')}</Text>
         <Input
-          placeholder="Search staff…"
+          placeholder={t('staff.searchPlaceholder')}
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
@@ -274,7 +280,9 @@ export default function OrgStaffScreen() {
                     active ? 'font-medium text-teal-700' : 'text-stone-600'
                   }`}
                 >
-                  {filter === 'ALL' ? 'All' : roleDisplay(filter.toLowerCase())}
+                  {filter === 'ALL'
+                    ? t('staff.filterAll')
+                    : roleLabel(filter.toLowerCase(), t)}
                 </Text>
               </Pressable>
             );
@@ -287,9 +295,9 @@ export default function OrgStaffScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load staff"
+          title={t('staff.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -306,8 +314,8 @@ export default function OrgStaffScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="people-outline"
-              title="No staff found"
-              subtitle="Try adjusting your search or filters"
+              title={t('staff.emptyTitle')}
+              subtitle={t('staff.emptyHint')}
             />
           }
           renderItem={({ item }) => (
@@ -319,18 +327,18 @@ export default function OrgStaffScreen() {
                   </Text>
                   <Text className="mt-0.5 text-sm text-stone-500">{item.email}</Text>
                   <View className="mt-2 flex-row flex-wrap gap-2">
-                    <Chip label={roleDisplay(item.role)} tone="sky" />
+                    <Chip label={roleLabel(item.role, t)} tone="sky" />
                     <Chip
-                      label={item.isActive ? 'Active' : 'Inactive'}
+                      label={item.isActive ? t('common.active') : t('common.inactive')}
                       tone={item.isActive ? 'green' : 'stone'}
                     />
                     {item.mustSetPassword ? (
-                      <Chip label="Awaiting password setup" tone="amber" />
+                      <Chip label={t('staff.awaitingPassword')} tone="amber" />
                     ) : null}
                   </View>
                   {item.createdAt ? (
                     <Text className="mt-1 text-xs text-stone-400">
-                      Joined {formatDate(item.createdAt)}
+                      {t('staff.joined', { date: formatDate(item.createdAt) })}
                     </Text>
                   ) : null}
                 </View>
@@ -346,7 +354,7 @@ export default function OrgStaffScreen() {
                       isLoading={actionId === item.id}
                       onPress={() => void resend(item.id)}
                     >
-                      Resend invite
+                      {t('staff.resendInvite')}
                     </Button>
                   </View>
                 ) : null}
@@ -358,7 +366,7 @@ export default function OrgStaffScreen() {
                     isLoading={actionId === item.id}
                     onPress={() => void toggleActive(item)}
                   >
-                    {item.isActive ? 'Deactivate' : 'Activate'}
+                    {item.isActive ? t('staff.deactivate') : t('staff.activate')}
                   </Button>
                 </View>
               </View>

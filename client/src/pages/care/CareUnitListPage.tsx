@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { listCareUnits, type CareUnit } from '@/lib/api/intake';
+import { localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
 
 type Props = {
   basePath: string;
@@ -17,10 +18,20 @@ export default function CareUnitListPage({
   title = 'Care Units & Patients',
   description = 'Open a care unit to view patients, edit profiles, and see linked episodes.',
 }: Props) {
-  const { t } = useTranslation('family');
   const isFamily = basePath.startsWith('/family');
-  const pageTitle = isFamily ? t('careUnit.listTitle') : title;
-  const pageDescription = isFamily ? t('careUnit.listDescription') : description;
+  const isCoordinator = basePath.startsWith('/coordinator');
+  const localized = isFamily || isCoordinator;
+  const { t } = useTranslation(isFamily ? 'family' : isCoordinator ? 'coordinator' : 'family');
+  const pageTitle = isFamily
+    ? t('careUnit.listTitle')
+    : isCoordinator
+      ? t('patients.title')
+      : title;
+  const pageDescription = isFamily
+    ? t('careUnit.listDescription')
+    : isCoordinator
+      ? t('patients.description')
+      : description;
   const [rows, setRows] = useState<CareUnit[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -37,11 +48,16 @@ export default function CareUnitListPage({
       setTotal(result.total);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error(isFamily ? t('careUnit.loadError') : 'Failed to load care units');
+      else
+        toast.error(
+          localized
+            ? t(isFamily ? 'careUnit.loadError' : 'common.failedLoad')
+            : 'Failed to load care units',
+        );
     } finally {
       setLoading(false);
     }
-  }, [search, isFamily, t]);
+  }, [search, isFamily, localized, t]);
 
   useEffect(() => {
     void load();
@@ -59,7 +75,7 @@ export default function CareUnitListPage({
           onClick={() => void load()}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
         >
-          <RefreshCw className="size-4" /> {isFamily ? t('common.refresh') : 'Refresh'}
+          <RefreshCw className="size-4" /> {localized ? t('common.refresh') : 'Refresh'}
         </button>
       </div>
 
@@ -67,13 +83,21 @@ export default function CareUnitListPage({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={isFamily ? t('careUnit.searchPlaceholder') : 'Search care units…'}
+          placeholder={
+            isFamily
+              ? t('careUnit.searchPlaceholder')
+              : isCoordinator
+                ? t('patients.searchPlaceholder')
+                : 'Search care units…'
+          }
           className="rounded-xl border border-stone-300 px-3 py-2 text-sm w-full sm:w-72"
         />
         <span className="text-sm text-stone-500">
           {isFamily
             ? t('careUnit.unitCount', { count: total })
-            : `${total} unit${total === 1 ? '' : 's'}`}
+            : isCoordinator
+              ? t('patients.unitCount', { count: total })
+              : `${total} unit${total === 1 ? '' : 's'}`}
         </span>
       </div>
 
@@ -86,7 +110,9 @@ export default function CareUnitListPage({
           <p className="p-8 text-center text-stone-500 text-sm">
             {isFamily
               ? t('careUnit.empty')
-              : 'No care units yet. Complete Family Onboarding first.'}
+              : isCoordinator
+                ? t('patients.empty')
+                : 'No care units yet. Complete Family Onboarding first.'}
           </p>
         ) : (
           rows.map((unit) => {
@@ -101,31 +127,39 @@ export default function CareUnitListPage({
                   <Users className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-stone-900">{unit.name}</p>
+                  <p className="font-semibold text-stone-900">{isCoordinator ? localizeGeneratedLabel(unit.name) : unit.name}</p>
                   <p className="mt-0.5 text-sm text-stone-500">
-                    {[unit.city, unit.country].filter(Boolean).join(', ') || 'No location'}
+                    {[unit.city, unit.country].filter(Boolean).join(', ') ||
+                      (isCoordinator ? t('patients.noLocation') : 'No location')}
                     {unit.primaryCaregiverName
-                      ? ` · Caregiver: ${unit.primaryCaregiverName}`
+                      ? isCoordinator
+                        ? ` · ${t('patients.caregiver', { name: unit.primaryCaregiverName })}`
+                        : ` · Caregiver: ${unit.primaryCaregiverName}`
                       : ''}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-stone-700">
-                      {patientCount} patient{patientCount === 1 ? '' : 's'}
+                      {isCoordinator
+                        ? t('patients.patientCount', { count: patientCount })
+                        : `${patientCount} patient${patientCount === 1 ? '' : 's'}`}
                     </span>
                     {unit._count && (
                       <>
                         <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-amber-800">
-                          {unit._count.intakeRecords}{' '}
-                          {basePath.startsWith('/family') ? 'request' : 'intake'}
-                          {unit._count.intakeRecords === 1 ? '' : 's'}
+                          {isFamily
+                            ? `${unit._count.intakeRecords} request${unit._count.intakeRecords === 1 ? '' : 's'}`
+                            : isCoordinator
+                              ? t('patients.intakeCount', { count: unit._count.intakeRecords })
+                              : `${unit._count.intakeRecords} intake${unit._count.intakeRecords === 1 ? '' : 's'}`}
                         </span>
-                        {!basePath.startsWith('/family') && (
+                        {!isFamily && (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-emerald-800">
-                            {unit._count.careEpisodes} episode
-                            {unit._count.careEpisodes === 1 ? '' : 's'}
+                            {isCoordinator
+                              ? t('patients.episodeCount', { count: unit._count.careEpisodes })
+                              : `${unit._count.careEpisodes} episode${unit._count.careEpisodes === 1 ? '' : 's'}`}
                           </span>
                         )}
-                        {basePath.startsWith('/family') && unit._count.careEpisodes > 0 && (
+                        {isFamily && unit._count.careEpisodes > 0 && (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-emerald-800">
                             {unit._count.careEpisodes} care journey
                             {unit._count.careEpisodes === 1 ? '' : 's'}

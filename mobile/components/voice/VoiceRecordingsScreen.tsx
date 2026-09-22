@@ -12,8 +12,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { useToast } from 'react-native-toast-notifications';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { EmptyState, StatusBadge } from '../ui';
 import { FAMILY, FamilyTabHero } from '../family/FamilyChrome';
+import { ROLE, RoleTabHero } from '../shell/RoleChrome';
 import { apiErrorMessage, formatDate } from '../../lib/format';
 import {
   deleteVoiceRecording,
@@ -45,13 +47,21 @@ function mimeFromUri(uri: string): { mimeType: string; ext: string } {
 
 type Props = {
   subtitle?: string;
+  i18nNs?: 'family' | 'clinical' | 'coordinator';
+  tone?: 'family' | 'role';
 };
 
 export function VoiceRecordingsScreen({
-  subtitle = 'Choose an assigned patient, then record. Title and notes are optional.',
+  subtitle,
+  i18nNs = 'clinical',
+  tone = 'family',
 }: Props) {
   useScreenProtection(true);
+  const { t } = useTranslation(i18nNs);
   const toast = useToast();
+  const heroSubtitle = subtitle ?? t('mobile.detail.voiceRecordHint');
+  const Hero = tone === 'role' ? RoleTabHero : FamilyTabHero;
+  const chrome = tone === 'role' ? ROLE : FAMILY;
   const [rows, setRows] = useState<VoiceRecording[]>([]);
   const [patients, setPatients] = useState<VoiceRecordingPatient[]>([]);
   const [selectedPatientKey, setSelectedPatientKey] = useState('');
@@ -93,12 +103,12 @@ export function VoiceRecordingsScreen({
         prev && patientRows.some((p) => p.id === prev) ? prev : patientRows[0]?.id ?? '',
       );
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load recordings'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('voice.toasts.loadFailed')), { type: 'danger' });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [t, toast]);
 
   useEffect(() => {
     void load();
@@ -112,13 +122,13 @@ export function VoiceRecordingsScreen({
   const startRecording = async () => {
     if (isRecording || uploading) return;
     if (!selectedRef.current) {
-      toast.show('Choose an assigned patient before recording.', { type: 'danger' });
+      toast.show(t('voice.toasts.choosePatient'), { type: 'danger' });
       return;
     }
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
-        toast.show('Microphone permission is required.', { type: 'danger' });
+        toast.show(t('mobile.detail.micPermissionRequired'), { type: 'danger' });
         return;
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
@@ -135,7 +145,7 @@ export function VoiceRecordingsScreen({
         setElapsed(elapsedRef.current);
       }, 1000);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Could not start recording'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('mobile.detail.couldNotStartRecording')), { type: 'danger' });
     }
   };
 
@@ -148,11 +158,11 @@ export function VoiceRecordingsScreen({
     setIsRecording(false);
     setUploading(true);
     try {
-      if (!patient) throw new Error('Choose an assigned patient before recording.');
+      if (!patient) throw new Error(t('voice.toasts.choosePatient'));
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recording.getURI();
-      if (!uri) throw new Error('No audio file was produced.');
+      if (!uri) throw new Error(t('mobile.detail.noAudioFile'));
       const status = await recording.getStatusAsync();
       const durationSeconds =
         status.isLoaded && typeof status.durationMillis === 'number'
@@ -173,10 +183,10 @@ export function VoiceRecordingsScreen({
       await deleteTempFile(uri);
       setTitleDraft('');
       setNotesDraft('');
-      toast.show('Voice recording saved', { type: 'success' });
+      toast.show(t('voice.toasts.saved'), { type: 'success' });
       await load();
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to save recording'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('voice.toasts.saveFailed')), { type: 'danger' });
     } finally {
       setUploading(false);
       setElapsed(0);
@@ -220,7 +230,7 @@ export function VoiceRecordingsScreen({
       });
       await sound.playAsync();
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Playback failed'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('voice.toasts.playbackFailed')), { type: 'danger' });
       setPlayingId(null);
     } finally {
       setBusyId(null);
@@ -237,18 +247,18 @@ export function VoiceRecordingsScreen({
       }
       await deleteVoiceRecording(id);
       setRows((prev) => prev.filter((row) => row.id !== id));
-      toast.show('Recording deleted', { type: 'success' });
+      toast.show(t('voice.toasts.deleted'), { type: 'success' });
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Delete failed'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('voice.toasts.deleteFailed')), { type: 'danger' });
     } finally {
       setBusyId(null);
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: chrome.stone50 }} edges={['top']}>
       <AppSwitcherPrivacyOverlay />
-      <FamilyTabHero title="Voice recordings" subtitle={subtitle} showBack />
+      <Hero title={t('voice.title')} subtitle={heroSubtitle} showBack />
       <FlatList
         data={rows}
         keyExtractor={(item) => item.id}
@@ -260,7 +270,7 @@ export function VoiceRecordingsScreen({
               setRefreshing(true);
               void load();
             }}
-            tintColor={FAMILY.teal}
+            tintColor={chrome.teal}
           />
         }
         ListHeaderComponent={
@@ -276,12 +286,10 @@ export function VoiceRecordingsScreen({
               }}
             >
               <Text style={{ fontSize: 12, fontWeight: '600', color: FAMILY.stone500 }}>
-                Patient (required)
+                {t('mobile.detail.patientRequired')}
               </Text>
               {patients.length === 0 ? (
-                <Text style={{ fontSize: 12, color: '#B45309' }}>
-                  Only patients on your active or validated care episodes appear here.
-                </Text>
+                <Text style={{ fontSize: 12, color: '#B45309' }}>{t('voice.patientHint')}</Text>
               ) : (
                 patients.map((p) => {
                   const selected = p.id === selectedPatientKey;
@@ -310,13 +318,13 @@ export function VoiceRecordingsScreen({
                 })
               )}
               <Text style={{ fontSize: 12, fontWeight: '600', color: FAMILY.stone500 }}>
-                Optional details
+                {t('mobile.detail.optionalDetails')}
               </Text>
               <TextInput
                 value={titleDraft}
                 onChangeText={setTitleDraft}
                 editable={!isRecording && !uploading}
-                placeholder="Title (optional)"
+                placeholder={t('voice.titleOptional')}
                 placeholderTextColor={FAMILY.stone400}
                 style={{
                   borderWidth: 1,
@@ -332,7 +340,7 @@ export function VoiceRecordingsScreen({
                 value={notesDraft}
                 onChangeText={setNotesDraft}
                 editable={!isRecording && !uploading}
-                placeholder="Notes (optional)"
+                placeholder={t('voice.notesOptional')}
                 placeholderTextColor={FAMILY.stone400}
                 multiline
                 style={{
@@ -362,7 +370,7 @@ export function VoiceRecordingsScreen({
                     }}
                   >
                     <Text style={{ color: FAMILY.white, fontWeight: '700' }}>
-                      {uploading ? 'Saving…' : 'Start recording'}
+                      {uploading ? t('mobile.detail.savingRecording') : t('voice.start')}
                     </Text>
                   </Pressable>
                 ) : (
@@ -378,7 +386,7 @@ export function VoiceRecordingsScreen({
                       }}
                     >
                       <Text style={{ color: FAMILY.white, fontWeight: '700' }}>
-                        Stop & save · {formatDuration(elapsed)}
+                        {t('mobile.detail.stopAndSave', { duration: formatDuration(elapsed) })}
                       </Text>
                     </Pressable>
                     <Pressable
@@ -407,17 +415,17 @@ export function VoiceRecordingsScreen({
                 color: FAMILY.stone400,
               }}
             >
-              History
+              {t('voice.history')}
             </Text>
           </View>
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator color={FAMILY.teal} style={{ marginTop: 24 }} />
+            <ActivityIndicator color={chrome.teal} style={{ marginTop: 24 }} />
           ) : (
             <EmptyState
-              title="No recordings yet"
-              subtitle="Start a recording to capture a voice note."
+              title={t('voice.emptyHistory')}
+              subtitle={t('mobile.detail.emptyRecordingHint')}
             />
           )
         }
@@ -434,7 +442,7 @@ export function VoiceRecordingsScreen({
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: FAMILY.stone900 }}>
-                  {item.title?.trim() || 'Untitled recording'}
+                  {item.title?.trim() || t('voice.untitled')}
                 </Text>
                 <Text style={{ marginTop: 4, fontSize: 12, color: FAMILY.stone500 }}>
                   {item.patientName ? `${item.patientName} · ` : ''}
@@ -448,7 +456,9 @@ export function VoiceRecordingsScreen({
               </View>
               <StatusBadge
                 status={playingId === item.id ? 'in_progress' : 'draft'}
-                label={playingId === item.id ? 'Playing' : 'Audio'}
+                label={
+                  playingId === item.id ? t('voice.playing') : t('plans.status.draft')
+                }
               />
             </View>
             <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
@@ -466,7 +476,7 @@ export function VoiceRecordingsScreen({
                 }}
               >
                 <Text style={{ fontWeight: '600', color: FAMILY.stone900 }}>
-                  {playingId === item.id ? 'Playing…' : 'Play'}
+                  {playingId === item.id ? t('voice.playing') : t('voice.play')}
                 </Text>
               </Pressable>
               <Pressable
@@ -482,7 +492,7 @@ export function VoiceRecordingsScreen({
                   opacity: busyId === item.id ? 0.6 : 1,
                 }}
               >
-                <Text style={{ fontWeight: '600', color: '#BE123C' }}>Delete</Text>
+                <Text style={{ fontWeight: '600', color: '#BE123C' }}>{t('voice.delete')}</Text>
               </Pressable>
             </View>
           </View>

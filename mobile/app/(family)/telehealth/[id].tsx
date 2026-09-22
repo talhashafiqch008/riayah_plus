@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/ui';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { TelehealthVideoRoom } from '../../../components/telehealth/TelehealthVideoRoom';
@@ -21,6 +22,7 @@ import {
 } from '../../../lib/api/telehealth';
 
 export default function FamilyTelehealthJoinScreen() {
+  const { t } = useTranslation('family');
   const { id } = useLocalSearchParams<{ id: string }>();
   const sessionId = String(id ?? '');
   const router = useRouter();
@@ -51,7 +53,7 @@ export default function FamilyTelehealthJoinScreen() {
           setPaymentInvoiceId(telehealthPaymentInvoiceId(err));
           setNeedsConsent(false);
           setJoin(null);
-          setError(apiErrorMessage(err, 'Payment required before joining'));
+          setError(apiErrorMessage(err, t('telehealthJoin.paymentRequired')));
           return null;
         }
         if (isTelehealthConsentRequired(err)) {
@@ -61,11 +63,11 @@ export default function FamilyTelehealthJoinScreen() {
           setJoin(null);
           return null;
         }
-        setError(apiErrorMessage(err, 'Could not join the session'));
+        setError(apiErrorMessage(err, t('telehealthJoin.joinFailed')));
         return null;
       }
     },
-    [],
+    [t],
   );
 
   const load = useCallback(async () => {
@@ -76,11 +78,11 @@ export default function FamilyTelehealthJoinScreen() {
       setSession(row);
       await requestJoin(sessionJoinRoomName(row));
     } catch (err: unknown) {
-      toast.show(apiErrorMessage(err, 'Failed to open session'), { type: 'danger' });
+      toast.show(apiErrorMessage(err, t('telehealthJoin.openFailed')), { type: 'danger' });
     } finally {
       setLoading(false);
     }
-  }, [requestJoin, sessionId, toast]);
+  }, [requestJoin, sessionId, t, toast]);
 
   useEffect(() => {
     void load();
@@ -101,9 +103,9 @@ export default function FamilyTelehealthJoinScreen() {
     try {
       await grantTelehealthConsent();
       await requestJoin(sessionJoinRoomName(session));
-      toast.show('Consent saved', { type: 'success' });
+      toast.show(t('telehealthJoin.consentSaved'), { type: 'success' });
     } catch (err: unknown) {
-      toast.show(apiErrorMessage(err, 'Could not save consent'), { type: 'danger' });
+      toast.show(apiErrorMessage(err, t('telehealthJoin.consentFailed')), { type: 'danger' });
     } finally {
       setBusy(false);
     }
@@ -112,10 +114,12 @@ export default function FamilyTelehealthJoinScreen() {
   const videoReady =
     join?.phase === 'in_call' && isLiveKitUrlReady(join.serverUrl) && Boolean(join.token);
 
+  const visitTitle = t('telehealthJoin.videoVisitTitle');
+
   if (videoReady && join?.serverUrl && join.token) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#1c1917' }} edges={['top']}>
-        <FamilyTabHero title="Video visit" subtitle="In call" showBack />
+        <FamilyTabHero title={visitTitle} subtitle={t('telehealthJoin.inCall')} showBack />
         <TelehealthVideoRoom
           token={join.token}
           serverUrl={join.serverUrl}
@@ -127,7 +131,7 @@ export default function FamilyTelehealthJoinScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Video visit" subtitle="Waiting room" showBack />
+      <FamilyTabHero title={visitTitle} subtitle={t('telehealthJoin.waitingTitle')} showBack />
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={FAMILY.teal} />
@@ -136,17 +140,21 @@ export default function FamilyTelehealthJoinScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           {session ? (
             <Text className="mb-4 text-sm text-stone-500">
-              Scheduled {formatDateTime(session.scheduledAt)}
-              {session.provider?.name ? ` · ${session.provider.name}` : ''}
+              {t('telehealthJoin.scheduled', {
+                datetime: `${formatDateTime(session.scheduledAt)}${
+                  session.provider?.name ? ` · ${session.provider.name}` : ''
+                }`,
+              })}
             </Text>
           ) : null}
 
           {needsPayment ? (
             <View className="rounded-2xl border border-stone-200 bg-white p-4">
-              <Text className="text-base font-semibold text-stone-900">Payment required</Text>
+              <Text className="text-base font-semibold text-stone-900">
+                {t('telehealthJoin.paymentTitle')}
+              </Text>
               <Text className="mt-2 text-sm leading-5 text-stone-600">
-                Pay the session invoice before you can join this video visit. After paying, return
-                here and try again.
+                {t('telehealthJoin.paymentBody')}
               </Text>
               {error ? <Text className="mt-2 text-sm text-rose-700">{error}</Text> : null}
               <View className="mt-4 gap-3">
@@ -154,20 +162,21 @@ export default function FamilyTelehealthJoinScreen() {
                   <Button
                     onPress={() => router.push(`/(family)/invoices/${paymentInvoiceId}`)}
                   >
-                    Pay invoice
+                    {t('telehealthJoin.payToJoin')}
                   </Button>
                 ) : null}
                 <Button variant="secondary" onPress={() => void load()}>
-                  I've paid — try again
+                  {t('telehealthJoin.tryAgainPaid')}
                 </Button>
               </View>
             </View>
           ) : needsConsent ? (
             <View className="rounded-2xl border border-stone-200 bg-white p-4">
-              <Text className="text-base font-semibold text-stone-900">Consent required</Text>
+              <Text className="text-base font-semibold text-stone-900">
+                {t('telehealthJoin.consentRequiredTitle')}
+              </Text>
               <Text className="mt-2 text-sm leading-5 text-stone-600">
-                Before joining a video visit, confirm you agree to receive care over a secure video
-                connection.
+                {t('telehealthJoin.consentRequiredBody')}
               </Text>
               <Pressable
                 onPress={() => setAgreed((v) => !v)}
@@ -183,40 +192,44 @@ export default function FamilyTelehealthJoinScreen() {
                   {agreed ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
                 </View>
                 <Text className="flex-1 text-sm leading-5 text-stone-600">
-                  I consent to join this telehealth session.
+                  {t('telehealthJoin.consentCheckbox')}
                 </Text>
               </Pressable>
               <View className="mt-4">
                 <Button isLoading={busy} disabled={!agreed} onPress={() => void onGrantConsent()}>
-                  Continue
+                  {t('telehealthJoin.continue')}
                 </Button>
               </View>
             </View>
           ) : join?.phase === 'waiting' ? (
             <View className="items-center rounded-2xl border border-stone-200 bg-white px-4 py-10">
               <ActivityIndicator color={FAMILY.teal} />
-              <Text className="mt-4 text-base font-semibold text-stone-900">In the waiting room</Text>
+              <Text className="mt-4 text-base font-semibold text-stone-900">
+                {t('telehealthJoin.inWaitingRoom')}
+              </Text>
               <Text className="mt-2 text-center text-sm leading-5 text-stone-500">
-                Your clinician will admit you shortly. Keep this screen open.
+                {t('telehealthJoin.waitingRoomBody')}
               </Text>
             </View>
           ) : join?.phase === 'in_call' ? (
             <View className="rounded-2xl border border-stone-200 bg-white px-4 py-8">
-              <Text className="text-center text-base font-semibold text-stone-900">You are admitted</Text>
+              <Text className="text-center text-base font-semibold text-stone-900">
+                {t('telehealthJoin.admittedShort')}
+              </Text>
               <Text className="mt-2 text-center text-sm leading-5 text-stone-500">
                 {isLiveKitUrlReady(join.serverUrl)
-                  ? 'Connecting to video…'
-                  : 'Video server is not configured yet. You are admitted — your clinician can continue on web, or LiveKit can be configured for mobile video.'}
+                  ? t('telehealthJoin.connectingVideo')
+                  : t('telehealthJoin.videoServerNotConfigured')}
               </Text>
             </View>
           ) : (
             <View className="rounded-2xl border border-stone-200 bg-white px-4 py-8">
               <Text className="text-center text-base font-semibold text-stone-900">
-                {error ?? 'Unable to join'}
+                {error ?? t('telehealthJoin.unableToJoin')}
               </Text>
               <View className="mt-4">
                 <Button variant="secondary" onPress={() => void load()}>
-                  Try again
+                  {t('mobile.common.tryAgain')}
                 </Button>
               </View>
             </View>

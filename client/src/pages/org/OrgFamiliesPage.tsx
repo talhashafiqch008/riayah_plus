@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { RefreshCw } from 'lucide-react';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/components/care/RolePageChrome';
 
 export default function OrgFamiliesPage() {
+  const { t } = useTranslation('org');
   const [families, setFamilies] = useState<OrgFamily[]>([]);
   const [coords, setCoords] = useState<OrgCoordinator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,24 +31,26 @@ export default function OrgFamiliesPage() {
       setFamilies(f);
       setCoords(c.filter((x) => x.isActive));
     } catch (error) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load families');
+      toast.error(isApiError(error) ? error.message : t('families.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const assign = async (familyId: string, coordinatorId: string) => {
     setSavingId(familyId);
     try {
       await assignOrgFamilyCoordinator(familyId, coordinatorId || null);
-      toast.success(coordinatorId ? 'Coordinator assigned' : 'Coordinator cleared');
+      toast.success(
+        coordinatorId ? t('families.assignedToast') : t('families.clearedToast'),
+      );
       await load();
     } catch (error) {
-      toast.error(isApiError(error) ? error.message : 'Assignment failed');
+      toast.error(isApiError(error) ? error.message : t('families.assignFailed'));
     } finally {
       setSavingId(null);
     }
@@ -55,8 +59,8 @@ export default function OrgFamiliesPage() {
   return (
     <RolePageShell>
       <RolePageHeader
-        title="Families"
-        description="Families linked to your organization. Assign a primary coordinator for ownership."
+        title={t('families.title')}
+        description={t('families.description')}
         actions={
           <button
             type="button"
@@ -65,24 +69,30 @@ export default function OrgFamiliesPage() {
             className={btnSecondaryClass}
           >
             <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('families.refresh')}
           </button>
         }
       />
 
       <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
         {loading ? (
-          <p className="p-6 text-stone-500">Loading…</p>
+          <p className="p-6 text-stone-500">{t('common.loading')}</p>
         ) : families.length === 0 ? (
-          <p className="p-6 text-stone-500">No families assigned to your organization yet.</p>
+          <p className="p-6 text-stone-500">{t('families.empty')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[640px] w-full text-sm">
-              <thead className="bg-stone-50 text-left text-stone-500">
+              <thead className="bg-stone-50 text-start text-stone-500">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium">Family</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium">Email</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium">Primary coordinator</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium">
+                    {t('families.colFamily')}
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium">
+                    {t('families.colEmail')}
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium">
+                    {t('families.colCoordinator')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -97,9 +107,9 @@ export default function OrgFamiliesPage() {
                         disabled={savingId === f.id}
                         className={`${fieldClass} min-w-[200px] max-w-xs`}
                         value={f.assignedCoordinatorId ?? ''}
-                        onChange={(e) => assign(f.id, e.target.value)}
+                        onChange={(e) => void assign(f.id, e.target.value)}
                       >
-                        <option value="">Unassigned</option>
+                        <option value="">{t('common.unassigned')}</option>
                         {coords.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/lib/errors';
 import { completeTask, listMyTasks, type Task } from '@/lib/api/shifts';
+import { familyDateLocale } from '@/lib/familyLanguage';
+import { localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
 import {
   RolePageHeader,
   RolePageShell,
@@ -39,6 +42,8 @@ function taskContext(task: Task) {
 }
 
 export default function SupportTasksPage() {
+  const { t } = useTranslation('support');
+  const dateLocale = familyDateLocale();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [evidenceById, setEvidenceById] = useState<Record<string, string>>({});
@@ -50,11 +55,11 @@ export default function SupportTasksPage() {
       const result = await listMyTasks();
       setTasks(result.data);
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Failed to load tasks');
+      toast.error(extractApiError(error).message || t('tasks.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -66,12 +71,12 @@ export default function SupportTasksPage() {
       const evidence = evidenceById[task.id]?.trim();
       await completeTask(task.id, {
         completionEvidence: evidence || undefined,
-        notes: evidence ? undefined : 'Completed on shift',
+        notes: evidence ? undefined : t('tasks.defaultNotes'),
       });
-      toast.success('Task completed');
+      toast.success(t('tasks.completedToast'));
       await load();
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Complete failed');
+      toast.error(extractApiError(error).message || t('tasks.completeFailed'));
     } finally {
       setBusyId(null);
     }
@@ -80,11 +85,11 @@ export default function SupportTasksPage() {
   return (
     <RolePageShell>
       <RolePageHeader
-        title="Tasks"
-        description="Complete assigned care tasks and attach evidence URLs when needed."
+        title={t('tasks.title')}
+        description={t('tasks.description')}
         actions={
           <Link to="/support/shifts" className={btnSecondaryClass}>
-            My shifts
+            {t('tasks.myShifts')}
           </Link>
         }
       />
@@ -96,10 +101,8 @@ export default function SupportTasksPage() {
       ) : tasks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-5 py-10 text-center sm:p-10">
           <ClipboardList className="mx-auto size-10 text-stone-300" />
-          <p className="mt-3 text-stone-600">No tasks assigned to you yet.</p>
-          <p className="mt-1 text-sm text-stone-500">
-            Ask your coordinator to assign episode tasks or book a session with task assignment.
-          </p>
+          <p className="mt-3 text-stone-600">{t('tasks.empty')}</p>
+          <p className="mt-1 text-sm text-stone-500">{t('tasks.emptyHint')}</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -112,28 +115,38 @@ export default function SupportTasksPage() {
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <h3 className="break-words font-semibold text-stone-900">{task.title}</h3>
+                    <h3 className="break-words font-semibold text-stone-900">
+                      {localizeGeneratedLabel(task.title) || task.title}
+                    </h3>
                     {ctx && (
                       <dl className="mt-2 grid gap-2 text-sm text-stone-600 sm:grid-cols-2">
                         {ctx.who && (
                           <div>
                             <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                              Client
+                              {t('tasks.client')}
                             </span>
-                            <p className="font-medium text-stone-800">{ctx.who}</p>
+                            <p className="font-medium text-stone-800">
+                              {localizeGeneratedLabel(ctx.who) || ctx.who}
+                            </p>
                           </div>
                         )}
                         <div className="min-w-0">
                           <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                            Care journey
+                            {t('tasks.careJourney')}
                           </span>
-                          <p className="break-words">{ctx.episodeTitle}</p>
+                          <p className="break-words">
+                            {localizeGeneratedLabel(ctx.episodeTitle) || ctx.episodeTitle}
+                          </p>
                         </div>
                         {(ctx.coordinator || ctx.assigner) && (
                           <p className="text-xs text-stone-500 sm:col-span-2">
-                            Assigned by {ctx.assigner || ctx.coordinator}
+                            {t('tasks.assignedBy', {
+                              name: ctx.assigner || ctx.coordinator,
+                            })}
                             {ctx.dueAt
-                              ? ` · Due ${new Date(ctx.dueAt).toLocaleString()}`
+                              ? ` · ${t('tasks.due', {
+                                  date: new Date(ctx.dueAt).toLocaleString(dateLocale),
+                                })}`
                               : ''}
                           </p>
                         )}
@@ -146,9 +159,11 @@ export default function SupportTasksPage() {
                     )}
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClass(task.status)}`}
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(task.status)}`}
                   >
-                    {task.status}
+                    {t(`tasks.status.${task.status}`, {
+                      defaultValue: task.status.replace(/_/g, ' '),
+                    })}
                   </span>
                 </div>
 
@@ -159,7 +174,7 @@ export default function SupportTasksPage() {
                       onChange={(e) =>
                         setEvidenceById((m) => ({ ...m, [task.id]: e.target.value }))
                       }
-                      placeholder="Evidence URL (optional)"
+                      placeholder={t('tasks.evidencePlaceholder')}
                       className={fieldClass}
                     />
                     <button
@@ -168,14 +183,14 @@ export default function SupportTasksPage() {
                       onClick={() => void onComplete(task)}
                       className={btnPrimaryClass}
                     >
-                      <CheckCircle2 className="size-4" /> Complete
+                      <CheckCircle2 className="size-4" /> {t('tasks.complete')}
                     </button>
                   </div>
                 )}
 
                 {task.completionEvidence && (
                   <p className="text-xs text-stone-500">
-                    Evidence:{' '}
+                    {t('tasks.evidence')}:{' '}
                     <a
                       href={task.completionEvidence}
                       target="_blank"

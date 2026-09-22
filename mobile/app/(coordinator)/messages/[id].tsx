@@ -7,6 +7,7 @@ export default function CoordinatorMessageThreadScreen() {
     <MessageThread
       conversationId={String(id ?? '')}
       basePath="/(coordinator)/messages"
+      i18nNs="coordinator"
     />
   );
 }

@@ -1,42 +1,56 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Button, Input } from '../../components/ui';
 import { AuthError, AuthShell } from '../../components/auth/AuthShell';
 import { ROLE } from '../../components/shell/RoleChrome';
 import { apiClient } from '../../lib/api/client';
 import { apiErrorMessage } from '../../lib/format';
 
-const schema = z
-  .object({
-    firstName: z.string().min(1, 'Enter your first name'),
-    lastName: z.string().min(1, 'Enter your last name'),
-    email: z.string().email('Enter a valid email'),
-    phone: z.string().optional(),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
-    confirmPassword: z.string().min(8, 'Confirm your password'),
-    consentAccepted: z.boolean(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  })
-  .refine((data) => data.consentAccepted === true, {
-    message: 'You must accept the terms to register',
-    path: ['consentAccepted'],
-  });
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  password: string;
+  confirmPassword: string;
+  consentAccepted: boolean;
+};
 
 export default function RegisterFamilyScreen() {
+  const { t } = useTranslation('auth');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          firstName: z.string().min(1, { message: t('register.firstNameRequired') }),
+          lastName: z.string().min(1, { message: t('register.lastNameRequired') }),
+          email: z.string().email({ message: t('register.emailInvalid') }),
+          phone: z.string().optional(),
+          password: z.string().min(8, { message: t('register.passwordMin') }),
+          confirmPassword: z.string().min(8, { message: t('register.confirmRequired') }),
+          consentAccepted: z.boolean(),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: t('register.passwordsMismatch'),
+          path: ['confirmPassword'],
+        })
+        .refine((data) => data.consentAccepted === true, {
+          message: t('register.consentRequired'),
+          path: ['consentAccepted'],
+        }),
+    [t],
+  );
 
   const {
     control,
@@ -71,7 +85,7 @@ export default function RegisterFamilyScreen() {
       });
       setSent(true);
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Could not create the account.'));
+      setError(apiErrorMessage(e, t('register.createFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -79,26 +93,30 @@ export default function RegisterFamilyScreen() {
 
   return (
     <AuthShell
-      kicker="Family"
-      title="Create a family account"
-      subtitle="Register to request care. An organization will be assigned before you can sign in."
+      kicker={t('register.kicker')}
+      title={t('register.title')}
+      subtitle={t('register.subtitle')}
       showBack
-      backLabel="Back to sign in"
+      backLabel={t('register.backToLogin')}
     >
       {sent ? (
         <View className="items-center py-2">
           <View className="mb-4 h-14 w-14 items-center justify-center rounded-full bg-teal-50">
             <Ionicons name="mail-outline" size={28} color={ROLE.teal} />
           </View>
-          <Text className="text-center text-base font-semibold text-stone-900">Check your email</Text>
+          <Text className="text-center text-base font-semibold text-stone-900">
+            {t('register.sentTitle')}
+          </Text>
           <Text className="mt-2 text-center text-sm leading-5 text-stone-500">
-            We created an account for{'\n'}
+            {t('register.sentBodyLead')}
+            {'\n'}
             <Text className="font-medium text-stone-800">{getValues('email')}</Text>
-            {'\n\n'}Verify your email, then wait for an organization to assign you before signing in.
+            {'\n\n'}
+            {t('register.sentBodyTail')}
           </Text>
           <View className="mt-6 w-full">
             <Link href="/(auth)/login" asChild replace>
-              <Button variant="secondary">Back to sign in</Button>
+              <Button variant="secondary">{t('register.backToLogin')}</Button>
             </Link>
           </View>
         </View>
@@ -109,8 +127,8 @@ export default function RegisterFamilyScreen() {
             name="firstName"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="First name"
-                placeholder="Sara"
+                label={t('register.firstName')}
+                placeholder={t('register.firstNamePlaceholder')}
                 autoComplete="given-name"
                 value={value}
                 onChangeText={onChange}
@@ -124,8 +142,8 @@ export default function RegisterFamilyScreen() {
             name="lastName"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="Last name"
-                placeholder="Hamad"
+                label={t('register.lastName')}
+                placeholder={t('register.lastNamePlaceholder')}
                 autoComplete="family-name"
                 value={value}
                 onChangeText={onChange}
@@ -139,8 +157,8 @@ export default function RegisterFamilyScreen() {
             name="email"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="Email"
-                placeholder="name@example.com"
+                label={t('register.email')}
+                placeholder={t('register.emailPlaceholder')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
@@ -156,8 +174,8 @@ export default function RegisterFamilyScreen() {
             name="phone"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="Phone (optional)"
-                placeholder="+974 …"
+                label={t('register.phone')}
+                placeholder={t('register.phonePlaceholder')}
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 value={value}
@@ -172,8 +190,8 @@ export default function RegisterFamilyScreen() {
             name="password"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="Password"
-                placeholder="At least 8 characters"
+                label={t('register.password')}
+                placeholder={t('register.passwordPlaceholder')}
                 secureTextEntry={!showPassword}
                 autoComplete="new-password"
                 value={value}
@@ -185,6 +203,9 @@ export default function RegisterFamilyScreen() {
                     onPress={() => setShowPassword((s) => !s)}
                     hitSlop={8}
                     accessibilityRole="button"
+                    accessibilityLabel={
+                      showPassword ? t('register.hidePassword') : t('register.showPassword')
+                    }
                   >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -201,8 +222,8 @@ export default function RegisterFamilyScreen() {
             name="confirmPassword"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="Confirm password"
-                placeholder="Repeat password"
+                label={t('register.confirmPassword')}
+                placeholder={t('register.confirmPasswordPlaceholder')}
                 secureTextEntry={!showPassword}
                 autoComplete="new-password"
                 value={value}
@@ -230,9 +251,7 @@ export default function RegisterFamilyScreen() {
                 >
                   {value ? <Ionicons name="checkmark" size={14} color={ROLE.white} /> : null}
                 </View>
-                <Text className="flex-1 text-sm leading-5 text-stone-600">
-                  I accept the terms of service and privacy notice for this family account.
-                </Text>
+                <Text className="flex-1 text-sm leading-5 text-stone-600">{t('register.consent')}</Text>
               </Pressable>
             )}
           />
@@ -243,7 +262,7 @@ export default function RegisterFamilyScreen() {
           <AuthError message={error} />
 
           <Button isLoading={submitting} onPress={handleSubmit(onSubmit)} size="lg">
-            Create family account
+            {t('register.submit')}
           </Button>
         </View>
       )}

@@ -14,17 +14,34 @@ export default function RoleShellPlaceholder({
 }: RoleShellPlaceholderProps) {
   const shell = ROLE_SHELLS[shellKey];
   const isFamily = shellKey === 'family';
+  const isSupport = shellKey === 'support';
   const isDocuments = isFamily && pageTitle === 'Documents';
-  const { t } = useTranslation('family');
+  const isSupportNotes = isSupport && pageTitle === 'Shift Notes';
+  const isSupportMessages = isSupport && pageTitle === 'Messages';
+  const { t } = useTranslation(isSupport ? 'support' : 'family');
 
-  const title = isDocuments ? t('placeholders.documents.title') : pageTitle;
+  const title = isDocuments
+    ? t('placeholders.documents.title')
+    : isSupportNotes
+      ? t('placeholders.notes.title')
+      : isSupportMessages
+        ? t('placeholders.messages.title')
+        : pageTitle;
   const body = isDocuments
     ? t('placeholders.documents.description')
-    : (description ??
-      `This section will be wired to live APIs in a later milestone. The ${shell.roleBadge} shell and navigation are in place.`);
+    : isSupportNotes
+      ? t('placeholders.notes.description')
+      : isSupportMessages
+        ? t('placeholders.messages.description')
+        : (description ??
+          `This section will be wired to live APIs in a later milestone. The ${shell.roleBadge} shell and navigation are in place.`);
   const badge = isDocuments
     ? t('placeholders.documents.badge')
-    : 'Placeholder · integration';
+    : isSupportNotes
+      ? t('placeholders.notes.badge')
+      : isSupportMessages
+        ? t('placeholders.messages.badge')
+        : 'Placeholder · integration';
 
   return (
     <div className="max-w-2xl">

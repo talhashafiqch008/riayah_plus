@@ -7,6 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Card, EmptyState, ScreenHeader, StatusBadge } from '../ui';
 import { ROLE, roleCardStyle } from '../shell/RoleChrome';
 import { VisitCheckinMap } from '../maps/VisitCheckinMap';
@@ -30,21 +32,47 @@ async function fetchGpsCompliance() {
   return (data?.data ?? data) as GpsComplianceStats;
 }
 
-function logBadge(log: GpsLogRow): { label: string; status: string } {
-  if (log.eventType === 'checkout') return { label: 'checked out', status: 'completed' };
-  if (log.geofenceStatus === 'no_address') return { label: 'no address', status: 'pending' };
-  if (log.geofenced) return { label: 'within radius', status: 'completed' };
+function geofenceBadgeLabel(
+  t: TFunction,
+  status: string | null | undefined,
+  opts?: { live?: boolean; geofenced?: boolean },
+): string {
+  if (opts?.live) return t('mobile.gps.badges.live');
+  if (status === 'no_address') return t('mobile.gps.badges.noAddress');
+  if (opts?.geofenced) return t('mobile.gps.badges.withinRadius');
+  const key = status ?? 'unknown';
+  return t(`mobile.gps.badges.${key}`, {
+    defaultValue: key.replace(/_/g, ' '),
+  });
+}
+
+function logBadge(t: TFunction, log: GpsLogRow): { label: string; status: string } {
+  if (log.eventType === 'checkout') {
+    return { label: t('mobile.gps.badges.checkedOut'), status: 'completed' };
+  }
+  if (log.geofenceStatus === 'no_address') {
+    return { label: t('mobile.gps.badges.noAddress'), status: 'pending' };
+  }
+  if (log.geofenced) {
+    return { label: t('mobile.gps.badges.withinRadius'), status: 'completed' };
+  }
+  const status = log.geofenceStatus ?? 'out_of_radius';
   return {
-    label: (log.geofenceStatus ?? 'out of radius').replace(/_/g, ' '),
+    label: t(`mobile.gps.badges.${status}`, {
+      defaultValue: status.replace(/_/g, ' '),
+    }),
     status: 'cancelled',
   };
 }
 
 interface GpsMonitorScreenProps {
   visitHref: (sessionId: string) => string;
+  i18nNs?: 'coordinator' | 'org';
 }
 
-export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
+export function GpsMonitorScreen({ visitHref, i18nNs = 'coordinator' }: GpsMonitorScreenProps) {
+  const { t } = useTranslation(i18nNs);
+
   const statsQuery = useQuery({
     queryKey: ['gps-compliance'],
     queryFn: fetchGpsCompliance,
@@ -79,8 +107,8 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Visit GPS"
-        subtitle="Check-ins, check-outs, and who is on a visit now"
+        title={t('mobile.gps.title')}
+        subtitle={t('mobile.gps.monitorSubtitle')}
         showBack
       />
       {loading ? (
@@ -91,9 +119,9 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
       ) : err ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load GPS data"
+          title={t('mobile.gps.loadError')}
           subtitle={apiErrorMessage(err)}
-          action={{ label: 'Try again', onPress: refetchAll }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: refetchAll }}
         />
       ) : (
         <ScrollView
@@ -107,23 +135,21 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
           }
         >
           <View className="flex-row flex-wrap gap-3">
-            <StatCard label="Check-ins" value={s?.totalCheckins ?? 0} />
-            <StatCard label="Check-outs" value={s?.totalCheckouts ?? 0} />
-            <StatCard label="Out of radius" value={s?.outOfRadius ?? 0} />
+            <StatCard label={t('mobile.gps.checkIns')} value={s?.totalCheckins ?? 0} />
+            <StatCard label={t('mobile.gps.checkOuts')} value={s?.totalCheckouts ?? 0} />
+            <StatCard label={t('mobile.gps.outOfRadius')} value={s?.outOfRadius ?? 0} />
             <StatCard
-              label="Compliance"
+              label={t('mobile.gps.compliance')}
               value={s?.complianceRate != null ? `${s.complianceRate}%` : '—'}
               teal
             />
           </View>
 
           <Text className="mb-3 mt-6 text-[10px] font-bold uppercase tracking-[2.5px] text-stone-400">
-            Live location
+            {t('mobile.gps.liveLocation')}
           </Text>
           {workers.length === 0 ? (
-            <Text className="mb-2 text-sm text-stone-500">
-              No one is checked in. Open the visit screen on the worker phone to share live GPS.
-            </Text>
+            <Text className="mb-2 text-sm text-stone-500">{t('mobile.gps.noOneCheckedIn')}</Text>
           ) : (
             workers.map((w) => {
               const dest =
@@ -134,6 +160,13 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
                 w.lat != null && w.lng != null
                   ? { latitude: w.lat, longitude: w.lng }
                   : null;
+              const statusLine = w.isLive
+                ? t('mobile.gps.liveLocation')
+                : w.lastSeenAt
+                  ? t('mobile.gps.lastSeen', { time: formatDateTime(w.lastSeenAt) })
+                  : w.checkInAt
+                    ? t('mobile.gps.checkedInAt', { time: formatDateTime(w.checkInAt) })
+                    : t('mobile.gps.waitingForGps');
               return (
                 <View key={w.sessionId} className="mb-4">
                   <VisitCheckinMap
@@ -150,21 +183,24 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
                     <View className="flex-row items-start justify-between gap-3">
                       <View className="min-w-0 flex-1">
                         <Text className="text-base font-semibold text-stone-900">{w.name}</Text>
-                        <Text className="mt-1 text-sm text-stone-600">With {w.patientName}</Text>
+                        <Text className="mt-1 text-sm text-stone-600">
+                          {t('mobile.gps.withPatient', { name: w.patientName })}
+                        </Text>
                         <Text className="mt-1 text-xs text-stone-400">
-                          {w.isLive
-                            ? 'Live location'
-                            : w.lastSeenAt
-                              ? `Last seen ${formatDateTime(w.lastSeenAt)}`
-                              : w.checkInAt
-                                ? `Checked in ${formatDateTime(w.checkInAt)}`
-                                : 'Waiting for GPS'}
-                          {w.distanceMeters != null ? ` · ${Math.round(w.distanceMeters)}m from address` : ''}
+                          {statusLine}
+                          {w.distanceMeters != null
+                            ? t('mobile.gps.distanceFromAddress', {
+                                meters: Math.round(w.distanceMeters),
+                              })
+                            : ''}
                         </Text>
                       </View>
                       <StatusBadge
                         status={w.isLive ? 'completed' : w.withinGeofence ? 'completed' : 'cancelled'}
-                        label={w.isLive ? 'live' : (w.geofenceStatus ?? 'unknown').replace(/_/g, ' ')}
+                        label={geofenceBadgeLabel(t, w.geofenceStatus, {
+                          live: w.isLive,
+                          geofenced: w.withinGeofence,
+                        })}
                       />
                     </View>
                   </Card>
@@ -174,13 +210,13 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
           )}
 
           <Text className="mb-3 mt-6 text-[10px] font-bold uppercase tracking-[2.5px] text-stone-400">
-            Check-ins and check-outs
+            {t('mobile.gps.checkInsSection')}
           </Text>
           {logs.length === 0 ? (
-            <Text className="text-sm text-stone-500">No visit GPS recorded yet.</Text>
+            <Text className="text-sm text-stone-500">{t('mobile.gps.noGpsYet')}</Text>
           ) : (
             logs.map((log) => {
-              const badge = logBadge(log);
+              const badge = logBadge(t, log);
               return (
                 <Card
                   key={log.id}
@@ -192,14 +228,16 @@ export function GpsMonitorScreen({ visitHref }: GpsMonitorScreenProps) {
                   <View className="flex-row items-start justify-between gap-3">
                     <View className="min-w-0 flex-1">
                       <Text className="text-sm font-bold text-stone-900">
-                        {log.worker?.name ?? 'Worker'}
+                        {log.worker?.name ?? t('mobile.gps.workerFallback')}
                       </Text>
                       <Text className="mt-0.5 text-xs text-stone-500">
                         {log.client?.name ? `${log.client.name} · ` : ''}
                         {formatDateTime(log.createdAt)}
                       </Text>
                       <Text className="mt-0.5 text-xs text-stone-400">
-                        {log.eventType === 'checkout' ? 'Check-out' : 'Check-in'}
+                        {log.eventType === 'checkout'
+                          ? t('mobile.gps.checkOut')
+                          : t('mobile.gps.checkIn')}
                         {log.address ? ` · ${log.address}` : ''}
                         {log.distanceMeters != null ? ` · ${log.distanceMeters}m` : ''}
                       </Text>

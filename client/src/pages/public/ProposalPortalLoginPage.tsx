@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,11 +18,15 @@ interface ProposalPortalLoginPageProps {
 }
 
 export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLoginPageProps) {
+  const { t } = useTranslation('auth');
   const shell = ROLE_SHELLS[portal];
   const { login, logout, complete2faLogin } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const allowPhone = portal === 'family';
+
+  const portalTitle = t(`portal.portals.${portal}.title`);
+  const portalRole = t(`portal.portals.${portal}.role`);
 
   const initialPhone = params.get('phone') ?? '';
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>(
@@ -38,8 +43,8 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
   const [loading, setLoading] = useState(false);
 
   const identifierLabel = useMemo(
-    () => (loginMethod === 'phone' ? 'Phone' : 'Email'),
-    [loginMethod],
+    () => (loginMethod === 'phone' ? t('portal.phone') : t('portal.email')),
+    [loginMethod, t],
   );
 
   const finishPortalLogin = async (user: { role?: string }) => {
@@ -50,13 +55,13 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
       await logout();
       setStep('credentials');
       setTwoFactorCode('');
-      const message = `This portal is for ${shell.roleBadge} accounts. Please use the correct login for your role.`;
+      const message = t('portal.wrongPortal', { role: portalRole });
       setError(message);
       toast.error(message);
       return;
     }
 
-    toast.success(`Welcome to ${shell.portalTitle}`);
+    toast.success(t('portal.welcomeToast', { portal: portalTitle }));
     navigate(redirectTo || getRoleDashboard(role), { replace: true });
   };
 
@@ -69,7 +74,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
       const isPhone = allowPhone && loginMethod === 'phone';
       const identifier = isPhone ? phone.replace(/\s+/g, '') : email;
       if (!identifier.trim()) {
-        toast.error(`Please enter your ${identifierLabel.toLowerCase()}.`);
+        toast.error(t('portal.enterIdentifier', { field: identifierLabel }));
         return;
       }
       const user = await login(identifier, password, isPhone);
@@ -79,7 +84,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
         setPendingUserId(err.twoFaToken);
         setStep('2fa');
         setTwoFactorCode('');
-        toast.success('Enter the 6-digit code from your authenticator app.');
+        toast.success(t('portal.enter2faToast'));
         return;
       }
 
@@ -88,7 +93,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
         err.statusCode === 403 &&
         err.message?.toLowerCase().includes('email not verified')
       ) {
-        toast.error('Please verify your email before logging in.');
+        toast.error(t('portal.verifyEmailFirst'));
         navigate(`/verify-email?email=${encodeURIComponent(email)}`);
         return;
       }
@@ -98,12 +103,12 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
         err.statusCode === 403 &&
         err.message?.toLowerCase().includes('phone not verified')
       ) {
-        toast.error('Please verify your phone before logging in.');
+        toast.error(t('portal.verifyPhoneFirst'));
         navigate(`/verify-phone?phone=${encodeURIComponent(phone.replace(/\s+/g, ''))}`);
         return;
       }
 
-      const message = err instanceof Error ? err.message : 'Invalid credentials';
+      const message = err instanceof Error ? err.message : t('portal.invalidCredentials');
       setError(message);
       toast.error(message);
     } finally {
@@ -114,7 +119,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
   const handle2faSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (twoFactorCode.length !== 6) {
-      toast.error('Please enter the 6-digit code.');
+      toast.error(t('portal.enter6Digit'));
       return;
     }
 
@@ -124,7 +129,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
       const user = await complete2faLogin(pendingUserId, twoFactorCode);
       await finishPortalLogin(user);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Invalid verification code';
+      const message = err instanceof Error ? err.message : t('portal.invalidCode');
       setError(message);
       toast.error(message);
     } finally {
@@ -139,19 +144,19 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
           <Link to="/">
             <img
               src="/logo.png"
-              alt="Riayah Plus"
+              alt={t('brand')}
               width={64}
               height={64}
               className="h-16 w-auto mx-auto mb-4"
             />
           </Link>
           <h1 className="text-2xl font-bold text-stone-900">
-            {step === '2fa' ? 'Two-Factor Authentication' : shell.portalTitle}
+            {step === '2fa' ? t('portal.twoFactorTitle') : portalTitle}
           </h1>
           <p className="text-stone-500 mt-1">
             {step === '2fa'
-              ? 'Enter the code from your authenticator app'
-              : `Sign in to your ${shell.roleBadge} account`}
+              ? t('portal.twoFactorHint')
+              : t('portal.signInTo', { role: portalRole })}
           </p>
         </div>
 
@@ -171,14 +176,14 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                     onClick={() => setLoginMethod('email')}
                     className={`rounded-lg py-2 text-sm font-semibold ${loginMethod === 'email' ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500'}`}
                   >
-                    Email
+                    {t('portal.email')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setLoginMethod('phone')}
                     className={`rounded-lg py-2 text-sm font-semibold ${loginMethod === 'phone' ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500'}`}
                   >
-                    Phone
+                    {t('portal.phone')}
                   </button>
                 </div>
               )}
@@ -186,7 +191,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
               {loginMethod === 'email' || !allowPhone ? (
                 <div>
                   <label htmlFor="portal-email" className="block text-sm font-medium text-stone-700 mb-1">
-                    Email
+                    {t('portal.email')}
                   </label>
                   <input
                     id="portal-email"
@@ -200,7 +205,9 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">
+                    {t('portal.phone')}
+                  </label>
                   <PhoneInput
                     value={phone}
                     defaultCountry={CountryCode.PK}
@@ -215,7 +222,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                   htmlFor="portal-password"
                   className="block text-sm font-medium text-stone-700 mb-1"
                 >
-                  Password
+                  {t('portal.password')}
                 </label>
                 <div className="relative">
                   <input
@@ -232,6 +239,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
                     tabIndex={-1}
+                    aria-label={showPassword ? t('portal.hidePassword') : t('portal.showPassword')}
                   >
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
@@ -243,7 +251,14 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                 disabled={loading}
                 className="w-full py-2.5 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="size-4 animate-spin" /> : 'Sign In'}
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    {t('portal.signingIn')}
+                  </>
+                ) : (
+                  t('portal.signIn')
+                )}
               </button>
             </form>
           ) : (
@@ -258,7 +273,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                   htmlFor="portal-2fa"
                   className="mb-1 block text-center text-sm font-medium text-stone-700"
                 >
-                  Authentication code
+                  {t('portal.authCode')}
                 </label>
                 <input
                   id="portal-2fa"
@@ -267,7 +282,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                   autoComplete="one-time-code"
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="000000"
+                  placeholder={t('portal.authCodePlaceholder')}
                   required
                   className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-center font-mono text-lg tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
@@ -277,7 +292,14 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                 disabled={loading || twoFactorCode.length !== 6}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 py-2.5 font-medium text-white hover:bg-teal-700 disabled:opacity-50"
               >
-                {loading ? <Loader2 className="size-4 animate-spin" /> : 'Verify & Sign In'}
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    {t('portal.verifying')}
+                  </>
+                ) : (
+                  t('portal.verify')
+                )}
               </button>
               <button
                 type="button"
@@ -288,7 +310,7 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
                 }}
                 className="w-full text-sm text-stone-500 hover:text-stone-700"
               >
-                Back to password
+                {t('portal.backToCredentials')}
               </button>
             </form>
           )}
@@ -297,15 +319,15 @@ export function ProposalPortalLoginPage({ portal, redirectTo }: ProposalPortalLo
             <div className="mt-6 space-y-2 text-center text-sm text-stone-500">
               {allowPhone && (
                 <p>
-                  New here?{' '}
+                  {t('portal.newHere')}{' '}
                   <Link to="/register" className="text-teal-600 hover:underline">
-                    Create a family account
+                    {t('portal.createFamilyAccount')}
                   </Link>
                 </p>
               )}
               <p>
                 <Link to="/forgot-password" className="text-teal-600 hover:underline">
-                  Forgot password?
+                  {t('portal.forgotPassword')}
                 </Link>
               </p>
             </div>

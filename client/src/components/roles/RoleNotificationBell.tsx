@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { isApiError } from '@/lib/errors';
 import {
@@ -14,12 +15,14 @@ import {
   notificationIsUnread,
   type AppNotification,
 } from '@/lib/api/notifications';
+import { localizeNotification } from '@/lib/localizeNotification';
 import { connectRealtime, subscribeNotificationRealtime } from '@/lib/realtime';
 
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString('en-QA', { dateStyle: 'medium', timeStyle: 'short' });
+  const tag = locale.startsWith('ar') ? 'ar-QA' : 'en-QA';
+  return date.toLocaleString(tag, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 interface RoleNotificationBellProps {
@@ -29,6 +32,7 @@ interface RoleNotificationBellProps {
 export default function RoleNotificationBell({ shellBasePath }: RoleNotificationBellProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -50,11 +54,11 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
       setRows(data.notifications);
       setUnread(data.notifications.filter(notificationIsUnread).length);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load notifications');
+      toast.error(isApiError(error) ? error.message : t('notificationsUi.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
@@ -115,7 +119,7 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
       );
       setUnread((c) => Math.max(0, c - 1));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not mark as read');
+      toast.error(isApiError(error) ? error.message : t('notificationsUi.markReadFailed'));
     }
   }
 
@@ -125,7 +129,7 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
       setRows((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString(), isRead: true })));
       setUnread(0);
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not mark all as read');
+      toast.error(isApiError(error) ? error.message : t('notificationsUi.markAllFailed'));
     }
   }
 
@@ -136,7 +140,7 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
       setRows((prev) => prev.filter((n) => n.id !== id));
       if (row && notificationIsUnread(row)) setUnread((c) => Math.max(0, c - 1));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not remove notification');
+      toast.error(isApiError(error) ? error.message : t('notificationsUi.removeFailed'));
     }
   }
 
@@ -155,7 +159,7 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
         type="button"
         onClick={() => void toggle()}
         className="relative rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-        aria-label="Notifications"
+        aria-label={t('notificationsUi.title')}
         aria-expanded={open}
       >
         <Bell className="size-5" />
@@ -169,14 +173,14 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-            <h3 className="text-sm font-semibold text-stone-900">Notifications</h3>
+            <h3 className="text-sm font-semibold text-stone-900">{t('notificationsUi.title')}</h3>
             {unread > 0 && (
               <button
                 type="button"
                 onClick={() => void onMarkAll()}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-800"
               >
-                <Check className="size-3" /> Mark all read
+                <Check className="size-3" /> {t('notificationsUi.markAllRead')}
               </button>
             )}
           </div>
@@ -189,13 +193,14 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
             ) : rows.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-stone-500">
                 <Bell className="mx-auto mb-2 size-8 text-stone-300" />
-                No notifications yet
+                {t('notificationsUi.empty')}
               </div>
             ) : (
               <ul className="divide-y divide-stone-50">
                 {rows.map((n) => {
                   const unreadRow = notificationIsUnread(n);
                   const href = notificationHref(n, shellBasePath);
+                  const localized = localizeNotification(n, t);
                   return (
                     <li
                       key={n.id}
@@ -218,12 +223,12 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
                                 unreadRow ? 'font-semibold text-stone-900' : 'font-medium text-stone-800'
                               }`}
                             >
-                              {n.title}
+                              {localized.title}
                             </p>
-                            <p className="mt-0.5 line-clamp-2 text-xs text-stone-500">{n.body}</p>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-stone-500">{localized.body}</p>
                             <p className="mt-1 text-[10px] text-stone-400">
-                              {formatWhen(n.createdAt)}
-                              {href ? ' · Open' : ''}
+                              {formatWhen(n.createdAt, i18n.language)}
+                              {href ? ` · ${t('notificationsUi.open')}` : ''}
                             </p>
                           </div>
                         </div>
@@ -232,7 +237,7 @@ export default function RoleNotificationBell({ shellBasePath }: RoleNotification
                         type="button"
                         onClick={() => void onDelete(n.id)}
                         className="absolute right-2 top-2 rounded p-1 text-stone-300 opacity-0 hover:text-rose-600 group-hover:opacity-100"
-                        aria-label="Remove notification"
+                        aria-label={t('notificationsUi.removeNotification')}
                       >
                         <Trash2 className="size-3.5" />
                       </button>

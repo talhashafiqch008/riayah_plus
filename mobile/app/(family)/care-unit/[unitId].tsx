@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Button,
@@ -31,9 +32,14 @@ import {
 } from '../../../lib/api/care';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDate } from '../../../lib/format';
-import { familyEpisodeStatusLabel, familyIntakeStatusLabel } from '../../../lib/familyLanguage';
+import {
+  familyEpisodeStatusLabel,
+  familyIntakeStatusLabel,
+  formatFamilyDate,
+} from '../../../lib/familyLanguage';
 import { parseFamilyWizardSummary } from '../../../lib/familyCareseekerIntake';
 import { toastError } from '../../../lib/toast';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 type UnitForm = {
   name: string;
@@ -56,6 +62,7 @@ function toForm(unit: CareUnit): UnitForm {
 }
 
 export default function FamilyCareUnitDetailScreen() {
+  const { t } = useTranslation('family');
   const { unitId } = useLocalSearchParams<{ unitId: string }>();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
@@ -82,8 +89,8 @@ export default function FamilyCareUnitDetailScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!unitId) throw new Error('Missing care unit');
-      if (!form.name.trim()) throw new Error('Care unit name is required');
+      if (!unitId) throw new Error(t('careUnit.notFound'));
+      if (!form.name.trim()) throw new Error(t('careUnit.nameRequired'));
       return updateCareUnit(unitId, {
         name: form.name.trim(),
         primaryCaregiverName: form.primaryCaregiverName.trim() || undefined,
@@ -94,18 +101,18 @@ export default function FamilyCareUnitDetailScreen() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['family-care-unit', unitId] });
-      queryClient.invalidateQueries({ queryKey: ['family-care-units'] });
+      void queryClient.invalidateQueries({ queryKey: ['family-care-unit', unitId] });
+      void queryClient.invalidateQueries({ queryKey: ['family-care-units'] });
       setEditing(false);
-      toast.show('Care unit updated', { type: 'success' });
+      toast.show(t('careUnit.updated'), { type: 'success' });
     },
-    onError: (e) => toastError(toast, e, 'Save failed'),
+    onError: (e) => toastError(toast, e, t('careUnit.saveFailed')),
   });
 
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Care unit" showBack />
+        <FamilyTabHero title={t('nav.care-unit')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -114,12 +121,12 @@ export default function FamilyCareUnitDetailScreen() {
   if (query.isError || !unit) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Care unit" showBack />
+        <FamilyTabHero title={t('nav.care-unit')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Care unit not found"
+          title={t('careUnit.notFound')}
           subtitle={query.error ? apiErrorMessage(query.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
@@ -128,10 +135,11 @@ export default function FamilyCareUnitDetailScreen() {
   const patients = unit.careRecipients ?? [];
   const episodes = unit.careEpisodes ?? [];
   const intakes = unit.intakeRecords ?? [];
+  const peopleWord = patients.length === 1 ? t('careUnit.person') : t('careUnit.people');
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <FamilyTabHero title={unit.name} subtitle="Household" showBack />
+      <FamilyTabHero title={unit.name} subtitle={t('careUnit.household')} showBack />
 
       <KeyboardAvoidingView
         className="flex-1"
@@ -149,13 +157,17 @@ export default function FamilyCareUnitDetailScreen() {
           }
         >
           <Text className="text-sm text-stone-500">
-            {patients.length} {patients.length === 1 ? 'person' : 'people'} needing care · open a
-            person below to see their care request
+            {t('careUnit.membersNeedingCare', {
+              count: patients.length,
+              people: peopleWord,
+            })}
           </Text>
 
           <Card className="mt-4" shadow>
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-semibold text-stone-900">Household details</Text>
+              <Text className="text-sm font-semibold text-stone-900">
+                {t('careUnit.householdDetails')}
+              </Text>
               {!editing ? (
                 <Pressable
                   onPress={() => {
@@ -165,7 +177,9 @@ export default function FamilyCareUnitDetailScreen() {
                   hitSlop={8}
                   accessibilityRole="button"
                 >
-                  <Text className="text-sm font-semibold text-teal-700">Edit</Text>
+                  <Text className="text-sm font-semibold text-teal-700">
+                    {t('careUnit.editShort')}
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -173,33 +187,33 @@ export default function FamilyCareUnitDetailScreen() {
             {editing ? (
               <View className="mt-3 gap-3">
                 <Input
-                  label="Name"
+                  label={t('careUnit.name')}
                   value={form.name}
                   onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
                 />
                 <Input
-                  label="Account holder"
+                  label={t('careUnit.accountHolder')}
                   value={form.primaryCaregiverName}
                   onChangeText={(v) => setForm((f) => ({ ...f, primaryCaregiverName: v }))}
                 />
                 <Input
-                  label="Phone"
+                  label={t('careUnit.phone')}
                   value={form.primaryCaregiverPhone}
                   onChangeText={(v) => setForm((f) => ({ ...f, primaryCaregiverPhone: v }))}
                   keyboardType="phone-pad"
                 />
                 <Input
-                  label="Relation"
+                  label={t('careUnit.relation')}
                   value={form.primaryCaregiverRelation}
                   onChangeText={(v) => setForm((f) => ({ ...f, primaryCaregiverRelation: v }))}
                 />
                 <Input
-                  label="City"
+                  label={t('careUnit.city')}
                   value={form.city}
                   onChangeText={(v) => setForm((f) => ({ ...f, city: v }))}
                 />
                 <Input
-                  label="Address"
+                  label={t('careUnit.address')}
                   value={form.address}
                   onChangeText={(v) => setForm((f) => ({ ...f, address: v }))}
                 />
@@ -212,7 +226,7 @@ export default function FamilyCareUnitDetailScreen() {
                         setForm(toForm(unit));
                       }}
                     >
-                      Cancel
+                      {t('careUnit.cancel')}
                     </Button>
                   </View>
                   <View className="flex-1">
@@ -220,18 +234,18 @@ export default function FamilyCareUnitDetailScreen() {
                       isLoading={saveMutation.isPending}
                       onPress={() => saveMutation.mutate()}
                     >
-                      Save
+                      {t('careUnit.save')}
                     </Button>
                   </View>
                 </View>
               </View>
             ) : (
               <View className="mt-3 gap-3">
-                <DetailRow label="Account holder" value={unit.primaryCaregiverName} />
-                <DetailRow label="Phone" value={unit.primaryCaregiverPhone} />
-                <DetailRow label="Relation" value={unit.primaryCaregiverRelation} />
+                <DetailRow label={t('careUnit.accountHolder')} value={unit.primaryCaregiverName} />
+                <DetailRow label={t('careUnit.phone')} value={unit.primaryCaregiverPhone} />
+                <DetailRow label={t('careUnit.relation')} value={unit.primaryCaregiverRelation} />
                 <DetailRow
-                  label="Location"
+                  label={t('careUnit.location')}
                   value={
                     [unit.address, unit.city, formatCountry(unit.country)]
                       .filter(Boolean)
@@ -243,20 +257,18 @@ export default function FamilyCareUnitDetailScreen() {
           </Card>
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Who needs care
+            {t('careUnit.whoNeedsCare')}
           </Text>
-          <Text className="mb-3 text-sm text-stone-500">
-            Open a person to view their individual care request.
-          </Text>
+          <Text className="mb-3 text-sm text-stone-500">{t('careUnit.openPersonHint')}</Text>
 
           {patients.length === 0 ? (
             <Card shadow={false}>
               <EmptyState
                 icon="person-outline"
-                title="No care recipient yet"
-                subtitle="Submit a care request from onboarding."
+                title={t('careUnit.emptyPatients')}
+                subtitle={t('careUnit.empty')}
                 action={{
-                  label: 'Start a care request',
+                  label: t('dashboard.startCareRequest'),
                   onPress: () => router.push('/(onboarding)/step-1-care-unit'),
                 }}
               />
@@ -267,7 +279,9 @@ export default function FamilyCareUnitDetailScreen() {
               const summary = parseFamilyWizardSummary(intake?.wizardPayload);
               const meta = [
                 patient.relationship,
-                patient.dateOfBirth ? `DOB ${formatDate(patient.dateOfBirth)}` : null,
+                patient.dateOfBirth
+                  ? t('careUnit.dob', { date: formatFamilyDate(patient.dateOfBirth) })
+                  : null,
                 summary?.supportCategories?.length
                   ? summary.supportCategories.join(', ')
                   : null,
@@ -299,10 +313,10 @@ export default function FamilyCareUnitDetailScreen() {
                         ) : null}
                       </View>
                       <Text className="mt-0.5 text-sm text-stone-500">
-                        {meta || 'Open to view care request'}
+                        {meta || t('careUnit.openCareRequest')}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
+                    <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
                   </View>
                 </Card>
               );
@@ -312,7 +326,7 @@ export default function FamilyCareUnitDetailScreen() {
           {episodes.length > 0 ? (
             <>
               <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Care journeys
+                {t('careUnit.journeysHeading')}
               </Text>
               {episodes.map((ep) => (
                 <Card
@@ -322,7 +336,9 @@ export default function FamilyCareUnitDetailScreen() {
                   shadow={false}
                 >
                   <View className="flex-row items-center justify-between gap-2">
-                    <Text className="flex-1 font-medium text-stone-900">{ep.title}</Text>
+                    <Text className="flex-1 font-medium text-stone-900">
+                      {ep.title ?? t('episodes.untitled')}
+                    </Text>
                     <Chip label={familyEpisodeStatusLabel(ep.status)} tone="green" />
                   </View>
                 </Card>

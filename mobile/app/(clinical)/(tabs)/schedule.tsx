@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,24 +11,27 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
 import { listAssessments, type Assessment } from '../../../lib/api/assessments';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
-
-const STATUS_FILTERS = [
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: '', label: 'All' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-] as const;
-
-function patientName(row: Assessment): string {
-  return row.patient?.name || row.episode?.title || 'Patient';
-}
+import { navForwardIcon } from '../../../lib/rtlIcons';
+import { clinicalAssessmentType, clinicalScheduleStatus } from '../../../lib/clinicalI18n';
 
 export default function ClinicalScheduleScreen() {
+  const { t } = useTranslation('clinical');
   const [status, setStatus] = useState('scheduled');
+
+  const filters = useMemo(
+    () => [
+      { value: 'scheduled', label: t('schedule.status.scheduled') },
+      { value: '', label: t('common.all') },
+      { value: 'completed', label: t('schedule.status.completed') },
+      { value: 'cancelled', label: t('schedule.status.cancelled') },
+    ],
+    [t],
+  );
 
   const query = useQuery({
     queryKey: ['clinical-assessments', status],
@@ -40,19 +43,21 @@ export default function ClinicalScheduleScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-      <ScreenHeader title="Schedule" subtitle="Assessments assigned to you" showBack={false} />
+      <ScreenHeader
+        title={t('nav.schedule')}
+        subtitle={t('mobile.scheduleSubtitle')}
+        showBack={false}
+      />
 
       <View className="border-b border-stone-100 bg-white pb-3">
-        <Text className="px-4 pt-3 text-sm text-stone-500">
-          Assessments assigned to you — complete with findings and report.
-        </Text>
+        <Text className="px-4 pt-3 text-sm text-stone-500">{t('schedule.description')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-3"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
-          {STATUS_FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -78,9 +83,9 @@ export default function ClinicalScheduleScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load assessments"
+          title={t('schedule.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -97,51 +102,61 @@ export default function ClinicalScheduleScreen() {
           ListHeaderComponent={
             rows.length > 0 ? (
               <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                {total} result{total === 1 ? '' : 's'}
+                {t(total === 1 ? 'schedule.count_one' : 'schedule.count_other', { count: total })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon="calendar-outline"
-              title="No assessments"
-              subtitle="Nothing in this filter yet. Assigned assessments appear here."
+              title={t('schedule.empty')}
+              subtitle={t('schedule.description')}
             />
           }
           renderItem={({ item }) => (
-            <Card
-              className="mb-3"
-              onPress={() => router.push(`/(clinical)/schedule/${item.id}`)}
-              shadow
-            >
-              <View className="flex-row items-start gap-3">
-                <View className="mt-0.5 rounded-xl bg-teal-50 p-2.5">
-                  <Ionicons name="clipboard-outline" size={20} color="#0F766E" />
-                </View>
-                <View className="flex-1">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="font-semibold text-stone-900">{patientName(item)}</Text>
-                    <StatusBadge
-                      status={item.status}
-                      label={item.status.replace(/_/g, ' ')}
-                    />
-                  </View>
-                  <Text className="mt-0.5 text-sm capitalize text-stone-500">
-                    {(item.type ?? 'assessment').replace(/_/g, ' ')}
-                    {item.scheduledAt ? ` · ${formatDateTime(item.scheduledAt)}` : ''}
-                  </Text>
-                  {item.status === 'scheduled' ? (
-                    <Text className="mt-1 text-sm font-medium text-teal-700">
-                      Tap to complete
-                    </Text>
-                  ) : null}
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#D6D3D1" />
-              </View>
-            </Card>
+            <AssessmentCard item={item} />
           )}
         />
       )}
     </SafeAreaView>
+  );
+}
+
+function AssessmentCard({ item }: { item: Assessment }) {
+  const { t, i18n } = useTranslation('clinical');
+  const name = item.patient?.name || item.episode?.title || t('common.patient');
+  const statusLabel = clinicalScheduleStatus(t, i18n, item.status);
+  const typeLabel = item.type
+    ? clinicalAssessmentType(t, i18n, item.type)
+    : t('common.episode');
+
+  return (
+    <Card
+      className="mb-3"
+      onPress={() => router.push(`/(clinical)/schedule/${item.id}`)}
+      shadow
+    >
+      <View className="flex-row items-start gap-3">
+        <View className="mt-0.5 rounded-xl bg-teal-50 p-2.5">
+          <Ionicons name="clipboard-outline" size={20} color="#0F766E" />
+        </View>
+        <View className="flex-1">
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Text className="font-semibold text-stone-900">{name}</Text>
+            <StatusBadge status={item.status} label={statusLabel} />
+          </View>
+          <Text className="mt-0.5 text-sm text-stone-500">
+            {typeLabel}
+            {item.scheduledAt ? ` · ${formatDateTime(item.scheduledAt)}` : ''}
+          </Text>
+          {item.status === 'scheduled' ? (
+            <Text className="mt-1 text-sm font-medium text-teal-700">
+              {t('schedule.markCompleted')}
+            </Text>
+          ) : null}
+        </View>
+        <Ionicons name={navForwardIcon()} size={18} color="#D6D3D1" />
+      </View>
+    </Card>
   );
 }

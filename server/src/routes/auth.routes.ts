@@ -104,6 +104,8 @@ router.use(authenticate);
 router.post('/logout-all', AuthController.logoutAll);
 router.get('/me', AuthController.me);
 router.get('/users/me', AuthController.me);
+router.put('/me/language', UserProfileController.setUiLanguage);
+router.put('/users/me/language', UserProfileController.setUiLanguage);
 router.post('/auth/resend-verification', AuthController.resendVerification);
 router.post('/2fa/enable', loginLimiter, AuthController.enable2fa);
 router.post('/2fa/verify-setup', loginLimiter, AuthController.verify2faSetup);

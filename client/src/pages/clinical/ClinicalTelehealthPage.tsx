@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { listSessions, type CareSession } from '@/lib/api/scheduling';
+import { familyDateLocale } from '@/lib/familyLanguage';
+import { localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
 
 function isJoinable(session: CareSession): boolean {
   return session.type === 'telehealth' && ['accepted', 'in_progress'].includes(session.status);
 }
 
 export default function ClinicalTelehealthPage() {
+  const { t } = useTranslation('clinical');
+  const dateLocale = familyDateLocale();
   const [sessions, setSessions] = useState<CareSession[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,11 +24,11 @@ export default function ClinicalTelehealthPage() {
       const rows = await listSessions();
       setSessions(rows.filter((s) => s.type === 'telehealth'));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load video sessions');
+      toast.error(isApiError(error) ? error.message : t('telehealth.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -48,17 +53,15 @@ export default function ClinicalTelehealthPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-stone-900">Video sessions</h2>
-          <p className="mt-1 text-stone-600">
-            Join the call, admit family from the waiting room, and review the care plan side panel.
-          </p>
+          <h2 className="text-2xl font-semibold text-stone-900">{t('telehealth.title')}</h2>
+          <p className="mt-1 text-stone-600">{t('telehealth.description')}</p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700"
         >
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {t('telehealth.refresh')}
         </button>
       </div>
 
@@ -69,17 +72,16 @@ export default function ClinicalTelehealthPage() {
       ) : upcoming.length === 0 && past.length === 0 ? (
         <div className="rounded-xl border border-dashed border-stone-200 bg-white p-10 text-center">
           <Video className="mx-auto size-10 text-stone-300" />
-          <p className="mt-3 text-stone-600">No telehealth sessions assigned to this account yet.</p>
-          <p className="mt-2 text-sm text-stone-500">
-            This list only shows calls booked for you. Log in as the clinician named on the family
-            waiting room (not a demo clinical user from another organization).
-          </p>
+          <p className="mt-3 text-stone-600">{t('telehealth.empty')}</p>
+          <p className="mt-2 text-sm text-stone-500">{t('telehealth.emptyHint')}</p>
         </div>
       ) : (
         <div className="space-y-6">
           {upcoming.length > 0 && (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-800">Upcoming</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-800">
+                {t('telehealth.upcoming')}
+              </h3>
               {upcoming.map((session) => (
                 <article
                   key={session.id}
@@ -87,17 +89,17 @@ export default function ClinicalTelehealthPage() {
                 >
                   <div>
                     <h3 className="font-semibold text-stone-900">
-                      {session.client?.name ?? 'Family'}
+                      {localizeGeneratedLabel(session.client?.name) || t('telehealth.family')}
                     </h3>
                     <p className="mt-1 text-sm text-stone-600">
-                      {new Date(session.scheduledAt).toLocaleString('en-QA')}
+                      {new Date(session.scheduledAt).toLocaleString(dateLocale)}
                     </p>
                   </div>
                   <Link
                     to={`/clinical/telehealth/${session.id}`}
                     className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
                   >
-                    Open session
+                    {t('telehealth.openSession')}
                   </Link>
                 </article>
               ))}
@@ -105,7 +107,9 @@ export default function ClinicalTelehealthPage() {
           )}
           {past.length > 0 && (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Past</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+                {t('telehealth.past')}
+              </h3>
               {past.map((session) => (
                 <article
                   key={session.id}
@@ -113,18 +117,20 @@ export default function ClinicalTelehealthPage() {
                 >
                   <div>
                     <span className="font-semibold text-stone-800">
-                      {session.client?.name ?? 'Family'}
+                      {localizeGeneratedLabel(session.client?.name) || t('telehealth.family')}
                     </span>
                     {' · '}
-                    {new Date(session.scheduledAt).toLocaleString('en-QA')}
+                    {new Date(session.scheduledAt).toLocaleString(dateLocale)}
                     {' · '}
-                    {session.status.replace(/_/g, ' ')}
+                    {t(`common.sessionStatus.${session.status}`, {
+                      defaultValue: session.status.replace(/_/g, ' '),
+                    })}
                   </div>
                   <Link
                     to={`/clinical/telehealth/${session.id}`}
                     className="text-sm font-semibold text-teal-700 hover:text-teal-800"
                   >
-                    Review
+                    {t('telehealth.review')}
                   </Link>
                 </article>
               ))}

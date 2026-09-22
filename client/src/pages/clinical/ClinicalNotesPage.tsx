@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2, RefreshCw, Stethoscope, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/lib/errors';
 import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
+import { localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
 import {
   RolePageHeader,
   RolePageShell,
@@ -26,6 +28,7 @@ function statusClass(status: string) {
 }
 
 export default function ClinicalNotesPage() {
+  const { t } = useTranslation('clinical');
   const [episodes, setEpisodes] = useState<CareEpisode[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,11 +38,11 @@ export default function ClinicalNotesPage() {
       const result = await listEpisodes({ limit: 50 });
       setEpisodes(result.data);
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Failed to load episodes');
+      toast.error(extractApiError(error).message || t('notes.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -48,11 +51,11 @@ export default function ClinicalNotesPage() {
   return (
     <RolePageShell>
       <RolePageHeader
-        title="Session Notes"
-        description="Choose a care episode to view or add clinical notes. Notes are immutable after save."
+        title={t('notes.title')}
+        description={t('notes.description')}
         actions={
           <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
-            <RefreshCw className="size-4" /> Refresh
+            <RefreshCw className="size-4" /> {t('notes.refresh')}
           </button>
         }
       />
@@ -64,11 +67,8 @@ export default function ClinicalNotesPage() {
       ) : episodes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-5 py-10 text-center sm:p-10">
           <Stethoscope className="mx-auto size-10 text-stone-300" />
-          <p className="mt-3 text-stone-600">No episodes available yet.</p>
-          <p className="mt-1 text-sm text-stone-500">
-            Episodes appear after a coordinator starts a care journey for a patient in your
-            organization.
-          </p>
+          <p className="mt-3 text-stone-600">{t('notes.empty')}</p>
+          <p className="mt-1 text-sm text-stone-500">{t('notes.emptyHint')}</p>
         </div>
       ) : (
         <ul className="divide-y divide-stone-100 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
@@ -83,19 +83,27 @@ export default function ClinicalNotesPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate font-semibold text-stone-900">{ep.title}</p>
+                    <p className="truncate font-semibold text-stone-900">
+                      {localizeGeneratedLabel(ep.title)}
+                    </p>
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(ep.status)}`}
                     >
-                      {ep.status.replace(/_/g, ' ')}
+                      {t(`episodes.status.${ep.status}`, {
+                        defaultValue: ep.status.replace(/_/g, ' '),
+                      })}
                     </span>
                   </div>
                   <p className="mt-0.5 truncate text-sm text-stone-500">
-                    {ep.patient?.name || ep.careRecipient?.name || 'Patient'}
-                    {ep.coordinator?.name ? ` · Coord: ${ep.coordinator.name}` : ''}
+                    {localizeGeneratedLabel(
+                      ep.patient?.name || ep.careRecipient?.name || t('common.patient'),
+                    )}
+                    {ep.coordinator?.name
+                      ? ` · ${t('notes.coord', { name: ep.coordinator.name })}`
+                      : ''}
                   </p>
                 </div>
-                <ChevronRight className="size-4 shrink-0 text-stone-400" />
+                <ChevronRight className="size-4 shrink-0 text-stone-400 rtl-flip" />
               </Link>
             </li>
           ))}

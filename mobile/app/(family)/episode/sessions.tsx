@@ -8,18 +8,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../../components/ui';
 import { FAMILY, FamilyTabHero } from '../../../components/family/FamilyChrome';
 import { SessionCard, type SessionCardSession } from '../../../components/session/SessionCard';
 import { apiClient } from '../../../lib/api/client';
-import { apiErrorMessage } from '../../../lib/format';
+import { apiErrorMessage, activeDateLocale } from '../../../lib/format';
 
 function monthKey(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  return d.toLocaleDateString(activeDateLocale(), { month: 'long', year: 'numeric' });
 }
 
 export function SessionsTab({ episodeId }: { episodeId?: string }) {
+  const { t } = useTranslation('family');
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['episode-sessions', episodeId],
     enabled: Boolean(episodeId),
@@ -35,7 +37,7 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
 
   const sections = useMemo(() => {
     if (sessions.length <= 3) {
-      return [{ title: 'Sessions', data: sessions }];
+      return [{ title: t('mobile.episode.sessionsSection'), data: sessions }];
     }
     const map = new Map<string, SessionCardSession[]>();
     for (const s of sessions) {
@@ -48,14 +50,14 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
       title,
       data: rows,
     }));
-  }, [sessions]);
+  }, [sessions, t]);
 
   if (!episodeId) {
     return (
       <EmptyState
         icon="calendar-outline"
-        title="No episode"
-        subtitle="Select an episode to view sessions."
+        title={t('mobile.episode.noEpisodeTitle')}
+        subtitle={t('mobile.episode.selectEpisodeSessions')}
       />
     );
   }
@@ -68,9 +70,9 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
     return (
       <EmptyState
         icon="alert-circle-outline"
-        title="Could not load"
+        title={t('mobile.common.notifications.loadError')}
         subtitle={apiErrorMessage(error)}
-        action={{ label: 'Try again', onPress: () => void refetch() }}
+        action={{ label: t('mobile.common.tryAgain'), onPress: () => void refetch() }}
       />
     );
   }
@@ -79,8 +81,8 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
     return (
       <EmptyState
         icon="calendar-outline"
-        title="No sessions yet"
-        subtitle="Booked care sessions will appear here."
+        title={t('mobile.episode.noSessionsTitle')}
+        subtitle={t('mobile.episode.noSessionsSubtitle')}
       />
     );
   }
@@ -118,8 +120,8 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
       ListEmptyComponent={
         <EmptyState
           icon="calendar-outline"
-          title="No sessions yet"
-          subtitle="Booked care sessions will appear here."
+          title={t('mobile.episode.noSessionsTitle')}
+          subtitle={t('mobile.episode.noSessionsSubtitle')}
         />
       }
     />
@@ -127,9 +129,14 @@ export function SessionsTab({ episodeId }: { episodeId?: string }) {
 }
 
 export default function EpisodeSessionsScreen() {
+  const { t } = useTranslation('family');
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Sessions" subtitle="Booked visits for this care journey" showBack />
+      <FamilyTabHero
+        title={t('mobile.episode.sessionsTitle')}
+        subtitle={t('mobile.episode.sessionsSubtitle')}
+        showBack
+      />
       <SessionsTab />
     </SafeAreaView>
   );

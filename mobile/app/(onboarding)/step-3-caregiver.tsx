@@ -2,15 +2,19 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Button, Input } from '../../components/ui';
 import {
+  careLocationEnumKey,
   GENDER_OPTIONS,
   LOCATION_OPTIONS,
+  PROVIDER_LANG_I18N,
   PROVIDER_LANGUAGES,
 } from '../../lib/onboardingOptions';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 
 export default function Step3Preferences() {
+  const { t } = useTranslation('family');
   const data = useOnboardingStore((s) => s.data);
   const updateData = useOnboardingStore((s) => s.updateData);
   const setStep = useOnboardingStore((s) => s.setStep);
@@ -34,10 +38,10 @@ export default function Step3Preferences() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['bottom']}>
       <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text className="text-2xl font-bold text-stone-900">Provider Preferences</Text>
-        <Text className="mb-6 mt-1 text-sm text-stone-500">Customize your ideal care provider.</Text>
+        <Text className="text-2xl font-bold text-stone-900">{t('onboarding.stepTitles.preferences')}</Text>
+        <Text className="mb-6 mt-1 text-sm text-stone-500">{t('onboarding.preferencesHint')}</Text>
 
-        <Text className="mb-2 font-semibold text-stone-900">Provider Gender</Text>
+        <Text className="mb-2 font-semibold text-stone-900">{t('onboarding.providerGender')}</Text>
         <View className="mb-6 gap-3">
           {GENDER_OPTIONS.map((option) => {
             const selected = data.practitionerGender === option.id;
@@ -49,18 +53,20 @@ export default function Step3Preferences() {
                   selected ? 'border-stone-900 bg-stone-50' : 'border-stone-200 bg-white'
                 }`}
               >
-                <Text className="font-bold text-stone-900">{option.label}</Text>
-                <Text className="text-xs text-stone-400">{option.description}</Text>
+                <Text className="font-bold text-stone-900">{t(`enums.gender.${option.id}`)}</Text>
+                <Text className="text-xs text-stone-400">{t(`enums.genderHint.${option.id}`)}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text className="mb-2 font-semibold text-stone-900">Spoken Languages</Text>
-        <Text className="mb-2 text-xs uppercase text-stone-400">Optional</Text>
+        <Text className="mb-2 font-semibold text-stone-900">{t('onboarding.spokenLanguages')}</Text>
+        <Text className="mb-2 text-xs uppercase text-stone-400">{t('onboarding.optional')}</Text>
         <View className="mb-6 flex-row flex-wrap gap-2">
           {PROVIDER_LANGUAGES.map((lang) => {
             const selected = data.languages.includes(lang.code);
+            const langKey = PROVIDER_LANG_I18N[lang.code];
+            const label = langKey ? t(`onboarding.languages.${langKey}`) : lang.code;
             return (
               <Pressable
                 key={lang.code}
@@ -71,17 +77,18 @@ export default function Step3Preferences() {
               >
                 <Text>{lang.flag}</Text>
                 <Text className={`font-medium ${selected ? 'text-white' : 'text-stone-700'}`}>
-                  {lang.label}
+                  {label}
                 </Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text className="mb-2 font-semibold text-stone-900">Care Location</Text>
+        <Text className="mb-2 font-semibold text-stone-900">{t('onboarding.careLocation')}</Text>
         <View className="mb-4 gap-3">
           {LOCATION_OPTIONS.map((option) => {
             const selected = data.careLocation === option.id;
+            const locKey = careLocationEnumKey(option.id);
             return (
               <Pressable
                 key={option.id}
@@ -93,8 +100,12 @@ export default function Step3Preferences() {
                 <View className="flex-row items-center gap-3">
                   <Ionicons name={option.icon} size={22} color="#0D9488" />
                   <View>
-                    <Text className="font-bold text-stone-900">{option.label}</Text>
-                    <Text className="text-xs text-stone-500">{option.description}</Text>
+                    <Text className="font-bold text-stone-900">
+                      {t(`enums.careLocation.${locKey}`)}
+                    </Text>
+                    <Text className="text-xs text-stone-500">
+                      {t(`enums.careLocationHint.${locKey}`)}
+                    </Text>
                   </View>
                 </View>
               </Pressable>
@@ -104,8 +115,8 @@ export default function Step3Preferences() {
 
         {data.careLocation === 'home' ? (
           <Input
-            label="Street Address / Area"
-            placeholder="e.g. West Bay, Doha..."
+            label={t('onboarding.streetAddress')}
+            placeholder={t('onboarding.streetAddressPlaceholder')}
             value={data.address}
             onChangeText={(address) => updateData({ address })}
           />
@@ -120,12 +131,12 @@ export default function Step3Preferences() {
               router.back();
             }}
           >
-            Back
+            {t('onboarding.back')}
           </Button>
         </View>
         <View className="flex-1">
           <Button onPress={onNext} disabled={!isValid}>
-            Continue
+            {t('onboarding.continue')}
           </Button>
         </View>
       </View>

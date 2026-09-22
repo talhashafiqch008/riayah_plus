@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -22,7 +23,6 @@ import {
 import { ClinicianDropdown } from '../../../components/ClinicianDropdown';
 import {
   allowedEpisodeTransitions,
-  episodeStatusLabel,
   getEpisode,
   listClinicians,
   scheduleAssessment,
@@ -30,19 +30,14 @@ import {
 } from '../../../lib/api/care';
 import { queryClient } from '../../../lib/query/client';
 import { apiErrorMessage, formatDateTime } from '../../../lib/format';
-import { familyAssessmentStatusLabel } from '../../../lib/familyLanguage';
 import { buildFamilyJourneyMilestones } from '../../../lib/familyJourneyMilestones';
 import { toastError } from '../../../lib/toast';
 
-const CONSULTATION_TYPES = [
-  { id: 'initial', label: 'Initial' },
-  { id: 'follow_up', label: 'Follow-up' },
-  { id: 'discharge', label: 'Discharge' },
-] as const;
+const CONSULTATION_TYPE_IDS = ['initial', 'follow_up', 'discharge'] as const;
 
 const TIME_SLOTS = ['09:00', '11:00', '14:00', '16:00'];
 
-function nextFourteenDays() {
+function nextFourteenDays(locale: string) {
   const out: { iso: string; day: string; date: string }[] = [];
   const now = new Date();
   for (let i = 0; i < 14; i++) {
@@ -50,7 +45,7 @@ function nextFourteenDays() {
     d.setDate(now.getDate() + i);
     out.push({
       iso: d.toISOString().slice(0, 10),
-      day: d.toLocaleDateString('en-AU', { weekday: 'short' }),
+      day: d.toLocaleDateString(locale, { weekday: 'short' }),
       date: String(d.getDate()),
     });
   }
@@ -64,7 +59,22 @@ function combineDateAndTime(dateIso: string, hhmm: string): string {
   return d.toISOString();
 }
 
+function episodeStatusLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  status: string,
+) {
+  return t(`episodes.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
+}
+
+function staffRoleLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  role: string,
+) {
+  return t(`mobile.detail.staffRoles.${role}`, { defaultValue: role.replace(/_/g, ' ') });
+}
+
 export default function CoordinatorEpisodeDetailScreen() {
+  const { t, i18n } = useTranslation('coordinator');
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
 
@@ -73,7 +83,8 @@ export default function CoordinatorEpisodeDetailScreen() {
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
 
-  const days = useMemo(() => nextFourteenDays(), []);
+  const dateLocale = i18n.language?.startsWith('ar') ? 'ar-QA' : 'en-AU';
+  const days = useMemo(() => nextFourteenDays(dateLocale), [dateLocale]);
 
   const query = useQuery({
     queryKey: ['coordinator-episode', id],
@@ -101,16 +112,19 @@ export default function CoordinatorEpisodeDetailScreen() {
       await queryClient.invalidateQueries({ queryKey: ['coordinator-episode', id] });
       await queryClient.invalidateQueries({ queryKey: ['coordinator-episodes'] });
       await queryClient.invalidateQueries({ queryKey: ['coordinator-shell-stats'] });
-      toast.show(`Status → ${episodeStatusLabel(next)}`, { type: 'success' });
+      toast.show(
+        t('mobile.detail.statusUpdatedToast', { status: episodeStatusLabel(t, next) }),
+        { type: 'success' },
+      );
     },
-    onError: (e) => toastError(toast, e, 'Status update failed'),
+    onError: (e) => toastError(toast, e, t('intake.toasts.statusUpdateFailed')),
   });
 
   const scheduleMutation = useMutation({
     mutationFn: async () => {
       if (!id) throw new Error('Missing episode');
-      if (!assessorId) throw new Error('Pick a clinician');
-      if (!date || !time) throw new Error('Pick a date and time');
+      if (!assessorId) throw new Error(t('mobile.detail.pickClinician'));
+      if (!date || !time) throw new Error(t('mobile.detail.pickDateTime'));
       return scheduleAssessment({
         episodeId: id,
         assessorId,
@@ -123,15 +137,15 @@ export default function CoordinatorEpisodeDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['coordinator-episodes'] });
       setDate(null);
       setTime(null);
-      toast.show('Assessment scheduled', { type: 'success' });
+      toast.show(t('episodeDetail.assessmentScheduled'), { type: 'success' });
     },
-    onError: (e) => toastError(toast, e, 'Schedule failed'),
+    onError: (e) => toastError(toast, e, t('episodeDetail.scheduleFailed')),
   });
 
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Episode" showBack />
+        <ScreenHeader title={t('mobile.detail.episodeFallback')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -140,12 +154,12 @@ export default function CoordinatorEpisodeDetailScreen() {
   if (query.isError || !episode) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <ScreenHeader title="Episode" showBack />
+        <ScreenHeader title={t('mobile.detail.episodeFallback')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Episode not found"
+          title={t('episodeDetail.notFound')}
           subtitle={query.error ? apiErrorMessage(query.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.shell.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
@@ -157,10 +171,16 @@ export default function CoordinatorEpisodeDetailScreen() {
   const clinicians = cliniciansQuery.data ?? [];
   const canBook = !isClosed && clinicians.length > 0;
 
+  const urgencyLabel = episode.urgencyLevel
+    ? t(`intake.urgency.${episode.urgencyLevel}`, {
+        defaultValue: episode.urgencyLevel.replace(/_/g, ' '),
+      })
+    : '—';
+
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title={episode.title ?? 'Episode'}
+        title={episode.title ?? t('mobile.detail.episodeFallback')}
         subtitle={episode.careRecipient?.name ?? episode.patient?.name ?? undefined}
         showBack
       />
@@ -180,18 +200,22 @@ export default function CoordinatorEpisodeDetailScreen() {
             <StatusBadge
               status={episode.status}
               size="md"
-              label={episodeStatusLabel(episode.status)}
+              label={episodeStatusLabel(t, episode.status)}
             />
           ) : null}
           <Pressable onPress={() => router.push(`/(coordinator)/plans/new?episodeId=${episode.id}`)}>
-            <Text className="text-sm font-semibold text-teal-700">New care plan</Text>
+            <Text className="text-sm font-semibold text-teal-700">
+              {t('mobile.detail.newCarePlan')}
+            </Text>
           </Pressable>
         </View>
 
         <Card className="mt-3" shadow>
-          <Text className="text-sm font-semibold text-stone-900">Care journey</Text>
+          <Text className="text-sm font-semibold text-stone-900">
+            {t('mobile.detail.careJourney')}
+          </Text>
           <Text className="mt-0.5 text-sm text-stone-500">
-            Family-facing milestones plus coordinator status actions.
+            {t('mobile.detail.careJourneyCoordinatorHint')}
           </Text>
           <View className="mt-4 gap-3">
             {milestones.map((m, i) => (
@@ -236,8 +260,10 @@ export default function CoordinatorEpisodeDetailScreen() {
                     >
                       {m.label}
                     </Text>
-                    {m.locked ? <Chip label="Coming soon" /> : null}
-                    {m.current && !m.locked ? <Chip label="Now" tone="teal" /> : null}
+                    {m.locked ? <Chip label={t('mobile.detail.comingSoon')} /> : null}
+                    {m.current && !m.locked ? (
+                      <Chip label={t('mobile.detail.now')} tone="teal" />
+                    ) : null}
                   </View>
                 </View>
               </View>
@@ -247,7 +273,7 @@ export default function CoordinatorEpisodeDetailScreen() {
           {nextStatuses.length > 0 ? (
             <View className="mt-5 border-t border-stone-100 pt-4">
               <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Advance status
+                {t('episodeDetail.advanceStatus')}
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {nextStatuses.map((next) => (
@@ -259,8 +285,10 @@ export default function CoordinatorEpisodeDetailScreen() {
                   >
                     <Text className="text-xs font-semibold capitalize text-stone-700">
                       {transitionMutation.isPending && transitionMutation.variables === next
-                        ? 'Updating…'
-                        : `→ ${episodeStatusLabel(next)}`}
+                        ? t('intake.detail.updating')
+                        : t('mobile.detail.statusTransition', {
+                            label: episodeStatusLabel(t, next),
+                          })}
                     </Text>
                   </Pressable>
                 ))}
@@ -268,36 +296,36 @@ export default function CoordinatorEpisodeDetailScreen() {
             </View>
           ) : (
             <Text className="mt-4 text-sm text-stone-500">
-              No further status transitions available.
+              {t('mobile.detail.noStatusTransitions')}
             </Text>
           )}
 
           <View className="mt-4 border-t border-stone-100 pt-4">
             <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Assigned coordinator
+              {t('episodeDetail.assignedCoordinator')}
             </Text>
             <Text className="mt-0.5 text-sm text-stone-800">
-              {episode.coordinator?.name ?? 'Unassigned'}
+              {episode.coordinator?.name ?? t('mobile.detail.unassigned')}
             </Text>
           </View>
         </Card>
 
         <Card className="mt-4" shadow>
-          <Text className="text-sm font-semibold text-stone-900">Clinical summary</Text>
+          <Text className="text-sm font-semibold text-stone-900">
+            {t('episodeDetail.clinicalSummary')}
+          </Text>
           <View className="mt-3 gap-3">
             <View>
               <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Reason for care
+                {t('episodeDetail.reasonForCare')}
               </Text>
               <Text className="mt-0.5 text-base text-stone-900">{episode.reasonForCare || '—'}</Text>
             </View>
             <View>
               <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Urgency
+                {t('episodeDetail.urgency')}
               </Text>
-              <Text className="mt-0.5 text-base capitalize text-stone-900">
-                {episode.urgencyLevel || '—'}
-              </Text>
+              <Text className="mt-0.5 text-base capitalize text-stone-900">{urgencyLabel}</Text>
             </View>
             {(episode.diagnoses ?? []).length > 0 ? (
               <View className="flex-row flex-wrap gap-2">
@@ -310,43 +338,56 @@ export default function CoordinatorEpisodeDetailScreen() {
         </Card>
 
         <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-          Consultations
+          {t('mobile.detail.consultations')}
         </Text>
         {assessments.length === 0 ? (
           <Card shadow={false}>
-            <Text className="text-sm text-stone-500">No consultations booked yet.</Text>
+            <Text className="text-sm text-stone-500">{t('mobile.detail.noConsultations')}</Text>
           </Card>
         ) : (
-          assessments.map((a) => (
-            <Card key={a.id} className="mb-2" shadow={false}>
-              <View className="flex-row items-start justify-between gap-2">
-                <Text className="flex-1 font-medium capitalize text-stone-900">
-                  {(a.type ?? 'consultation').replace(/_/g, ' ')}
-                  {a.scheduledAt ? ` · ${formatDateTime(a.scheduledAt)}` : ''}
-                </Text>
-                <StatusBadge
-                  status={a.status ?? 'scheduled'}
-                  label={familyAssessmentStatusLabel(a.status ?? 'scheduled')}
-                />
-              </View>
-              {a.assessor?.name ? (
-                <Text className="mt-1 text-sm text-stone-500">
-                  With {a.assessor.name}
-                  {a.assessor.role ? ` · ${a.assessor.role.replace(/_/g, ' ')}` : ''}
-                </Text>
-              ) : null}
-            </Card>
-          ))
+          assessments.map((a) => {
+            const assessmentStatus = a.status ?? 'scheduled';
+            return (
+              <Card key={a.id} className="mb-2" shadow={false}>
+                <View className="flex-row items-start justify-between gap-2">
+                  <Text className="flex-1 font-medium capitalize text-stone-900">
+                    {t(`assessmentTypes.${a.type ?? 'initial'}`, {
+                      defaultValue: (a.type ?? 'consultation').replace(/_/g, ' '),
+                    })}
+                    {a.scheduledAt ? ` · ${formatDateTime(a.scheduledAt)}` : ''}
+                  </Text>
+                  <StatusBadge
+                    status={assessmentStatus}
+                    label={t(`mobile.detail.assessmentStatus.${assessmentStatus}`, {
+                      defaultValue: assessmentStatus.replace(/_/g, ' '),
+                    })}
+                  />
+                </View>
+                {a.assessor?.name ? (
+                  <Text className="mt-1 text-sm text-stone-500">
+                    {a.assessor.role
+                      ? t('mobile.detail.withPersonRole', {
+                          name: a.assessor.name,
+                          role: staffRoleLabel(t, a.assessor.role),
+                        })
+                      : t('mobile.detail.withPerson', { name: a.assessor.name })}
+                  </Text>
+                ) : null}
+              </Card>
+            );
+          })
         )}
 
         {!isClosed ? (
           <Card className="mt-4" shadow>
-            <Text className="text-sm font-semibold text-stone-900">Book a consultation</Text>
+            <Text className="text-sm font-semibold text-stone-900">
+              {t('mobile.detail.bookConsultation')}
+            </Text>
             {cliniciansQuery.isLoading ? (
               <ActivityIndicator color="#0D9488" className="mt-4" />
             ) : !canBook ? (
               <Text className="mt-2 text-sm text-stone-500">
-                No clinicians available to book right now.
+                {t('mobile.detail.noCliniciansToBook')}
               </Text>
             ) : (
               <View className="mt-3 gap-4">
@@ -358,15 +399,15 @@ export default function CoordinatorEpisodeDetailScreen() {
 
                 <View>
                   <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Type
+                    {t('episodeDetail.type')}
                   </Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {CONSULTATION_TYPES.map((t) => {
-                      const selected = type === t.id;
+                    {CONSULTATION_TYPE_IDS.map((consultType) => {
+                      const selected = type === consultType;
                       return (
                         <Pressable
-                          key={t.id}
-                          onPress={() => setType(t.id)}
+                          key={consultType}
+                          onPress={() => setType(consultType)}
                           className={`rounded-xl border px-3 py-2 ${
                             selected ? 'border-teal-600 bg-teal-50' : 'border-stone-200 bg-white'
                           }`}
@@ -376,7 +417,7 @@ export default function CoordinatorEpisodeDetailScreen() {
                               selected ? 'font-medium text-teal-700' : 'text-stone-600'
                             }`}
                           >
-                            {t.label}
+                            {t(`assessmentTypes.${consultType}`)}
                           </Text>
                         </Pressable>
                       );
@@ -386,7 +427,7 @@ export default function CoordinatorEpisodeDetailScreen() {
 
                 <View>
                   <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Date
+                    {t('mobile.detail.date')}
                   </Text>
                   <ScrollView
                     horizontal
@@ -421,15 +462,15 @@ export default function CoordinatorEpisodeDetailScreen() {
 
                 <View>
                   <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                    Time
+                    {t('mobile.detail.time')}
                   </Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {TIME_SLOTS.map((t) => {
-                      const selected = time === t;
+                    {TIME_SLOTS.map((slot) => {
+                      const selected = time === slot;
                       return (
                         <Pressable
-                          key={t}
-                          onPress={() => setTime(t)}
+                          key={slot}
+                          onPress={() => setTime(slot)}
                           className={`rounded-xl border px-4 py-2 ${
                             selected ? 'border-teal-600 bg-teal-50' : 'border-stone-200 bg-white'
                           }`}
@@ -439,7 +480,7 @@ export default function CoordinatorEpisodeDetailScreen() {
                               selected ? 'font-medium text-teal-700' : 'text-stone-600'
                             }`}
                           >
-                            {t}
+                            {slot}
                           </Text>
                         </Pressable>
                       );
@@ -452,7 +493,7 @@ export default function CoordinatorEpisodeDetailScreen() {
                   isLoading={scheduleMutation.isPending}
                   onPress={() => scheduleMutation.mutate()}
                 >
-                  Book consultation
+                  {t('intake.actions.scheduleConsultation')}
                 </Button>
               </View>
             )}
@@ -460,27 +501,39 @@ export default function CoordinatorEpisodeDetailScreen() {
         ) : null}
 
         <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-          Sessions
+          {t('episodeDetail.sessions')}
         </Text>
         {sessions.length === 0 ? (
           <Card shadow={false}>
-            <Text className="text-sm text-stone-500">No care sessions scheduled yet.</Text>
+            <Text className="text-sm text-stone-500">{t('episodeDetail.noSessions')}</Text>
           </Card>
         ) : (
-          sessions.map((s) => (
-            <Card key={s.id} className="mb-2" shadow={false}>
-              <View className="flex-row items-start justify-between gap-2">
-                <Text className="flex-1 font-medium text-stone-900">
-                  {s.scheduledAt ? formatDateTime(s.scheduledAt) : 'Session'}
-                  {s.durationMinutes ? ` · ${s.durationMinutes} min` : ''}
-                </Text>
-                <StatusBadge status={s.status ?? 'scheduled'} />
-              </View>
-              {s.provider?.name ? (
-                <Text className="mt-1 text-sm text-stone-500">With {s.provider.name}</Text>
-              ) : null}
-            </Card>
-          ))
+          sessions.map((s) => {
+            const sessionStatus = s.status ?? 'scheduled';
+            return (
+              <Card key={s.id} className="mb-2" shadow={false}>
+                <View className="flex-row items-start justify-between gap-2">
+                  <Text className="flex-1 font-medium text-stone-900">
+                    {s.scheduledAt ? formatDateTime(s.scheduledAt) : t('mobile.detail.sessionFallback')}
+                    {s.durationMinutes
+                      ? ` · ${t('display.minutes', { count: s.durationMinutes })}`
+                      : ''}
+                  </Text>
+                  <StatusBadge
+                    status={sessionStatus}
+                    label={t(`schedule.sessionStatus.${sessionStatus}`, {
+                      defaultValue: sessionStatus.replace(/_/g, ' '),
+                    })}
+                  />
+                </View>
+                {s.provider?.name ? (
+                  <Text className="mt-1 text-sm text-stone-500">
+                    {t('mobile.detail.withPerson', { name: s.provider.name })}
+                  </Text>
+                ) : null}
+              </Card>
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,52 +1,18 @@
+import { useMemo } from 'react';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { RoleHome } from '../../../components/shell/RoleHome';
 import { VoiceRecordWidget } from '../../../components/voice/VoiceRecordWidget';
 import { listCarePlans, listEpisodes, listIntakeQueue } from '../../../lib/api/care';
 
 type ShellStat = { label: string; value: string; accent: 'teal' | 'stone' | 'amber' };
 
-const NEXT_STEPS = [
-  'Review new intake requests',
-  'Request missing documents from families',
-  'Schedule consultations after episode creation',
-  'Escalate urgency when clinically indicated',
-];
-
-const QUICK_LINKS = [
-  {
-    name: 'Intake Queue',
-    href: '/(coordinator)/intake',
-    hint: 'Review submitted requests',
-    icon: 'document-text-outline' as const,
-  },
-  {
-    name: 'Patients',
-    href: '/(coordinator)/patients',
-    hint: 'Care units in your organization',
-    icon: 'people-outline' as const,
-  },
-  {
-    name: 'Episodes',
-    href: '/(coordinator)/episodes',
-    hint: 'Advance status and schedule',
-    icon: 'heart-outline' as const,
-  },
-  {
-    name: 'Care Plans',
-    href: '/(coordinator)/plans',
-    hint: 'Build and submit plans',
-    icon: 'clipboard-outline' as const,
-  },
-  {
-    name: 'Visit GPS',
-    href: '/(coordinator)/map',
-    hint: 'Check-ins, check-outs, and live visits',
-    icon: 'location-outline' as const,
-  },
-] as const;
-
-async function fetchCoordinatorStats(): Promise<ShellStat[]> {
+async function fetchCoordinatorStats(labels: {
+  pending: string;
+  episodes: string;
+  plans: string;
+}): Promise<ShellStat[]> {
   const [submitted, underReview, activeEpisodes, plansAwaiting] = await Promise.all([
     (async () => {
       try {
@@ -85,27 +51,86 @@ async function fetchCoordinatorStats(): Promise<ShellStat[]> {
   ]);
 
   return [
-    { label: 'Pending\nintake', value: String(submitted + underReview), accent: 'amber' },
-    { label: 'Active\nepisodes', value: String(activeEpisodes), accent: 'teal' },
-    { label: 'Plans\nawaiting', value: String(plansAwaiting), accent: 'stone' },
+    { label: labels.pending, value: String(submitted + underReview), accent: 'amber' },
+    { label: labels.episodes, value: String(activeEpisodes), accent: 'teal' },
+    { label: labels.plans, value: String(plansAwaiting), accent: 'stone' },
   ];
 }
 
 export default function CoordinatorHomeScreen() {
+  const { t } = useTranslation('coordinator');
+
+  const labels = useMemo(
+    () => ({
+      pending: t('mobile.home.statsPending'),
+      episodes: t('mobile.home.statsEpisodes'),
+      plans: t('mobile.home.statsPlans'),
+    }),
+    [t],
+  );
+
   const statsQuery = useQuery({
-    queryKey: ['coordinator-shell-stats'],
-    queryFn: fetchCoordinatorStats,
+    queryKey: ['coordinator-shell-stats', labels.pending],
+    queryFn: () => fetchCoordinatorStats(labels),
   });
 
   const stats = statsQuery.data ?? [
-    { label: 'Pending\nintake', value: '—', accent: 'amber' as const },
-    { label: 'Active\nepisodes', value: '—', accent: 'teal' as const },
-    { label: 'Plans\nawaiting', value: '—', accent: 'stone' as const },
+    { label: labels.pending, value: '—', accent: 'amber' as const },
+    { label: labels.episodes, value: '—', accent: 'teal' as const },
+    { label: labels.plans, value: '—', accent: 'stone' as const },
   ];
+
+  const nextSteps = useMemo(
+    () => [
+      t('dashboard.steps.reviewIntake'),
+      t('dashboard.steps.requestDocs'),
+      t('dashboard.steps.scheduleConsults'),
+      t('dashboard.steps.escalate'),
+    ],
+    [t],
+  );
+
+  const quickLinks = useMemo(
+    () =>
+      [
+        {
+          name: t('nav.intake'),
+          href: '/(coordinator)/intake',
+          hint: t('mobile.home.intakeHint'),
+          icon: 'document-text-outline' as const,
+        },
+        {
+          name: t('nav.patients'),
+          href: '/(coordinator)/patients',
+          hint: t('mobile.home.patientsHint'),
+          icon: 'people-outline' as const,
+        },
+        {
+          name: t('nav.episodes'),
+          href: '/(coordinator)/episodes',
+          hint: t('mobile.home.episodesHint'),
+          icon: 'heart-outline' as const,
+        },
+        {
+          name: t('nav.plans'),
+          href: '/(coordinator)/plans',
+          hint: t('mobile.home.plansHint'),
+          icon: 'clipboard-outline' as const,
+        },
+        {
+          name: t('mobile.detail.visitGps'),
+          href: '/(coordinator)/map',
+          hint: t('mobile.home.gpsHint'),
+          icon: 'location-outline' as const,
+        },
+      ] as const,
+    [t],
+  );
 
   return (
     <RoleHome
-      tagline="Intake, episodes, and plans for your panel."
+      i18nNs="coordinator"
+      tagline={t('mobile.home.tagline')}
       notificationsHref="/(coordinator)/notifications"
       profileHref="/(coordinator)/profile"
       stats={stats}
@@ -114,10 +139,15 @@ export default function CoordinatorHomeScreen() {
       isError={statsQuery.isError}
       onRefresh={() => void statsQuery.refetch()}
       onRetry={() => void statsQuery.refetch()}
-      nextSteps={NEXT_STEPS}
-      cta={{ label: 'Open intake queue', onPress: () => router.push('/(coordinator)/intake') }}
-      quickLinks={QUICK_LINKS}
-      topWidget={<VoiceRecordWidget historyHref="/(coordinator)/voice-recordings" />}
+      nextSteps={nextSteps}
+      cta={{
+        label: t('dashboard.openIntake'),
+        onPress: () => router.push('/(coordinator)/intake'),
+      }}
+      quickLinks={quickLinks}
+      topWidget={
+        <VoiceRecordWidget historyHref="/(coordinator)/voice-recordings" i18nNs="coordinator" />
+      }
     />
   );
 }

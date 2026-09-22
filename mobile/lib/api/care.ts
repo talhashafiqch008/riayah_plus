@@ -5,6 +5,7 @@
  */
 
 import { apiClient } from './client';
+import i18n from '../../i18n/config';
 
 /* ------------------------------------------------------------------ episodes */
 
@@ -289,24 +290,14 @@ export function carePlanStatusLabel(
   status: string,
   variant: 'family' | 'staff' = 'family',
 ): string {
-  switch (normalizeCarePlanStatus(status)) {
-    case 'draft':
-      return 'Draft';
-    case 'submitted_for_approval':
-      return variant === 'staff' ? 'Awaiting family approval' : 'Awaiting your approval';
-    case 'approved':
-      return 'Approved';
-    case 'active':
-      return 'Active';
-    case 'revision_requested':
-      return 'Revision requested';
-    case 'rejected':
-      return 'Rejected';
-    case 'completed':
-      return 'Completed';
-    default:
-      return status.replace(/_/g, ' ');
+  const normalized = normalizeCarePlanStatus(status);
+  if (normalized === 'submitted_for_approval' && variant === 'family') {
+    return i18n.t('mobile.common.awaitingYourApproval', { ns: 'family' });
   }
+  const key = `status.carePlan.${normalized}`;
+  const translated = i18n.t(key, { ns: 'family', defaultValue: '' });
+  if (translated && translated !== key) return translated;
+  return status.replace(/_/g, ' ');
 }
 
 export async function listCarePlans(params?: { episodeId?: string }) {

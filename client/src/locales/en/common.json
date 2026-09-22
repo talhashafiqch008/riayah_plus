@@ -14,10 +14,372 @@
     "error": "Error",
     "success": "Success"
   },
+  "a11y": {
+    "back": "Back",
+    "action": "Action"
+  },
+  "select": {
+    "placeholder": "Select…",
+    "empty": "No options available.",
+    "search": "Search…"
+  },
+  "sessionCard": {
+    "client": "Client",
+    "provider": "Provider",
+    "session": "Session"
+  },
+  "sessionType": {
+    "telehealth": "Telehealth",
+    "in_person": "In person",
+    "home_visit": "Home visit",
+    "visit": "Visit",
+    "session": "Session"
+  },
+  "sessionStatus": {
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "scheduled": "Scheduled",
+    "in_progress": "In progress",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "rejected": "Rejected",
+    "no_show": "No show",
+    "checked_in": "Checked in"
+  },
   "language": {
     "en": "English",
     "ar": "العربية",
     "switchToEn": "English",
     "switchToAr": "العربية"
+  },
+  "languageGate": {
+    "eyebrow": "Language",
+    "title": "Choose your language",
+    "body": "Pick the language you want to use in Riayah Plus. This becomes your permanent language for this account.",
+    "permanent": "You will not be able to change this later from the app.",
+    "enHint": "Continue in English",
+    "arHint": "المتابعة بالعربية",
+    "saving": "Saving…",
+    "error": "Could not save language preference. Please try again."
+  },
+  "status": {
+    "active": "Active",
+    "approved": "Approved",
+    "completed": "Completed",
+    "checked_in": "Checked In",
+    "accepted": "Accepted",
+    "in_progress": "In Progress",
+    "pending": "Pending",
+    "in_review": "In Review",
+    "scheduled": "Scheduled",
+    "under_review": "Under Review",
+    "submitted_for_approval": "Submitted For Approval",
+    "cancelled": "Cancelled",
+    "rejected": "Rejected",
+    "inactive": "Inactive",
+    "paid": "Paid",
+    "sent": "Sent",
+    "disputed": "Disputed",
+    "overdue": "Overdue",
+    "on_hold": "On Hold",
+    "draft": "Draft",
+    "intake_submitted": "Intake Submitted",
+    "validated": "Validated",
+    "closed": "Closed",
+    "revision_requested": "Revision Requested",
+    "no_show": "No Show",
+    "withdrawn": "Withdrawn",
+    "episode_created": "Episode Created"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "timeout": "Request timed out. Check your connection.",
+    "network": "Could not reach the server. Check your connection."
+  },
+  "notificationsCatalog": {
+    "telehealth_reminder": {
+      "title": "Telehealth session in 30 minutes",
+      "body": "Your video session starts in about 30 minutes. Open the app to join."
+    },
+    "telehealth_ready": {
+      "title": "Telehealth session confirmed",
+      "body": "A video session is confirmed. Join from the app when it starts."
+    },
+    "telehealth_admitted": {
+      "title": "You have been admitted",
+      "body": "You were admitted to the video session. Rejoin from the app to enter."
+    },
+    "telehealth_admitted_clinician": {
+      "title": "You have been admitted",
+      "body": "The clinician admitted you. Rejoin to enter the video session."
+    },
+    "telehealth_admitted_host": {
+      "title": "You have been admitted",
+      "body": "The host admitted you. Rejoin to enter the video session."
+    },
+    "episode_validated": {
+      "title": "Your intake has been reviewed",
+      "body": "Your care coordinator has reviewed your intake and your episode is now active."
+    },
+    "session_booked_by_family": {
+      "title": "Family booked a session",
+      "body": "A session was booked on a care episode."
+    },
+    "session_booked": {
+      "title": "New care session booked",
+      "body": "A family booked a care session on your schedule."
+    },
+    "meeting_cancelled": {
+      "title": "Meeting Cancelled",
+      "body": "A telehealth session was cancelled."
+    },
+    "meeting_scheduled": {
+      "title": "Telehealth Meeting Scheduled",
+      "body": "You have a telehealth meeting scheduled. Open the app for details."
+    },
+    "meeting_ended": {
+      "title": "Meeting Ended",
+      "body": "The telehealth session has ended."
+    },
+    "assessment_scheduled": {
+      "title": "Assessment scheduled",
+      "body": "You have a new assessment on your schedule."
+    },
+    "consultation_booked_by_family": {
+      "title": "Consultation booked by family",
+      "body": "A family member scheduled a consultation for a care episode."
+    },
+    "assessment_booked": {
+      "title": "Assessment booked",
+      "body": "An assessment was scheduled for your care episode."
+    },
+    "assessment_completed": {
+      "title": "Assessment completed",
+      "body": "Your assessment findings are ready."
+    },
+    "care_plan_submitted": {
+      "title": "Care Plan Ready for Your Review",
+      "body": "Your care coordinator has submitted a care plan for your approval."
+    },
+    "care_plan_revision": {
+      "title": "Care Plan Revision Requested",
+      "body": "There is an update about your care plan. Open the app for details."
+    },
+    "care_plan_being_revised": {
+      "title": "Care Plan Being Revised",
+      "body": "Your care coordinator updated the care plan. You will be asked to approve the new version once it is submitted."
+    },
+    "care_plan_rejected": {
+      "title": "Care Plan Rejected",
+      "body": "The family has rejected the submitted care plan."
+    },
+    "care_plan_cosign": {
+      "title": "Care Plan Clinically Co-signed",
+      "body": "A clinical staff member has co-signed the care plan."
+    },
+    "care_plan_ai_draft": {
+      "title": "AI Care Plan Draft Ready",
+      "body": "An AI-generated care plan draft is ready for your review. Edit and submit when ready — it will not go to the family until you submit."
+    },
+    "intake_reviewed": {
+      "title": "Intake reviewed",
+      "body": "Your intake was validated by the care coordinator."
+    },
+    "intake_withdrawn": {
+      "title": "Intake withdrawn",
+      "body": "A family withdrew an intake that was under review."
+    },
+    "session_assigned": {
+      "title": "New care session assigned",
+      "body": "You have a new care session on your schedule."
+    },
+    "session_assigned_recurring": {
+      "title": "Recurring care sessions assigned",
+      "body": "Multiple care sessions were scheduled for a care episode."
+    },
+    "payment_received": {
+      "title": "Payment received",
+      "body": "Payment for invoice {{invoiceNumber}} was successful."
+    },
+    "payment_failed": {
+      "title": "Payment failed",
+      "body": "Payment for invoice {{invoiceNumber}} failed. Please try again."
+    },
+    "invoice_generated": {
+      "title": "Invoice ready",
+      "body": "Invoice {{invoiceNumber}} for {{currency}} {{amount}} is ready."
+    },
+    "invoice_sent": {
+      "title": "Invoice {{invoiceNumber}}",
+      "body": "You have a new invoice for {{currency}} {{amount}}."
+    },
+    "invoice_overdue": {
+      "title": "Invoice overdue",
+      "body": "Invoice {{invoiceNumber}} ({{currency}} {{amount}}) is past due."
+    },
+    "quotation_generated": {
+      "title": "Quotation ready",
+      "body": "A quotation ({{invoiceNumber}}) for {{currency}} {{amount}} is ready for your care plan."
+    },
+    "gps_out_of_radius": {
+      "title": "Out-of-Radius Check-In Detected",
+      "body": "A worker checked in {{distanceMeters}}m from the patient's address."
+    },
+    "gps_missed_checkin": {
+      "title": "Missed Check-In",
+      "body": "A worker has not checked in for a scheduled home visit."
+    },
+    "new_booking": {
+      "title": "New Booking Request",
+      "body": "You have a new booking request."
+    },
+    "counter_offer": {
+      "title": "Counter Offer Received",
+      "body": "The provider offered a new rate of {{amount}}."
+    },
+    "booking_reminder": {
+      "title": "Upcoming Booking Reminder",
+      "body": "You have a booking tomorrow."
+    },
+    "booking_confirmed": {
+      "title": "Booking Confirmed",
+      "body": "Your payment was successful and your booking is confirmed."
+    },
+    "booking_payment_provider": {
+      "title": "New Booking Payment",
+      "body": "A client has paid for a booking with you."
+    },
+    "booking_new": {
+      "title": "New Booking",
+      "body": "You have a new paid booking."
+    },
+    "booking_status": {
+      "title": "Booking {{status}}",
+      "body": "Your booking has been {{status}}."
+    },
+    "booking_status_changed": {
+      "title": "Booking Update",
+      "body": "Your booking status changed to: {{status}}"
+    },
+    "booking_status_changed": {
+      "title": "Booking Update",
+      "body": "Your booking status changed to: {{status}}"
+    },
+    "document_renewal": {
+      "title": "Document Expiring Soon",
+      "body": "A document on your account expires soon. Please renew it."
+    },
+    "document_request": {
+      "title": "Document Required",
+      "body": "You have been asked to upload a {{documentType}} document."
+    },
+    "document_received": {
+      "title": "Document Received",
+      "body": "The requested {{documentType}} document has been uploaded."
+    },
+    "emergency_alert": {
+      "title": "Emergency Alert",
+      "body": "A client has raised an emergency. Open the app to respond."
+    },
+    "emergency_alert_provider": {
+      "title": "Client Emergency",
+      "body": "Your current client needs emergency assistance."
+    },
+    "emergency_response": {
+      "title": "Emergency Response",
+      "body": "There is an update on an emergency request."
+    },
+    "care_need_bid": {
+      "title": "New Bid Received",
+      "body": "A provider has placed a bid on your care need."
+    },
+    "bid_accepted": {
+      "title": "Bid Accepted!",
+      "body": "The client has accepted your bid. A booking has been created."
+    },
+    "bid_rejected": {
+      "title": "Bid Not Accepted",
+      "body": "The client did not accept your bid on this care need."
+    },
+    "bid_counter_offer": {
+      "title": "Counter-Offer Received",
+      "body": "The client has made a counter-offer on your bid."
+    },
+    "care_order_created": {
+      "title": "New Care Order",
+      "body": "A new care order has been created."
+    },
+    "account_deletion": {
+      "title": "Account Deletion Request",
+      "body": "A user requested account deletion."
+    },
+    "verification_verified": {
+      "title": "Account Verified!",
+      "body": "Your account has been verified. You can now start accepting bookings."
+    },
+    "verification_rejected": {
+      "title": "Verification Update",
+      "body": "Your verification was not approved."
+    },
+    "dispute_opened": {
+      "title": "Dispute Opened",
+      "body": "A dispute was opened on a booking."
+    },
+    "dispute_opened_staff": {
+      "title": "New Booking Dispute",
+      "body": "A new dispute was opened and needs review."
+    },
+    "dispute_resolved": {
+      "title": "Dispute Resolved",
+      "body": "A booking dispute has been resolved."
+    },
+    "no_show_penalty": {
+      "title": "No-Show Penalty Applied",
+      "body": "A no-show penalty was applied to your account."
+    },
+    "no_show_compensation": {
+      "title": "No-Show Compensation",
+      "body": "You received compensation for a provider no-show."
+    },
+    "no_show_cancelled": {
+      "title": "Booking Cancelled — Provider No-Show",
+      "body": "Your booking was cancelled because the provider did not show up."
+    },
+    "payout_processed": {
+      "title": "Payout Processed",
+      "body": "Your payout has been processed."
+    },
+    "whatsapp_booking": {
+      "title": "New WhatsApp Booking",
+      "body": "A new booking was created via WhatsApp."
+    }
+  },
+  "notificationsUi": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "markAllAsRead": "Mark all as read",
+    "empty": "No notifications yet",
+    "markRead": "Mark read",
+    "markAsRead": "Mark as read",
+    "remove": "Remove",
+    "removeNotification": "Remove notification",
+    "delete": "Delete",
+    "open": "Open",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "recently": "Recently",
+    "liveUpdates": "Live updates enabled",
+    "connecting": "Connecting…",
+    "allMarkedRead": "All notifications marked as read",
+    "deleted": "Notification deleted",
+    "newNotification": "New notification",
+    "notification": "Notification",
+    "raiyahNotification": "Raiyah Notification",
+    "loadFailed": "Failed to load notifications",
+    "markReadFailed": "Could not mark as read",
+    "markAllFailed": "Could not mark all as read",
+    "removeFailed": "Could not remove notification"
   }
 }

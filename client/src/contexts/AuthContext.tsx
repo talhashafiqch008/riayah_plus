@@ -34,6 +34,8 @@ export interface User {
   phone?: string;
   avatar?: string | null;
   organizationId?: string | null;
+  /** Permanent UI language (`en` | `ar`). Null/undefined until the forced chooser completes. */
+  uiLanguage?: 'en' | 'ar' | null;
   onboarding_status?: string;
   is_active?: boolean;
   is_verified?: boolean;
@@ -97,6 +99,11 @@ function mapUserData(userData: Record<string, unknown>, extra?: Record<string, u
     phone: userData.phone as string | undefined,
     avatar: userData.avatar as string | null | undefined,
     organizationId: (userData.organizationId ?? userData.organization_id ?? null) as string | null,
+    uiLanguage: (() => {
+      const raw = (userData.uiLanguage ?? userData.ui_language ?? null) as string | null;
+      if (raw === 'en' || raw === 'ar') return raw;
+      return null;
+    })(),
     onboarding_status: (
       userData.onboarding_status ||
       userData.onboardingStatus ||

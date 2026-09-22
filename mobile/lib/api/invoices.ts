@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import i18n from '../../i18n/config';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
@@ -66,15 +67,11 @@ export function invoiceLineItems(invoice: Invoice): InvoiceLineItem[] {
 }
 
 export function invoiceStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    draft: 'Preparing',
-    sent: 'Due',
-    overdue: 'Overdue',
-    paid: 'Paid',
-    cancelled: 'Cancelled',
-    disputed: 'Disputed',
-  };
-  return labels[status] ?? status.replace(/_/g, ' ');
+  const normalized = String(status).toLowerCase();
+  const key = `status.invoice.${normalized}`;
+  const translated = i18n.t(key, { ns: 'family', defaultValue: '' });
+  if (translated && translated !== key) return translated;
+  return status.replace(/_/g, ' ');
 }
 
 export function canPayInvoice(invoice: Invoice): boolean {

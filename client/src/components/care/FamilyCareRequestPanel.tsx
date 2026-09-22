@@ -11,6 +11,10 @@ import {
   formatFamilyDateTime,
   familyIntakeStatusLabel,
 } from '@/lib/familyLanguage';
+import {
+  localizeAccountTypeLabel,
+  localizeChip,
+} from '@/lib/localizeStoredEnglish';
 
 const ACCOUNT_OPTIONS = [
   { id: 'myself', label: 'Individual (for myself)' },
@@ -116,10 +120,10 @@ function joinLocalized(group: string, parts: string[], separator: string): strin
 function SummaryGrid({ summary }: { summary: FamilyWizardSummary }) {
   const { t } = useTranslation('family');
   const rows: { label: string; value: string }[] = [
-    summary.accountType ? { label: t('careUnit.summary.accountType'), value: summary.accountType } : null,
+    summary.accountType ? { label: t('careUnit.summary.accountType'), value: localizeAccountTypeLabel(summary.accountType) } : null,
     summary.country ? { label: t('careUnit.summary.location'), value: summary.country } : null,
     summary.preferredLanguage
-      ? { label: t('careUnit.summary.language'), value: summary.preferredLanguage }
+      ? { label: t('careUnit.summary.language'), value: localizeChip(summary.preferredLanguage) }
       : null,
     summary.supportCategories.length
       ? {
@@ -128,7 +132,10 @@ function SummaryGrid({ summary }: { summary: FamilyWizardSummary }) {
         }
       : null,
     summary.specificNeeds.length
-      ? { label: t('careUnit.summary.specificNeeds'), value: summary.specificNeeds.join(' · ') }
+      ? {
+          label: t('careUnit.summary.specificNeeds'),
+          value: summary.specificNeeds.map((n) => localizeChip(n)).join(' · '),
+        }
       : null,
     summary.practitionerGender
       ? {
@@ -137,7 +144,10 @@ function SummaryGrid({ summary }: { summary: FamilyWizardSummary }) {
         }
       : null,
     summary.providerLanguages.length
-      ? { label: t('careUnit.summary.providerLanguages'), value: summary.providerLanguages.join(', ') }
+      ? {
+          label: t('careUnit.summary.providerLanguages'),
+          value: summary.providerLanguages.map((l) => localizeChip(l)).join(', '),
+        }
       : null,
     summary.careLocation
       ? {
@@ -412,6 +422,7 @@ type IntakeLike = {
 export function FamilyCareRequestPanel({
   intakes,
   variant = 'family',
+  localeNs,
   editing = false,
   draft,
   onDraftChange,
@@ -419,18 +430,25 @@ export function FamilyCareRequestPanel({
 }: {
   intakes?: IntakeLike[] | null;
   variant?: 'family' | 'staff';
+  /** Coordinator Arabic shell: translate staff chrome via coordinator ns. */
+  localeNs?: 'family' | 'coordinator';
   editing?: boolean;
   draft?: FamilyWizardDraft;
   onDraftChange?: (draft: FamilyWizardDraft) => void;
   actions?: ReactNode;
 }) {
-  const { t } = useTranslation('family');
+  const isFamily = variant === 'family';
+  const isCoordinator = localeNs === 'coordinator';
+  const { t } = useTranslation(isCoordinator ? 'coordinator' : 'family');
   const latest = intakes?.[0];
   if (!latest) return null;
 
   const summary = parseFamilyWizardSummary(latest.wizardPayload);
-  const statusLabel = familyIntakeStatusLabel(latest.status);
-  const isFamily = variant === 'family';
+  const statusLabel = isCoordinator
+    ? t(`intake.status.${latest.status}`, {
+        defaultValue: familyIntakeStatusLabel(latest.status),
+      })
+    : familyIntakeStatusLabel(latest.status);
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4 sm:p-5 space-y-4">
@@ -441,14 +459,24 @@ export function FamilyCareRequestPanel({
             </div>
             <div>
               <p className="text-sm font-semibold text-teal-900">
-                {isFamily ? t('careUnit.requestTitle') : 'Family request summary'}
+                {isFamily
+                  ? t('careUnit.requestTitle')
+                  : isCoordinator
+                    ? t('patientDetail.familyRequestSummary')
+                    : 'Family request summary'}
               </p>
               <p className="text-xs text-teal-800/80 mt-0.5">
                 {editing
-                  ? t('careUnit.requestEditHint')
+                  ? isFamily
+                    ? t('careUnit.requestEditHint')
+                    : isCoordinator
+                      ? t('patientDetail.fromSimpleOnboarding')
+                      : 'Edit care request'
                   : isFamily
                     ? t('careUnit.requestHint')
-                    : 'From simple family onboarding'}
+                    : isCoordinator
+                      ? t('patientDetail.fromSimpleOnboarding')
+                      : 'From simple family onboarding'}
               </p>
             </div>
           </div>
@@ -460,9 +488,11 @@ export function FamilyCareRequestPanel({
               </span>
               {latest.submittedAt && (
                 <span className="text-[11px] text-teal-800/70">
-                  {t('careUnit.submitted', {
-                    date: formatFamilyDateTime(latest.submittedAt),
-                  })}
+                  {isCoordinator
+                    ? formatFamilyDateTime(latest.submittedAt)
+                    : t('careUnit.submitted', {
+                        date: formatFamilyDateTime(latest.submittedAt),
+                      })}
                 </span>
               )}
             </div>
@@ -487,7 +517,7 @@ export function FamilyCareRequestPanel({
       {!editing && (latest.serviceInterests?.length ?? 0) > 0 && (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80 mb-1.5">
-            {isFamily ? t('careUnit.servicesRequested') : 'Mapped service interests'}
+            {isFamily ? t('careUnit.servicesRequested') : isCoordinator ? t('patientDetail.mappedServices') : 'Mapped service interests'}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {latest.serviceInterests!.map((s) => (
@@ -495,7 +525,11 @@ export function FamilyCareRequestPanel({
                 key={s}
                 className="rounded-full bg-white border border-teal-200 px-2.5 py-0.5 text-xs font-medium text-teal-900"
               >
-                {s.replace(/_/g, ' ')}
+                {isCoordinator
+                  ? t(`intake.services.${s}`, {
+                      defaultValue: s.replace(/_/g, ' '),
+                    })
+                  : s.replace(/_/g, ' ')}
               </span>
             ))}
           </div>

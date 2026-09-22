@@ -13,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -52,6 +53,7 @@ function hadPriorRevision(plan: CarePlan): boolean {
 
 export default function FamilyCarePlanReviewScreen() {
   useScreenProtection(true);
+  const { t } = useTranslation('family');
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
   const [notes, setNotes] = useState('');
@@ -72,11 +74,11 @@ export default function FamilyCarePlanReviewScreen() {
 
   const decision = useMutation({
     mutationFn: async (action: Decision) => {
-      if (!id) throw new Error('Missing care plan');
+      if (!id) throw new Error(t('carePlanReview.missing'));
       if (action === 'approve') return approveCarePlan(id);
       if (action === 'revision') {
         const trimmed = notes.trim();
-        if (!trimmed) throw new Error('Please explain what changes you need');
+        if (!trimmed) throw new Error(t('carePlanReview.needExplanation'));
         return requestCarePlanRevision(id, trimmed);
       }
       return rejectCarePlan(id, notes.trim() || undefined);
@@ -86,21 +88,21 @@ export default function FamilyCarePlanReviewScreen() {
       queryClient.invalidateQueries({ queryKey: ['family-care-plan', id] });
       toast.show(
         action === 'approve'
-          ? 'Care plan approved'
+          ? t('carePlanReview.approved')
           : action === 'revision'
-            ? 'Revision requested'
-            : 'Care plan rejected',
+            ? t('carePlanReview.revisionRequested')
+            : t('carePlanReview.rejected'),
         { type: 'success' },
       );
       router.replace('/(family)/care-plans');
     },
-    onError: (e) => toastError(toast, e, 'Action failed'),
+    onError: (e) => toastError(toast, e, t('carePlanReview.actionFailed')),
   });
 
   if (query.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Care plan" showBack />
+        <FamilyTabHero title={t('carePlanReview.title')} showBack />
         <ActivityIndicator size="large" color="#0D9488" className="mt-12" />
       </SafeAreaView>
     );
@@ -109,12 +111,12 @@ export default function FamilyCarePlanReviewScreen() {
   if (query.isError || !plan) {
     return (
       <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
-        <FamilyTabHero title="Care plan" showBack />
+        <FamilyTabHero title={t('carePlanReview.title')} showBack />
         <EmptyState
           icon="alert-circle-outline"
-          title="Plan not found"
+          title={t('carePlanReview.notFound')}
           subtitle={query.error ? apiErrorMessage(query.error) : undefined}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       </SafeAreaView>
     );
@@ -130,7 +132,11 @@ export default function FamilyCarePlanReviewScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <AppSwitcherPrivacyOverlay />
-      <FamilyTabHero title={plan.title} subtitle={`Version ${plan.version}`} showBack />
+      <FamilyTabHero
+        title={plan.title}
+        subtitle={t('carePlanReview.version', { version: plan.version })}
+        showBack
+      />
 
       <KeyboardAvoidingView
         className="flex-1"
@@ -161,21 +167,20 @@ export default function FamilyCarePlanReviewScreen() {
           {showCareTeamUpdate ? (
             <View className="mt-4 rounded-2xl border border-teal-300 bg-teal-50 p-4">
               <Text className="text-xs font-bold uppercase tracking-wider text-teal-800">
-                What the care team changed
+                {t('carePlanReview.teamChanged')}
               </Text>
               <Text className="mt-2 text-sm leading-5 text-stone-800">
-                {coordinatorChangeNotes ??
-                  'Your care team updated this plan after your change request. Review the goals and services below.'}
+                {coordinatorChangeNotes ?? t('carePlanReview.teamUpdatedFallback')}
               </Text>
             </View>
           ) : null}
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Care goals
+            {t('carePlanReview.careGoals')}
           </Text>
           {goals.length === 0 ? (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">No goals listed yet.</Text>
+              <Text className="text-sm text-stone-500">{t('carePlanReview.noGoals')}</Text>
             </Card>
           ) : (
             goals.map((goal, index) => (
@@ -191,12 +196,14 @@ export default function FamilyCarePlanReviewScreen() {
                     ) : null}
                     {goal.measurement ?? goal.measurableOutcome ? (
                       <Text className="mt-1 text-xs text-stone-500">
-                        Measure: {goal.measurement ?? goal.measurableOutcome}
+                        {t('carePlanReview.measure', {
+                          value: goal.measurement ?? goal.measurableOutcome,
+                        })}
                       </Text>
                     ) : null}
                     {goal.targetDate ? (
                       <Text className="mt-0.5 text-xs text-stone-400">
-                        Target {formatDate(goal.targetDate)}
+                        {t('carePlanReview.targetDate', { date: formatDate(goal.targetDate) })}
                       </Text>
                     ) : null}
                   </View>
@@ -206,11 +213,11 @@ export default function FamilyCarePlanReviewScreen() {
           )}
 
           <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Services & costs
+            {t('carePlanReview.servicesCosts')}
           </Text>
           {items.length === 0 ? (
             <Card shadow={false}>
-              <Text className="text-sm text-stone-500">No services listed yet.</Text>
+              <Text className="text-sm text-stone-500">{t('carePlanReview.noServices')}</Text>
             </Card>
           ) : (
             items.map((item) => (
@@ -238,10 +245,10 @@ export default function FamilyCarePlanReviewScreen() {
 
           {canAct ? (
             <View className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <Text className="font-semibold text-stone-900">Your decision</Text>
+              <Text className="font-semibold text-stone-900">{t('carePlanReview.yourDecision')}</Text>
               <View className="mt-3">
                 <Input
-                  placeholder="Optional notes (required to request changes)"
+                  placeholder={t('carePlanReview.notesPlaceholder')}
                   value={notes}
                   onChangeText={setNotes}
                   multiline
@@ -256,7 +263,7 @@ export default function FamilyCarePlanReviewScreen() {
                   disabled={busy}
                   onPress={() => decision.mutate('approve')}
                 >
-                  Approve
+                  {t('carePlanReview.approve')}
                 </Button>
                 <Button
                   variant="secondary"
@@ -264,7 +271,7 @@ export default function FamilyCarePlanReviewScreen() {
                   disabled={busy}
                   onPress={() => decision.mutate('revision')}
                 >
-                  Request changes
+                  {t('carePlanReview.requestChanges')}
                 </Button>
                 <Button
                   variant="destructive"
@@ -272,14 +279,14 @@ export default function FamilyCarePlanReviewScreen() {
                   disabled={busy}
                   onPress={() => decision.mutate('reject')}
                 >
-                  Reject
+                  {t('carePlanReview.reject')}
                 </Button>
               </View>
             </View>
           ) : plan.rejectionNotes ? (
             <Card className="mt-6" shadow={false}>
               <Text className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Notes from your last decision
+                {t('carePlanReview.lastDecisionNotes')}
               </Text>
               <Text className="mt-1 text-sm text-stone-700">{plan.rejectionNotes}</Text>
             </Card>

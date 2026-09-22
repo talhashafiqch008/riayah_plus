@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Mic, MicOff, Pause, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
@@ -43,6 +44,13 @@ export default function VoiceRecordingsPage({
   title = 'Voice recordings',
   description = 'Choose an assigned patient first, then record a voice note. Replay or delete from your history.',
 }: Props) {
+  const { pathname } = useLocation();
+  const isCoordinator = pathname.startsWith('/coordinator');
+  const isClinical = pathname.startsWith('/clinical');
+  const localized = isCoordinator || isClinical;
+  const { t } = useTranslation(isClinical ? 'clinical' : 'coordinator');
+  const pageTitle = localized ? t('voice.title') : title;
+  const pageDescription = localized ? t('voice.description') : description;
   const [params] = useSearchParams();
   const sessionId = params.get('sessionId') ?? undefined;
   const meetingId = params.get('meetingId') ?? undefined;
@@ -94,7 +102,7 @@ export default function VoiceRecordingsPage({
         prev && patientRows.some((p) => p.id === prev) ? prev : patientRows[0]?.id ?? '',
       );
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load voice recordings');
+      toast.error(isApiError(error) ? error.message : (localized ? t('voice.toasts.loadFailed') : 'Failed to load voice recordings'));
     } finally {
       setLoading(false);
     }
@@ -116,11 +124,11 @@ export default function VoiceRecordingsPage({
   const startRecording = async () => {
     if (isRecording || uploading) return;
     if (!selectedPatient) {
-      toast.error('Choose an assigned patient before recording.');
+      toast.error(localized ? t('voice.toasts.choosePatient') : 'Choose an assigned patient before recording.');
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      toast.error('Voice recording is not supported in this browser.');
+      toast.error(localized ? t('voice.toasts.unsupported') : 'Voice recording is not supported in this browser.');
       return;
     }
     try {
@@ -148,7 +156,7 @@ export default function VoiceRecordingsPage({
           const blob = new Blob(chunksRef.current, { type: blobType });
           chunksRef.current = [];
           if (!blob.size) {
-            toast.error('No audio captured.');
+            toast.error(localized ? t('voice.toasts.noAudio') : 'No audio captured.');
             return;
           }
           setUploading(true);
@@ -160,7 +168,7 @@ export default function VoiceRecordingsPage({
                 : 'webm';
             const patient = selectedPatient;
             if (!patient) {
-              toast.error('Choose an assigned patient before recording.');
+              toast.error(localized ? t('voice.toasts.choosePatient') : 'Choose an assigned patient before recording.');
               return;
             }
             await uploadVoiceRecording({
@@ -177,10 +185,10 @@ export default function VoiceRecordingsPage({
             });
             setTitleDraft('');
             setNotesDraft('');
-            toast.success('Voice recording saved');
+            toast.success(localized ? t('voice.toasts.saved') : 'Voice recording saved');
             await load();
           } catch (error: unknown) {
-            toast.error(isApiError(error) ? error.message : 'Failed to save recording');
+            toast.error(isApiError(error) ? error.message : (localized ? t('voice.toasts.saveFailed') : 'Failed to save recording'));
           } finally {
             setUploading(false);
             setElapsed(0);
@@ -200,7 +208,7 @@ export default function VoiceRecordingsPage({
         setElapsed(elapsedRef.current);
       }, 1000);
     } catch {
-      toast.error('Microphone permission is required to record.');
+      toast.error(localized ? t('voice.toasts.micRequired') : 'Microphone permission is required to record.');
       stopTracks();
     }
   };
@@ -261,11 +269,11 @@ export default function VoiceRecordingsPage({
       audio.onended = () => setPlayingId(null);
       audio.onerror = () => {
         setPlayingId(null);
-        toast.error('Could not play this recording');
+        toast.error(localized ? t('voice.toasts.playFailed') : 'Could not play this recording');
       };
       await audio.play();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Playback failed');
+      toast.error(isApiError(error) ? error.message : (localized ? t('voice.toasts.playbackFailed') : 'Playback failed'));
       setPlayingId(null);
     } finally {
       setBusyId(null);
@@ -273,7 +281,7 @@ export default function VoiceRecordingsPage({
   };
 
   const removeRecording = async (id: string) => {
-    if (!window.confirm('Delete this voice recording?')) return;
+    if (!window.confirm(localized ? t('voice.confirmDelete') : 'Delete this voice recording?')) return;
     try {
       setBusyId(id);
       if (playingId === id && audioRef.current) {
@@ -283,9 +291,9 @@ export default function VoiceRecordingsPage({
       }
       await deleteVoiceRecording(id);
       setRows((prev) => prev.filter((row) => row.id !== id));
-      toast.success('Recording deleted');
+      toast.success(localized ? t('voice.toasts.deleted') : 'Recording deleted');
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Delete failed');
+      toast.error(isApiError(error) ? error.message : (localized ? t('voice.toasts.deleteFailed') : 'Delete failed'));
     } finally {
       setBusyId(null);
     }
@@ -295,8 +303,8 @@ export default function VoiceRecordingsPage({
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-stone-900">{title}</h1>
-          <p className="mt-1 text-sm text-stone-600">{description}</p>
+          <h1 className="text-2xl font-semibold text-stone-900">{pageTitle}</h1>
+          <p className="mt-1 text-sm text-stone-600">{pageDescription}</p>
           {(sessionId || meetingId) && (
             <p className="mt-2 text-xs text-teal-700">
               Linked to {sessionId ? `session ${sessionId}` : `meeting ${meetingId}`}
@@ -309,15 +317,18 @@ export default function VoiceRecordingsPage({
           className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
         >
           <RefreshCw className="size-4" />
-          Refresh
+          {localized ? t('voice.refresh') : 'Refresh'}
         </button>
       </div>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Record</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+          {localized ? t('voice.record') : 'Record'}
+        </h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block text-sm text-stone-700 sm:col-span-2">
-            Patient <span className="font-normal text-rose-600">*</span>
+            {localized ? t('voice.patient') : 'Patient'}{' '}
+            <span className="font-normal text-rose-600">*</span>
             <select
               value={selectedPatientKey}
               onChange={(e) => setSelectedPatientKey(e.target.value)}
@@ -325,7 +336,7 @@ export default function VoiceRecordingsPage({
               className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-400 disabled:bg-stone-50"
             >
               {patients.length === 0 ? (
-                <option value="">No assigned patients</option>
+                <option value="">{localized ? t('voice.noPatients') : 'No assigned patients'}</option>
               ) : (
                 patients.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -336,28 +347,42 @@ export default function VoiceRecordingsPage({
             </select>
             {patients.length === 0 ? (
               <p className="mt-1 text-xs text-amber-700">
-                You can only record for patients on your active or validated care episodes.
+                {localized
+                  ? t('voice.patientHint')
+                  : 'You can only record for patients on your active or validated care episodes.'}
               </p>
             ) : null}
           </label>
           <label className="block text-sm text-stone-700">
-            Title <span className="font-normal text-stone-400">(optional)</span>
+            {localized ? t('voice.titleOptional') : (
+              <>
+                Title <span className="font-normal text-stone-400">(optional)</span>
+              </>
+            )}
             <input
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
               disabled={isRecording || uploading}
-              placeholder="e.g. Post-session follow-up"
+              placeholder={
+                localized ? t('voice.titlePlaceholder') : 'e.g. Post-session follow-up'
+              }
               className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
             />
           </label>
           <label className="block text-sm text-stone-700 sm:col-span-2">
-            Notes <span className="font-normal text-stone-400">(optional)</span>
+            {localized ? t('voice.notesOptional') : (
+              <>
+                Notes <span className="font-normal text-stone-400">(optional)</span>
+              </>
+            )}
             <textarea
               value={notesDraft}
               onChange={(e) => setNotesDraft(e.target.value)}
               disabled={isRecording || uploading}
               rows={2}
-              placeholder="Optional context for this recording"
+              placeholder={
+                localized ? t('voice.notesPlaceholder') : 'Optional context for this recording'
+              }
               className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
             />
           </label>
@@ -372,7 +397,7 @@ export default function VoiceRecordingsPage({
               className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
             >
               <Mic className="size-4" />
-              Start recording
+              {localized ? t('voice.start') : 'Start recording'}
             </button>
           ) : (
             <>
@@ -383,7 +408,7 @@ export default function VoiceRecordingsPage({
                   className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
                 >
                   <Play className="size-4" />
-                  Resume
+                  {localized ? t('voice.resume') : 'Resume'}
                 </button>
               ) : (
                 <button
@@ -392,7 +417,7 @@ export default function VoiceRecordingsPage({
                   className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
                 >
                   <Pause className="size-4" />
-                  Pause
+                  {localized ? t('voice.pause') : 'Pause'}
                 </button>
               )}
               <button
@@ -401,7 +426,7 @@ export default function VoiceRecordingsPage({
                 className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700"
               >
                 <Square className="size-4" />
-                Stop & save
+                {localized ? t('voice.stop') : 'Stop & save'}
               </button>
               <button
                 type="button"
@@ -409,38 +434,42 @@ export default function VoiceRecordingsPage({
                 className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
                 <MicOff className="size-4" />
-                Cancel
+                {localized ? t('voice.cancel') : 'Cancel'}
               </button>
             </>
           )}
           <span className="font-mono text-sm text-stone-600">
-            {uploading ? 'Saving…' : formatDuration(elapsed)}
+            {uploading ? (localized ? t('common.loading') : 'Saving…') : formatDuration(elapsed)}
             {isRecording && !isPaused ? (
-              <span className="ml-2 inline-block size-2 animate-pulse rounded-full bg-rose-500" />
+              <span className="ms-2 inline-block size-2 animate-pulse rounded-full bg-rose-500" />
             ) : null}
           </span>
         </div>
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">History</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+          {localized ? t('voice.history') : 'History'}
+        </h2>
         {loading ? (
           <div className="mt-6 flex justify-center py-10">
             <div className="size-8 animate-spin rounded-full border-b-2 border-teal-600" />
           </div>
         ) : rows.length === 0 ? (
-          <p className="mt-4 text-sm text-stone-500">No voice recordings yet.</p>
+          <p className="mt-4 text-sm text-stone-500">
+            {localized ? t('voice.emptyHistory') : 'No voice recordings yet.'}
+          </p>
         ) : (
           <ul className="mt-4 divide-y divide-stone-100">
             {rows.map((row) => (
               <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-stone-900">
-                    {row.title?.trim() || 'Untitled recording'}
+                    {row.title?.trim() || (localized ? t('voice.untitled') : 'Untitled recording')}
                   </p>
                   <p className="mt-0.5 text-xs text-stone-500">
                     {row.patientName ? `${row.patientName} · ` : ''}
-                    {new Date(row.createdAt).toLocaleString('en-QA')} ·{' '}
+                    {new Date(row.createdAt).toLocaleString(localized ? undefined : 'en-QA')} ·{' '}
                     {formatDuration(row.durationSeconds)} · {formatBytes(row.sizeBytes)}
                     {row.sessionId ? ` · session` : ''}
                     {row.meetingId ? ` · meeting` : ''}
@@ -457,7 +486,7 @@ export default function VoiceRecordingsPage({
                     className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-60"
                   >
                     <Play className="size-3.5" />
-                    {playingId === row.id ? 'Playing…' : 'Play'}
+                    {playingId === row.id ? (localized ? t('voice.playing') : 'Playing…') : localized ? t('voice.play') : 'Play'}
                   </button>
                   <button
                     type="button"
@@ -466,7 +495,7 @@ export default function VoiceRecordingsPage({
                     className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                   >
                     <Trash2 className="size-3.5" />
-                    Delete
+                    {localized ? t('voice.delete') : 'Delete'}
                   </button>
                 </div>
               </li>

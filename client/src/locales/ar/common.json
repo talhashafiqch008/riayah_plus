@@ -14,10 +14,372 @@
     "error": "حدث خطأ",
     "success": "تم بنجاح"
   },
+  "a11y": {
+    "back": "رجوع",
+    "action": "إجراء"
+  },
+  "select": {
+    "placeholder": "اختر…",
+    "empty": "لا خيارات متاحة.",
+    "search": "بحث…"
+  },
+  "sessionCard": {
+    "client": "العميل",
+    "provider": "مقدّم الرعاية",
+    "session": "جلسة"
+  },
+  "sessionType": {
+    "telehealth": "عن بُعد",
+    "in_person": "حضوري",
+    "home_visit": "زيارة منزلية",
+    "visit": "زيارة",
+    "session": "جلسة"
+  },
+  "sessionStatus": {
+    "pending": "قيد الانتظار",
+    "accepted": "مقبولة",
+    "scheduled": "مجدولة",
+    "in_progress": "جارٍ التنفيذ",
+    "completed": "مكتملة",
+    "cancelled": "ملغاة",
+    "rejected": "مرفوضة",
+    "no_show": "لم يحضر",
+    "checked_in": "تم تسجيل الحضور"
+  },
   "language": {
     "en": "English",
     "ar": "العربية",
     "switchToEn": "English",
     "switchToAr": "العربية"
+  },
+  "languageGate": {
+    "eyebrow": "اللغة",
+    "title": "اختر لغتك",
+    "body": "اختر اللغة التي تريد استخدامها في رعاية بلس. ستصبح هذه اللغة الدائمة لحسابك.",
+    "permanent": "لن تتمكن من تغييرها لاحقاً من التطبيق.",
+    "enHint": "Continue in English",
+    "arHint": "المتابعة بالعربية",
+    "saving": "جاري الحفظ…",
+    "error": "تعذر حفظ تفضيل اللغة. حاول مرة أخرى."
+  },
+  "status": {
+    "active": "نشط",
+    "approved": "معتمد",
+    "completed": "مكتمل",
+    "checked_in": "تم تسجيل الحضور",
+    "accepted": "مقبول",
+    "in_progress": "قيد التنفيذ",
+    "pending": "قيد الانتظار",
+    "in_review": "قيد المراجعة",
+    "scheduled": "مجدول",
+    "under_review": "قيد المراجعة",
+    "submitted_for_approval": "مقدّم للموافقة",
+    "cancelled": "ملغى",
+    "rejected": "مرفوض",
+    "inactive": "غير نشط",
+    "paid": "مدفوع",
+    "sent": "مُرسل",
+    "disputed": "متنازع عليه",
+    "overdue": "متأخر",
+    "on_hold": "معلّق",
+    "draft": "مسودة",
+    "intake_submitted": "تم تقديم الطلب",
+    "validated": "تم الاعتماد",
+    "closed": "مغلق",
+    "revision_requested": "طُلبت مراجعة",
+    "no_show": "لم يحضر",
+    "withdrawn": "منسحب",
+    "episode_created": "تم إنشاء المسار"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما",
+    "timeout": "انتهت مهلة الطلب. تحقق من اتصالك.",
+    "network": "تعذر الوصول إلى الخادم. تحقق من اتصالك."
+  },
+  "notificationsCatalog": {
+    "telehealth_reminder": {
+      "title": "جلسة عن بُعد خلال 30 دقيقة",
+      "body": "تبدأ جلسة الفيديو خلال نحو 30 دقيقة. افتح التطبيق للانضمام."
+    },
+    "telehealth_ready": {
+      "title": "تم تأكيد جلسة العلاج عن بُعد",
+      "body": "تم تأكيد جلسة فيديو. انضم من التطبيق عند بدء الجلسة."
+    },
+    "telehealth_admitted": {
+      "title": "تم قبولك في الجلسة",
+      "body": "تم قبولك في جلسة الفيديو. أعد الانضمام من التطبيق للدخول."
+    },
+    "telehealth_admitted_clinician": {
+      "title": "تم قبولك في الجلسة",
+      "body": "قبلك الأخصائي. أعد الانضمام للدخول إلى جلسة الفيديو."
+    },
+    "telehealth_admitted_host": {
+      "title": "تم قبولك في الجلسة",
+      "body": "قبلك المضيف. أعد الانضمام للدخول إلى جلسة الفيديو."
+    },
+    "episode_validated": {
+      "title": "تمت مراجعة طلبكم",
+      "body": "راجع منسّق الرعاية طلبكم وأصبح مسار الرعاية نشطًا الآن."
+    },
+    "session_booked_by_family": {
+      "title": "حجزت العائلة جلسة",
+      "body": "تم حجز جلسة على مسار رعاية."
+    },
+    "session_booked": {
+      "title": "تم حجز جلسة رعاية جديدة",
+      "body": "حجزت العائلة جلسة رعاية في جدولك."
+    },
+    "meeting_cancelled": {
+      "title": "تم إلغاء الاجتماع",
+      "body": "تم إلغاء جلسة العلاج عن بُعد."
+    },
+    "meeting_scheduled": {
+      "title": "تم جدولة اجتماع عن بُعد",
+      "body": "لديك اجتماع عن بُعد مجدول. افتح التطبيق للتفاصيل."
+    },
+    "meeting_ended": {
+      "title": "انتهى الاجتماع",
+      "body": "انتهت جلسة العلاج عن بُعد."
+    },
+    "assessment_scheduled": {
+      "title": "تم جدولة تقييم",
+      "body": "لديك تقييم جديد في جدولك."
+    },
+    "consultation_booked_by_family": {
+      "title": "حجزت العائلة استشارة",
+      "body": "قام أحد أفراد العائلة بجدولة استشارة لمسار الرعاية."
+    },
+    "assessment_booked": {
+      "title": "تم حجز تقييم",
+      "body": "تم جدولة تقييم لمسار رعايتك."
+    },
+    "assessment_completed": {
+      "title": "اكتمل التقييم",
+      "body": "نتائج تقييمك جاهزة."
+    },
+    "care_plan_submitted": {
+      "title": "خطة الرعاية جاهزة لمراجعتك",
+      "body": "قدّم منسّق الرعاية خطة رعاية لموافقتك."
+    },
+    "care_plan_revision": {
+      "title": "طُلبت مراجعة خطة الرعاية",
+      "body": "هناك تحديث بخصوص خطة الرعاية. افتح التطبيق للتفاصيل."
+    },
+    "care_plan_being_revised": {
+      "title": "جاري مراجعة خطة الرعاية",
+      "body": "حدّث منسّق الرعاية خطة الرعاية. سيُطلب منك الموافقة على النسخة الجديدة عند تقديمها."
+    },
+    "care_plan_rejected": {
+      "title": "رُفضت خطة الرعاية",
+      "body": "رفضت العائلة خطة الرعاية المقدّمة."
+    },
+    "care_plan_cosign": {
+      "title": "تم التوقيع السريري المشترك على خطة الرعاية",
+      "body": "وقّع أحد أفراد الطاقم السريري على خطة الرعاية."
+    },
+    "care_plan_ai_draft": {
+      "title": "مسودة خطة رعاية بالذكاء الاصطناعي جاهزة",
+      "body": "مسودة خطة رعاية مُولّدة بالذكاء الاصطناعي جاهزة لمراجعتك. عدّلها وقدّمها عند الجاهزية — لن تُرسل للعائلة حتى تقدّمها."
+    },
+    "intake_reviewed": {
+      "title": "تمت مراجعة الطلب",
+      "body": "اعتمد منسّق الرعاية طلبك."
+    },
+    "intake_withdrawn": {
+      "title": "سُحب الطلب",
+      "body": "سحبت عائلة طلبًا كان قيد المراجعة."
+    },
+    "session_assigned": {
+      "title": "تم تعيين جلسة رعاية جديدة",
+      "body": "لديك جلسة رعاية جديدة في جدولك."
+    },
+    "session_assigned_recurring": {
+      "title": "تم تعيين جلسات رعاية متكررة",
+      "body": "تم جدولة عدة جلسات رعاية لمسار الرعاية."
+    },
+    "payment_received": {
+      "title": "تم استلام الدفع",
+      "body": "تم الدفع بنجاح للفاتورة {{invoiceNumber}}."
+    },
+    "payment_failed": {
+      "title": "فشل الدفع",
+      "body": "فشل الدفع للفاتورة {{invoiceNumber}}. يرجى المحاولة مرة أخرى."
+    },
+    "invoice_generated": {
+      "title": "الفاتورة جاهزة",
+      "body": "الفاتورة {{invoiceNumber}} بمبلغ {{currency}} {{amount}} جاهزة."
+    },
+    "invoice_sent": {
+      "title": "فاتورة {{invoiceNumber}}",
+      "body": "لديك فاتورة جديدة بمبلغ {{currency}} {{amount}}."
+    },
+    "invoice_overdue": {
+      "title": "فاتورة متأخرة",
+      "body": "الفاتورة {{invoiceNumber}} ({{currency}} {{amount}}) تجاوزت موعد الاستحقاق."
+    },
+    "quotation_generated": {
+      "title": "عرض السعر جاهز",
+      "body": "عرض السعر ({{invoiceNumber}}) بمبلغ {{currency}} {{amount}} جاهز لخطة رعايتكم."
+    },
+    "gps_out_of_radius": {
+      "title": "رصد تسجيل حضور خارج النطاق",
+      "body": "سجّل العامل حضوره على بعد {{distanceMeters}} م من عنوان المريض."
+    },
+    "gps_missed_checkin": {
+      "title": "تسجيل حضور فائت",
+      "body": "لم يسجّل العامل حضوره لزيارة منزلية مجدولة."
+    },
+    "new_booking": {
+      "title": "طلب حجز جديد",
+      "body": "لديك طلب حجز جديد."
+    },
+    "counter_offer": {
+      "title": "عرض مضاد مستلم",
+      "body": "قدّم مقدّم الخدمة سعرًا جديدًا: {{amount}}."
+    },
+    "booking_reminder": {
+      "title": "تذكير بحجز قادم",
+      "body": "لديك حجز غدًا."
+    },
+    "booking_confirmed": {
+      "title": "تم تأكيد الحجز",
+      "body": "تم الدفع بنجاح وتأكيد حجزك."
+    },
+    "booking_payment_provider": {
+      "title": "دفعة حجز جديدة",
+      "body": "دفع عميل مقابل حجز معك."
+    },
+    "booking_new": {
+      "title": "حجز جديد",
+      "body": "لديك حجز مدفوع جديد."
+    },
+    "booking_status": {
+      "title": "الحجز {{status}}",
+      "body": "تم تحديث حالة حجزك إلى {{status}}."
+    },
+    "booking_status_changed": {
+      "title": "تحديث الحجز",
+      "body": "تم تغيير حالة حجزك إلى: {{status}}"
+    },
+    "booking_status_changed": {
+      "title": "تحديث الحجز",
+      "body": "تم تغيير حالة حجزك إلى: {{status}}"
+    },
+    "document_renewal": {
+      "title": "وثيقة على وشك الانتهاء",
+      "body": "وثيقة في حسابك ستنتهي قريبًا. يرجى تجديدها."
+    },
+    "document_request": {
+      "title": "مطلوب رفع وثيقة",
+      "body": "طُلب منك رفع وثيقة: {{documentType}}."
+    },
+    "document_received": {
+      "title": "تم استلام الوثيقة",
+      "body": "تم رفع الوثيقة المطلوبة: {{documentType}}."
+    },
+    "emergency_alert": {
+      "title": "تنبيه طوارئ",
+      "body": "رفع عميل طلب طوارئ. افتح التطبيق للاستجابة."
+    },
+    "emergency_alert_provider": {
+      "title": "طوارئ للعميل",
+      "body": "عميلك الحالي يحتاج مساعدة طارئة."
+    },
+    "emergency_response": {
+      "title": "استجابة للطوارئ",
+      "body": "هناك تحديث بخصوص طلب طوارئ."
+    },
+    "care_need_bid": {
+      "title": "عرض جديد مستلم",
+      "body": "قدّم مقدّم خدمة عرضًا على احتياج الرعاية."
+    },
+    "bid_accepted": {
+      "title": "تم قبول العرض!",
+      "body": "قبل العميل عرضك وتم إنشاء حجز."
+    },
+    "bid_rejected": {
+      "title": "لم يُقبل العرض",
+      "body": "لم يقبل العميل عرضك على احتياج الرعاية هذا."
+    },
+    "bid_counter_offer": {
+      "title": "عرض مضاد مستلم",
+      "body": "قدّم العميل عرضًا مضادًا على عرضك."
+    },
+    "care_order_created": {
+      "title": "أمر رعاية جديد",
+      "body": "تم إنشاء أمر رعاية جديد."
+    },
+    "account_deletion": {
+      "title": "طلب حذف حساب",
+      "body": "طلب مستخدم حذف حسابه."
+    },
+    "verification_verified": {
+      "title": "تم التحقق من الحساب!",
+      "body": "تم التحقق من حسابك. يمكنك الآن قبول الحجوزات."
+    },
+    "verification_rejected": {
+      "title": "تحديث التحقق",
+      "body": "لم تتم الموافقة على التحقق من حسابك."
+    },
+    "dispute_opened": {
+      "title": "تم فتح نزاع",
+      "body": "تم فتح نزاع على حجز."
+    },
+    "dispute_opened_staff": {
+      "title": "نزاع حجز جديد",
+      "body": "تم فتح نزاع جديد ويحتاج مراجعة."
+    },
+    "dispute_resolved": {
+      "title": "تم حل النزاع",
+      "body": "تم حل نزاع الحجز."
+    },
+    "no_show_penalty": {
+      "title": "تم تطبيق غرامة عدم الحضور",
+      "body": "طُبقت غرامة عدم حضور على حسابك."
+    },
+    "no_show_compensation": {
+      "title": "تعويض عدم حضور",
+      "body": "حصلت على تعويض بسبب عدم حضور مقدّم الخدمة."
+    },
+    "no_show_cancelled": {
+      "title": "أُلغي الحجز — عدم حضور المقدّم",
+      "body": "أُلغي حجزك لأن مقدّم الخدمة لم يحضر."
+    },
+    "payout_processed": {
+      "title": "تمت معالجة الدفع",
+      "body": "تمت معالجة دفعتك."
+    },
+    "whatsapp_booking": {
+      "title": "حجز واتساب جديد",
+      "body": "تم إنشاء حجز جديد عبر واتساب."
+    }
+  },
+  "notificationsUi": {
+    "title": "الإشعارات",
+    "markAllRead": "تعليم الكل كمقروء",
+    "markAllAsRead": "تعليم الكل كمقروء",
+    "empty": "لا توجد إشعارات بعد",
+    "markRead": "تعليم كمقروء",
+    "markAsRead": "تعليم كمقروء",
+    "remove": "إزالة",
+    "removeNotification": "إزالة الإشعار",
+    "delete": "حذف",
+    "open": "فتح",
+    "justNow": "الآن",
+    "minutesAgo": "منذ {{count}} د",
+    "hoursAgo": "منذ {{count}} س",
+    "daysAgo": "منذ {{count}} ي",
+    "recently": "مؤخرًا",
+    "liveUpdates": "التحديثات المباشرة مفعّلة",
+    "connecting": "جارٍ الاتصال…",
+    "allMarkedRead": "تم تعليم جميع الإشعارات كمقروءة",
+    "deleted": "تم حذف الإشعار",
+    "newNotification": "إشعار جديد",
+    "notification": "إشعار",
+    "raiyahNotification": "إشعار رعاية",
+    "loadFailed": "تعذر تحميل الإشعارات",
+    "markReadFailed": "تعذر تعليم الإشعار كمقروء",
+    "markAllFailed": "تعذر تعليم الكل كمقروء",
+    "removeFailed": "تعذر إزالة الإشعار"
   }
 }

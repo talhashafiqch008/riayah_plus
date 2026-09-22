@@ -37,6 +37,8 @@ export default function StaffPersonCard({
   const roleText = localize
     ? familyStaffRoleLabel(staff.role)
     : staff.role.replace(/_/g, ' ');
+  // Avoid English title-case on already-localized Arabic role labels.
+  const roleClass = localize ? 'text-xs font-medium text-teal-700' : 'text-xs font-medium text-teal-700 capitalize';
 
   return (
     <div
@@ -55,7 +57,7 @@ export default function StaffPersonCard({
       </div>
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="font-semibold text-stone-900 truncate">{staff.name}</p>
-        <p className="text-xs font-medium text-teal-700 capitalize">
+        <p className={roleClass}>
           {specialtyLine(staff, roleText)}
         </p>
         {variant === 'clinician' && (

@@ -4,14 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Menu, X, LogOut, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { RoleShellConfig } from '@/config/proposalRoleShells';
-import { familyNavKey, getShellNavLabel } from '@/config/proposalRoleShells';
+import { getShellNavLabel, shellNavKey } from '@/config/proposalRoleShells';
 import { badgeLabel, fetchNavBadgesForShell, type NavBadgeMap } from '@/lib/api/navBadges';
 import RoleNotificationBell from '@/components/roles/RoleNotificationBell';
-import { LanguageSwitcher } from '@/components/landing/LanguageSwitcher';
 
 interface HealthRoleLayoutProps {
   config: RoleShellConfig;
 }
+
+const LOCALIZED_SHELLS = new Set(['family', 'coordinator', 'clinical', 'support', 'org']);
 
 export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
   const { pathname } = useLocation();
@@ -19,8 +20,9 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [badges, setBadges] = useState<NavBadgeMap>({});
+  const isLocalized = LOCALIZED_SHELLS.has(config.key);
   const isFamily = config.key === 'family';
-  const { t } = useTranslation('family');
+  const { t } = useTranslation(isLocalized ? config.key : 'family');
 
   const refreshBadges = useCallback(() => {
     void fetchNavBadgesForShell(config.key).then(setBadges);
@@ -32,7 +34,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
     const onFocus = () => refreshBadges();
     window.addEventListener('focus', onFocus);
     return () => {
-      window.clearInterval(id);
+      clearInterval(id);
       window.removeEventListener('focus', onFocus);
     };
   }, [refreshBadges, pathname]);
@@ -54,13 +56,13 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
   };
 
   const navLabel = (href: string, fallback: string) => {
-    if (!isFamily) return fallback;
-    const key = familyNavKey(href, config.basePath);
+    if (!isLocalized) return fallback;
+    const key = shellNavKey(href, config.basePath);
     return t(`nav.${key}`, { defaultValue: fallback });
   };
 
   const pageTitle = (() => {
-    if (!isFamily) return getShellNavLabel(config, pathname);
+    if (!isLocalized) return getShellNavLabel(config, pathname);
     const item = config.navigation.find((nav) =>
       nav.href === config.basePath
         ? pathname === config.basePath
@@ -70,8 +72,8 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
     return navLabel(item.href, item.name);
   })();
 
-  const portalTitle = isFamily ? t('portalTitle') : config.portalTitle;
-  const roleBadge = isFamily ? t('roleBadge') : config.roleBadge;
+  const portalTitle = isLocalized ? t('portalTitle') : config.portalTitle;
+  const roleBadge = isLocalized ? t('roleBadge') : config.roleBadge;
 
   return (
     <div className="h-dvh overflow-hidden bg-stone-50 flex font-sans">
@@ -104,7 +106,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
               type="button"
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg shrink-0"
-              aria-label={isFamily ? t('layout.closeSidebar') : 'Close sidebar'}
+              aria-label={isLocalized ? t('layout.closeSidebar') : 'Close sidebar'}
             >
               <X className="size-4" />
             </button>
@@ -132,7 +134,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
                       active ? 'bg-white text-red-600' : 'bg-red-600 text-white'
                     }`}
                     title={
-                      isFamily
+                      isLocalized
                         ? t('layout.badgeAttention', { count })
                         : `${count} need attention`
                     }
@@ -146,17 +148,12 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
         </nav>
 
         <div className="p-3 border-t border-stone-100 space-y-2 shrink-0">
-          {isFamily ? (
-            <div className="px-3 pb-1">
-              <LanguageSwitcher variant="dashboard" className="w-full justify-center" />
-            </div>
-          ) : null}
           <div className="px-3 py-2">
             <p className="text-sm font-semibold text-stone-900">
-              {user?.firstName ?? (isFamily ? t('layout.userFallback') : 'User')}
+              {user?.firstName ?? (isLocalized ? t('layout.userFallback') : 'User')}
             </p>
             <p className="text-xs text-stone-400 capitalize">
-              {isFamily ? t('roleBadge') : user?.role?.replace(/_/g, ' ')}
+              {isLocalized ? t('roleBadge') : user?.role?.replace(/_/g, ' ')}
             </p>
           </div>
           <button
@@ -165,7 +162,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
             className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl"
           >
             <LogOut className="size-4" />
-            {isFamily ? t('layout.signOut') : 'Sign out'}
+            {isLocalized ? t('layout.signOut') : 'Sign out'}
           </button>
         </div>
       </aside>
@@ -176,7 +173,7 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 text-stone-500 hover:bg-stone-100 rounded-lg"
-            aria-label={isFamily ? t('layout.openMenu') : 'Open menu'}
+            aria-label={isLocalized ? t('layout.openMenu') : 'Open menu'}
           >
             <Menu className="size-5" />
           </button>
@@ -185,21 +182,16 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
               type="button"
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-2 text-stone-500 hover:bg-stone-100 rounded-lg"
-              aria-label={isFamily ? t('layout.closeMenu') : 'Close menu'}
+              aria-label={isLocalized ? t('layout.closeMenu') : 'Close menu'}
             >
               <X className="size-5" />
             </button>
           )}
           <h1 className="font-semibold text-stone-900 flex-1 min-w-0 truncate">{pageTitle}</h1>
-          {isFamily ? (
-            <div className="hidden sm:block shrink-0">
-              <LanguageSwitcher variant="dashboard" />
-            </div>
-          ) : null}
           <RoleNotificationBell shellBasePath={config.basePath} />
         </header>
         <main id="main-content" className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8">
-          {config.key === 'family' && !user?.organizationId && (
+          {isFamily && !user?.organizationId && (
             <div
               role="status"
               className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 text-start"
@@ -213,3 +205,4 @@ export function HealthRoleLayout({ config }: HealthRoleLayoutProps) {
     </div>
   );
 }
+

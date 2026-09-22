@@ -1,10 +1,13 @@
 
 import { useState } from 'react';
 import { Bell, X, Check, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { localizeNotification } from '@/lib/localizeNotification';
 
 export function NotificationBellEcho() {
  const [showDropdown, setShowDropdown] = useState(false);
+ const { t } = useTranslation('common');
  const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
  const formatTime = (dateString: string) => {
@@ -13,12 +16,12 @@ export function NotificationBellEcho() {
  const now = new Date();
  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
 
- if (diffInMinutes < 1) return 'Just now';
- if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
- if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
- return `${Math.floor(diffInMinutes / 1440)}d ago`;
+ if (diffInMinutes < 1) return t('notificationsUi.justNow');
+ if (diffInMinutes < 60) return t('notificationsUi.minutesAgo', { count: diffInMinutes });
+ if (diffInMinutes < 1440) return t('notificationsUi.hoursAgo', { count: Math.floor(diffInMinutes / 60) });
+ return t('notificationsUi.daysAgo', { count: Math.floor(diffInMinutes / 1440) });
  } catch {
- return 'Recently';
+ return t('notificationsUi.recently');
  }
  };
 
@@ -27,7 +30,7 @@ export function NotificationBellEcho() {
  <button
  onClick={() => setShowDropdown(!showDropdown)}
  className="relative p-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
- aria-label="Notifications"
+ aria-label={t('notificationsUi.title')}
  >
  <Bell className="size-5" />
  {unreadCount > 0 && (
@@ -55,17 +58,17 @@ export function NotificationBellEcho() {
  {/* Header */}
  <div className="p-4 border-b border-stone-200 flex items-center justify-between">
  <div>
- <h3 className="text-lg font-semibold text-stone-900">Notifications</h3>
+ <h3 className="text-lg font-semibold text-stone-900">{t('notificationsUi.title')}</h3>
  <p className="text-xs text-stone-500 mt-0.5">
  {isConnected ? (
  <span className="flex items-center gap-1">
  <span className="size-1.5 bg-green-500 rounded-full"></span>
- Live updates enabled
+ {t('notificationsUi.liveUpdates')}
  </span>
  ) : (
  <span className="flex items-center gap-1">
  <span className="size-1.5 bg-stone-400 rounded-full"></span>
- Connecting…
+ {t('notificationsUi.connecting')}
  </span>
  )}
  </p>
@@ -75,14 +78,15 @@ export function NotificationBellEcho() {
  <button
  onClick={markAllAsRead}
  className="text-xs text-teal-600 hover:text-teal-700 font-medium"
- title="Mark all as read"
+ title={t('notificationsUi.markAllAsRead')}
  >
- Mark all read
+ {t('notificationsUi.markAllRead')}
  </button>
  )}
  <button
  onClick={() => setShowDropdown(false)}
  className="text-stone-500 hover:text-stone-700"
+ aria-label={t('actions.close')}
  >
  <X className="size-5" />
  </button>
@@ -94,15 +98,24 @@ export function NotificationBellEcho() {
  {notifications.length === 0 ? (
  <div className="py-12 text-center text-stone-500">
  <Bell className="size-12 mx-auto mb-3 opacity-30" />
- <p className="text-sm">No notifications yet</p>
+ <p className="text-sm">{t('notificationsUi.empty')}</p>
  </div>
  ) : (
  <div className="divide-y divide-stone-100">
  {notifications.map((notification) => {
  // Backend uses is_read: 0 = unread, 1 = read
  const isUnread = notification.is_read === 0;
- const message = notification.body || notification.title || 'New notification';
- const title = notification.title || 'Notification';
+ const localized = localizeNotification(
+ {
+ title: notification.title,
+ body: notification.body,
+ type: notification.type,
+ data: notification.data,
+ },
+ t,
+ );
+ const message = localized.body || localized.title || t('notificationsUi.newNotification');
+ const title = localized.title || t('notificationsUi.notification');
 
  return (
  <div
@@ -131,7 +144,7 @@ export function NotificationBellEcho() {
  <button
  onClick={() => markAsRead(notification.id)}
  className="text-teal-600 hover:text-teal-700 p-1"
- title="Mark as read"
+ title={t('notificationsUi.markAsRead')}
  >
  <Check className="size-4" />
  </button>
@@ -139,7 +152,7 @@ export function NotificationBellEcho() {
  <button
  onClick={() => deleteNotification(notification.id)}
  className="text-red-600 hover:text-red-700 p-1"
- title="Delete"
+ title={t('notificationsUi.delete')}
  >
  <Trash2 className="size-4" />
  </button>

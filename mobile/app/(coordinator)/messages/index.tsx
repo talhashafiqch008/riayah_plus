@@ -5,6 +5,7 @@ export default function CoordinatorMessagesScreen() {
     <MessagesInbox
       basePath="/(coordinator)/messages"
       canStartStaffThreads
+      i18nNs="coordinator"
     />
   );
 }

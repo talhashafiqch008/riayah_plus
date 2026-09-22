@@ -97,7 +97,22 @@
     "booked": "Session booked",
     "bookingFailed": "Booking failed",
     "taken": "Taken",
-    "closed": "Closed"
+    "closed": "Closed",
+    "sessionTypeLabel": "Session type",
+    "selectType": "Select type…",
+    "timesToday": "Times today",
+    "slotsLegend": "Green = available · Gray = booked or too soon",
+    "slotBooked": "Booked",
+    "slotTooSoon": "Too soon",
+    "confirmBooking": "Confirm booking",
+    "telehealthPayHint": "Telehealth sessions create an invoice — pay before joining the video room.",
+    "visitConfirmHint": "Your care team will confirm the visit details after booking.",
+    "durationMin": "{{count}} min",
+    "types": {
+      "telehealth": "Telehealth (video call)",
+      "in_person": "In-person",
+      "home_visit": "Home visit"
+    }
   },
   "telehealth": {
     "title": "Video sessions",
@@ -126,7 +141,22 @@
     "consentCta": "I understand — continue",
     "admittedTitle": "You have been admitted.",
     "admittedBody": "Video will start here when the clinic call server is configured. You can stay on this page — you are already in the session.",
-    "leave": "Leave session"
+    "leave": "Leave session",
+    "inCall": "In call",
+    "paymentTitle": "Payment required",
+    "paymentBody": "Pay the session invoice before you can join this video visit. After paying, return here and try again.",
+    "consentRequiredTitle": "Consent required",
+    "consentRequiredBody": "Before joining a video visit, confirm you agree to receive care over a secure video connection.",
+    "consentCheckbox": "I consent to join this telehealth session.",
+    "continue": "Continue",
+    "inWaitingRoom": "In the waiting room",
+    "waitingRoomBody": "Your clinician will admit you shortly. Keep this screen open.",
+    "admittedShort": "You are admitted",
+    "connectingVideo": "Connecting to video…",
+    "videoServerNotConfigured": "Video server is not configured yet. You are admitted — your clinician can continue on web, or LiveKit can be configured for mobile video.",
+    "unableToJoin": "Unable to join",
+    "scheduled": "Scheduled {{datetime}}",
+    "videoVisitTitle": "Video visit"
   },
   "carePlans": {
     "title": "Care Plans",
@@ -143,6 +173,7 @@
     "approved": "Care plan approved",
     "approveFailed": "Approve failed",
     "needExplanation": "Please explain what changes you need",
+    "missing": "Missing care plan",
     "revisionRequested": "Revision requested",
     "requestFailed": "Request failed",
     "rejected": "Care plan rejected",
@@ -156,7 +187,15 @@
     "requestChanges": "Request changes",
     "reject": "Reject plan",
     "total": "Total",
-    "teamChanged": "What the care team changed"
+    "teamChanged": "What the care team changed",
+    "title": "Care plan",
+    "version": "Version {{version}}",
+    "teamUpdatedFallback": "Your care team updated this plan after your change request. Review the goals and services below.",
+    "noGoals": "No goals listed yet.",
+    "noServices": "No services listed yet.",
+    "targetDate": "Target {{date}}",
+    "lastDecisionNotes": "Notes from your last decision",
+    "actionFailed": "Action failed"
   },
   "billing": {
     "title": "Billing",
@@ -190,7 +229,9 @@
     "total": "Total",
     "dueDate": "Due {{date}}",
     "issued": "Issued {{date}}",
-    "quotationHint": "This is an estimate from your approved care plan. You will receive a separate invoice after services are completed."
+    "quotationHint": "This is an estimate from your approved care plan. You will receive a separate invoice after services are completed.",
+    "billingDocument": "Billing document",
+    "noLineItems": "No line items"
   },
   "messages": {
     "title": "Messages",
@@ -216,7 +257,18 @@
       "family_clinical": "Clinician",
       "coordinator_clinical": "Care team",
       "internal_staff": "Internal"
-    }
+    },
+    "backToInbox": "Back to inbox",
+    "secureSubtitle": "Secure messaging",
+    "conversationFallback": "Conversation",
+    "emptyThreadSubtitle": "Say hello to start the conversation.",
+    "threadLoadError": "Failed to load thread",
+    "sendFailed": "Could not send message",
+    "openAttachmentFailed": "Could not open attachment",
+    "openAttachment": "Open attachment {{name}}",
+    "startConversationPrompt": "Start a conversation",
+    "attachHint": "Attach a file",
+    "typeMessage": "Write a message"
   },
   "episodes": {
     "title": "Care Journey",
@@ -302,6 +354,15 @@
     "householdDetails": "Household details",
     "accountHolder": "Account holder",
     "whoNeedsCare": "Who needs care",
+    "openPersonHint": "Open a person to view their individual care request.",
+    "membersNeedingCare": "{{count}} {{people}} needing care · open a person below to see their care request",
+    "household": "Household",
+    "editShort": "Edit",
+    "city": "City",
+    "address": "Address",
+    "updated": "Care unit updated",
+    "saveFailed": "Save failed",
+    "nameRequired": "Care unit name is required",
     "openCareRequest": "Open to view care request",
     "dob": "DOB {{date}}",
     "journeysHeading": "Your care journeys",
@@ -358,7 +419,21 @@
     "notFound": "Person not found on this care unit.",
     "male": "Male",
     "female": "Female",
-    "noPreference": "No preference"
+    "noPreference": "No preference",
+    "requestOnboardingHint": "What you told us during onboarding.",
+    "noRequestLinked": "No care request linked to this person yet. Submit one from onboarding, or ask your care team to attach an intake.",
+    "noJourneysForPerson": "No care journey for this person yet.",
+    "dateOfBirthInput": "Date of birth (YYYY-MM-DD)",
+    "pointOfContactPhone": "Point of contact phone",
+    "missingPerson": "Missing person",
+    "nameRequired": "Name is required",
+    "saveFailed": "Save failed",
+    "unknown": "Unknown",
+    "careRequestLabel": "Care request",
+    "providerPreference": "Provider preference",
+    "startLabel": "Start",
+    "revisionUpdated": "Updated",
+    "revisionCreated": "Created"
   },
   "onboarding": {
     "eyebrow": "Care request",
@@ -420,7 +495,40 @@
           "1": "Stay informed about the care journey",
           "2": "Cannot edit clinical records or care plans alone"
         }
+      },
+      "support_coordinator": {
+        "title": "Support Coordinator",
+        "subtitle": "For clients",
+        "description": "I coordinate support for NDIS participants and clients."
       }
+    },
+    "mobile": {
+      "whereAreYou": "Where are you?",
+      "step1Subtitle": "Location, language, and who needs care.",
+      "detectedTapToChange": "Detected from your device — tap to change",
+      "loginRequired": "Please log in to continue.",
+      "submitSuccessToast": "Request received — our care team will review it soon.",
+      "startTimeHm": "Start (HH:mm)",
+      "endTimeHm": "End (HH:mm)",
+      "timeRange": {
+        "morning": "6am - 12pm",
+        "afternoon": "12pm - 6pm",
+        "evening": "6pm - 10pm",
+        "overnight": "10pm - 6am"
+      }
+    },
+    "toasts": {
+      "loginRequired": "Please log in to continue onboarding.",
+      "providerLoggedIn": "You are logged in as a Provider.",
+      "alreadyCompleted": "You have already completed onboarding.",
+      "sessionInvalid": "Session invalid. Please log in again.",
+      "completeRegistration": "Please complete account registration first.",
+      "requestReceived": "Request received — our care team will review it soon.",
+      "submitFailed": "Failed to submit care request.",
+      "checkInputs": "Please check your inputs",
+      "sessionExpired": "Session expired. Please try again.",
+      "saveProgressError": "An error occurred while saving your progress. Please try again.",
+      "profileSynced": "Profile synced successfully"
     },
     "careNeeds": {
       "selectAll": "Select all categories that apply."
@@ -610,7 +718,28 @@
       "spouse": "Spouse",
       "sibling": "Sibling",
       "relative": "Relative",
+      "family": "Family",
+      "client": "Client",
       "other": "Other"
+    },
+    "account": {
+      "myself": "Individual (for myself)",
+      "family_member": "Family Guardian",
+      "support_coordinator": "Support Coordinator"
+    },
+    "need": {
+      "personal_care": "Personal care",
+      "companionship": "Companionship",
+      "shopping_errands": "Shopping / errands",
+      "shopping errands": "Shopping / errands",
+      "newborn_support": "Newborn support",
+      "newborn support": "Newborn support",
+      "medication_reminders": "Medication reminders",
+      "medication reminders": "Medication reminders",
+      "laundry": "Laundry",
+      "cleaning": "Cleaning",
+      "mobility_assistance": "Mobility assistance",
+      "mobility assistance": "Mobility assistance"
     },
     "role": {
       "clinical_staff": "Clinical staff",
@@ -696,6 +825,136 @@
       "completed": "Completed",
       "cancelled": "Cancelled",
       "no_show": "Missed"
+    }
+  },
+  "mobile": {
+    "tabs": {
+      "home": "Home",
+      "journey": "Journey",
+      "appointments": "Appointments",
+      "plans": "Plans",
+      "more": "More"
+    },
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
+    "home": {
+      "tagline": "Your care, in one place.",
+      "fallbackName": "there",
+      "statsActive": "Active\njourneys",
+      "statsUpcoming": "Upcoming\nsessions",
+      "statsAlerts": "Unread\nalerts",
+      "loadRetryPrefix": "Could not load — ",
+      "retry": "tap to retry",
+      "nextVisit": "Next visit",
+      "requestCare": "Request care",
+      "requestCareHint": "Find the right support for your family",
+      "quickAccess": "Quick access",
+      "notifications": "Notifications",
+      "profile": "Profile",
+      "openNextAppointment": "Open next appointment",
+      "journeyHint": "Follow your progress",
+      "appointmentsHint": "View and book sessions",
+      "documentsHint": "Upload and manage files",
+      "careUnitHint": "Your care team",
+      "messagesHint": "Chat with your care team"
+    },
+    "more": {
+      "myAccount": "My account",
+      "myCare": "My care",
+      "communication": "Communication",
+      "account": "Account",
+      "careUnit": "My care unit",
+      "careUnitDesc": "Household, people needing care, and their requests",
+      "newRequest": "New care request",
+      "newRequestDesc": "Start a care request for someone in your household",
+      "documentsDesc": "Reports and files shared with your care team",
+      "messagesDesc": "Talk to your care team",
+      "videoDesc": "Join remote care sessions",
+      "notificationsDesc": "Updates about your care journey",
+      "profile": "Profile & settings",
+      "profileDesc": "Your details and account preferences",
+      "billingDesc": "Quotations, invoices, and pay online",
+      "openProfile": "Open profile"
+    },
+    "common": {
+      "tryAgain": "Try again",
+      "loading": "Loading…",
+      "all": "All",
+      "book": "Book",
+      "actionRequired": "Action required",
+      "pendingCount": "{{count}} pending",
+      "careRecipient": "Care recipient",
+      "started": "Started {{date}}",
+      "withProvider": "With {{name}}",
+      "clinicianTba": "Clinician TBA",
+      "videoTapJoin": "Video visit — tap to join",
+      "filterUpcoming": "Upcoming",
+      "filterDone": "Done",
+      "filterCancelled": "Cancelled",
+      "bookingsSubtitle": "Sessions with your assigned clinician",
+      "emptySessionsHint": "Book an open slot with your assigned clinician, or wait for your coordinator to schedule one.",
+      "journeysSubtitle": "Your care from request to active support",
+      "journeysEmptyHint": "After you submit a care request, your care team will start one.",
+      "journeyCount": "{{count}} care journey",
+      "journeyCount_other": "{{count}} care journeys",
+      "plansSubtitle": "Review, approve, or request changes",
+      "plansEmptyHint": "Your coordinator will share a plan once it is ready.",
+      "awaitingYourApproval": "Awaiting your approval",
+      "profile": {
+        "notSignedIn": "Not signed in.",
+        "email": "Email",
+        "role": "Role",
+        "organization": "Organization",
+        "displayName": "Display name",
+        "changePassword": "Change password",
+        "signOut": "Sign out",
+        "signOutConfirm": "Are you sure?",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "save": "Save",
+        "saving": "Saving…",
+        "invalidName": "Invalid name",
+        "invalidNameHint": "Please enter at least 2 characters.",
+        "saveFailed": "Could not save",
+        "loading": "Loading…"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "allCaughtUp": "All caught up",
+        "empty": "No notifications yet.",
+        "unread": "{{count}} unread",
+        "loadError": "Could not load",
+        "somethingWrong": "Something went wrong",
+        "tryAgain": "Try again"
+      }
+    },
+    "documents": {
+      "subtitle": "Reports and files from your care team",
+      "hubTitle": "Documents hub coming soon",
+      "hubBody": "A dedicated space for all your care files. For now, documents are available directly from your care unit and care journey.",
+      "accessFrom": "Access documents from",
+      "careUnitHint": "Upload documents from your care unit",
+      "careJourneyHint": "View reports attached to your care journey"
+    },
+    "episode": {
+      "sessionsTitle": "Sessions",
+      "sessionsSubtitle": "Booked visits for this care journey",
+      "sessionsSection": "Sessions",
+      "carePlanTitle": "Care plan",
+      "carePlanSubtitle": "Goals and services for this journey",
+      "noEpisodeTitle": "No episode",
+      "selectEpisodeSessions": "Select an episode to view sessions.",
+      "selectEpisodePlan": "Select an episode to view its care plan.",
+      "noCarePlanTitle": "No care plan yet",
+      "noCarePlanSubtitle": "Your coordinator is preparing one.",
+      "goalsServicesHeader": "Goals & Services",
+      "noGoalsOrServices": "No goals or services listed yet.",
+      "defaultPlanTitle": "Care Plan",
+      "noSessionsTitle": "No sessions yet",
+      "noSessionsSubtitle": "Booked care sessions will appear here."
     }
   }
 }

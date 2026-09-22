@@ -124,6 +124,8 @@ export function carePlanStatusLabel(status: string): string {
     completed: 'Completed',
   };
   const fallback = english[s] ?? String(s).replace(/_/g, ' ');
+  const coord = i18n.t(`plans.status.${s}`, { ns: 'coordinator', defaultValue: '' });
+  if (coord && coord !== `plans.status.${s}`) return coord;
   const key = `status.carePlan.${s}`;
   const translated = i18n.t(key, { ns: 'family', defaultValue: '' });
   if (translated && translated !== key) return translated;

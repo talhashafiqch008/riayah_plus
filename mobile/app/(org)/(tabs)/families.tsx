@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, EmptyState, Input, ScreenHeader } from '../../../components/ui';
 import {
@@ -25,16 +26,19 @@ import { apiErrorMessage } from '../../../lib/format';
 function coordinatorLabel(
   family: OrgFamily,
   coords: OrgCoordinator[],
+  unassigned: string,
+  assignedFallback: string,
 ): string {
-  if (!family.assignedCoordinatorId) return 'Unassigned';
+  if (!family.assignedCoordinatorId) return unassigned;
   return (
     family.assignedCoordinator?.name ??
     coords.find((c) => c.id === family.assignedCoordinatorId)?.name ??
-    'Assigned'
+    assignedFallback
   );
 }
 
 export default function OrgFamiliesScreen() {
+  const { t } = useTranslation('org');
   const toast = useToast();
   const qc = useQueryClient();
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -77,15 +81,16 @@ export default function OrgFamiliesScreen() {
         delete next[vars.familyId];
         return next;
       });
-      toast.show(vars.coordinatorId ? 'Coordinator assigned' : 'Coordinator cleared', {
-        type: 'success',
-      });
+      toast.show(
+        vars.coordinatorId ? t('families.assignedToast') : t('families.clearedToast'),
+        { type: 'success' },
+      );
       await qc.invalidateQueries({ queryKey: ['org-families'] });
       await qc.invalidateQueries({ queryKey: ['org-dashboard'] });
       await qc.invalidateQueries({ queryKey: ['org-pending-intakes'] });
     },
     onError: (e, vars) => {
-      const msg = apiErrorMessage(e, 'Assignment failed');
+      const msg = apiErrorMessage(e, t('families.assignFailed'));
       setRowError((prev) => ({ ...prev, [vars.familyId]: msg }));
       toast.show(msg, { type: 'danger' });
     },
@@ -110,8 +115,8 @@ export default function OrgFamiliesScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Families"
-        subtitle="Assign a primary coordinator"
+        title={t('families.title')}
+        subtitle={t('mobile.families.subtitle')}
         showBack={false}
       />
 
@@ -120,9 +125,12 @@ export default function OrgFamiliesScreen() {
       ) : familiesQuery.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load families"
+          title={t('mobile.families.loadError')}
           subtitle={apiErrorMessage(familiesQuery.error)}
-          action={{ label: 'Try again', onPress: () => void familiesQuery.refetch() }}
+          action={{
+            label: t('mobile.shell.tryAgain'),
+            onPress: () => void familiesQuery.refetch(),
+          }}
         />
       ) : (
         <FlatList
@@ -140,29 +148,32 @@ export default function OrgFamiliesScreen() {
             />
           }
           ListHeaderComponent={
-            <Text className="mb-4 text-sm text-stone-500">
-              Families linked to your organization. Assign a primary coordinator for ownership.
-            </Text>
+            <Text className="mb-4 text-sm text-stone-500">{t('families.description')}</Text>
           }
           ListEmptyComponent={
             <EmptyState
               icon="people-outline"
-              title="No families yet"
-              subtitle="No families assigned to your organization yet."
+              title={t('mobile.families.emptyTitle')}
+              subtitle={t('families.empty')}
             />
           }
           renderItem={({ item }) => {
             const err = rowError[item.id];
             const saving =
               assignMutation.isPending && assignMutation.variables?.familyId === item.id;
-            const label = coordinatorLabel(item, coords);
+            const label = coordinatorLabel(
+              item,
+              coords,
+              t('common.unassigned'),
+              t('mobile.families.assignedFallback'),
+            );
             const assigned = Boolean(item.assignedCoordinatorId);
             return (
               <Card className="mb-3" shadow>
                 <Text className="font-semibold text-stone-900">{item.name}</Text>
                 <Text className="mt-0.5 text-sm text-stone-500">{item.email}</Text>
                 <Text className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wider text-stone-400">
-                  Primary coordinator
+                  {t('families.colCoordinator')}
                 </Text>
                 <Pressable
                   disabled={saving}
@@ -171,7 +182,7 @@ export default function OrgFamiliesScreen() {
                     assigned ? 'border-stone-200' : 'border-stone-200'
                   } ${saving ? 'opacity-50' : ''}`}
                   accessibilityRole="button"
-                  accessibilityLabel="Select coordinator"
+                  accessibilityLabel={t('mobile.families.selectA11y')}
                 >
                   <Text
                     className={`flex-1 text-sm ${
@@ -179,7 +190,7 @@ export default function OrgFamiliesScreen() {
                     }`}
                     numberOfLines={1}
                   >
-                    {saving ? 'Saving…' : label}
+                    {saving ? t('mobile.shell.saving') : label}
                   </Text>
                   <Ionicons name="chevron-down" size={16} color="#A8A29E" />
                 </Pressable>
@@ -203,7 +214,9 @@ export default function OrgFamiliesScreen() {
           >
             <View className="flex-row items-center justify-between border-b border-stone-100 px-4 py-3">
               <Text className="text-base font-semibold text-stone-900">
-                {pickingFamily ? `Coordinator · ${pickingFamily.name}` : 'Select coordinator'}
+                {pickingFamily
+                  ? t('mobile.families.pickerTitleNamed', { name: pickingFamily.name })
+                  : t('mobile.families.pickerTitle')}
               </Text>
               <Pressable onPress={closePicker} hitSlop={12}>
                 <Ionicons name="close" size={22} color="#57534E" />
@@ -211,7 +224,7 @@ export default function OrgFamiliesScreen() {
             </View>
             <View className="px-4 pt-3">
               <Input
-                placeholder="Search coordinators…"
+                placeholder={t('mobile.families.searchPlaceholder')}
                 value={pickerSearch}
                 onChangeText={setPickerSearch}
                 autoCorrect={false}
@@ -238,7 +251,7 @@ export default function OrgFamiliesScreen() {
                         : 'text-stone-800'
                     }`}
                   >
-                    Unassigned
+                    {t('common.unassigned')}
                   </Text>
                   {pickingFamily && !pickingFamily.assignedCoordinatorId ? (
                     <Ionicons name="checkmark-circle" size={20} color="#0D9488" />
@@ -248,8 +261,8 @@ export default function OrgFamiliesScreen() {
               ListEmptyComponent={
                 <Text className="p-4 text-sm text-stone-500">
                   {coords.length === 0
-                    ? 'No active coordinators. Invite one first.'
-                    : 'No coordinators match that search.'}
+                    ? t('mobile.families.noActive')
+                    : t('mobile.families.noSearchMatch')}
                 </Text>
               }
               renderItem={({ item: c }) => {

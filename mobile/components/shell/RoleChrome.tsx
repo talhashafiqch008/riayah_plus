@@ -4,12 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { navBackIcon } from '../../lib/rtlIcons';
 
 /** Website tokens from mern/client/src/index.css */
 export const ROLE = {
@@ -72,6 +74,7 @@ export function RoleTabHero({
   left?: ReactNode;
   showBack?: boolean;
 }) {
+  const { t } = useTranslation('common');
   return (
     <LinearGradient
       colors={[...ROLE_HERO_COLORS]}
@@ -99,7 +102,7 @@ export function RoleTabHero({
           ) : showBack ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={t('a11y.back')}
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.back();
@@ -108,7 +111,7 @@ export function RoleTabHero({
               className="mb-3 h-[38px] w-[38px] items-center justify-center rounded-full"
               style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
             >
-              <Ionicons name="chevron-back" size={22} color={ROLE.white} />
+              <Ionicons name={navBackIcon()} size={22} color={ROLE.white} />
             </Pressable>
           ) : null}
           <Text

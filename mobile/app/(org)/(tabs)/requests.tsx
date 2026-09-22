@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from 'react-native-toast-notifications';
-import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, EmptyState, ScreenHeader, StatusBadge } from '../../../components/ui';
 import {
   assignOrgFamilyCoordinator,
@@ -20,6 +20,7 @@ import {
 import { apiErrorMessage, formatDate } from '../../../lib/format';
 
 export default function OrgPendingRequestsScreen() {
+  const { t } = useTranslation('org');
   const toast = useToast();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -47,7 +48,7 @@ export default function OrgPendingRequestsScreen() {
         delete next[vars.familyId];
         return next;
       });
-      toast.show('Coordinator assigned. Request is now in their intake queue.', {
+      toast.show(t('pending.assignedToast'), {
         type: 'success',
       });
       await qc.invalidateQueries({ queryKey: ['org-pending-intakes'] });
@@ -55,7 +56,7 @@ export default function OrgPendingRequestsScreen() {
       await qc.invalidateQueries({ queryKey: ['org-families'] });
     },
     onError: (e, vars) => {
-      const msg = apiErrorMessage(e, 'Assignment failed');
+      const msg = apiErrorMessage(e, t('pending.assignFailed'));
       setRowError((prev) => ({ ...prev, [vars.familyId]: msg }));
       toast.show(msg, { type: 'danger' });
     },
@@ -66,8 +67,8 @@ export default function OrgPendingRequestsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['top']}>
       <ScreenHeader
-        title="Pending requests"
-        subtitle="Route unassigned care requests"
+        title={t('pending.title')}
+        subtitle={t('mobile.requests.subtitle')}
         showBack={false}
       />
 
@@ -76,9 +77,12 @@ export default function OrgPendingRequestsScreen() {
       ) : pendingQuery.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load pending requests"
+          title={t('mobile.requests.loadError')}
           subtitle={apiErrorMessage(pendingQuery.error)}
-          action={{ label: 'Try again', onPress: () => void pendingQuery.refetch() }}
+          action={{
+            label: t('mobile.shell.tryAgain'),
+            onPress: () => void pendingQuery.refetch(),
+          }}
         />
       ) : (
         <FlatList
@@ -96,16 +100,13 @@ export default function OrgPendingRequestsScreen() {
             />
           }
           ListHeaderComponent={
-            <Text className="mb-4 text-sm text-stone-500">
-              Care requests from families without a primary coordinator. Assign a coordinator to
-              route each request into their intake queue.
-            </Text>
+            <Text className="mb-4 text-sm text-stone-500">{t('pending.description')}</Text>
           }
           ListEmptyComponent={
             <EmptyState
               icon="checkmark-circle-outline"
-              title="No pending unassigned requests"
-              subtitle="New family care requests without a coordinator will appear here."
+              title={t('mobile.requests.emptyTitle')}
+              subtitle={t('mobile.requests.emptyHint')}
             />
           }
           renderItem={({ item }) => {
@@ -117,7 +118,7 @@ export default function OrgPendingRequestsScreen() {
                 <View className="flex-row items-start justify-between gap-2">
                   <View className="flex-1">
                     <Text className="font-semibold text-stone-900">
-                      {item.careRecipient?.name ?? 'Patient'} — {item.familyUser.name}
+                      {item.careRecipient?.name ?? t('common.patient')} — {item.familyUser.name}
                     </Text>
                     <Text className="mt-0.5 text-sm text-stone-500">{item.familyUser.email}</Text>
                     {item.reasonForCare ? (
@@ -136,7 +137,7 @@ export default function OrgPendingRequestsScreen() {
 
                 {coords.length === 0 ? (
                   <Text className="mt-3 text-sm text-amber-700">
-                    Invite an active coordinator first.
+                    {t('mobile.requests.inviteCoordinatorFirst')}
                   </Text>
                 ) : (
                   <View className="mt-3 gap-2">
@@ -169,7 +170,7 @@ export default function OrgPendingRequestsScreen() {
                       }
                       onPress={() => {
                         if (!picked) {
-                          const msg = 'Select a coordinator';
+                          const msg = t('pending.selectRequired');
                           setRowError((prev) => ({ ...prev, [familyId]: msg }));
                           toast.show(msg, { type: 'danger' });
                           return;
@@ -177,7 +178,7 @@ export default function OrgPendingRequestsScreen() {
                         assignMutation.mutate({ familyId, coordinatorId: picked });
                       }}
                     >
-                      Assign & route
+                      {t('pending.assign')}
                     </Button>
                   </View>
                 )}

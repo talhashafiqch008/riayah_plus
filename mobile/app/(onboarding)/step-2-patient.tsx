@@ -3,11 +3,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui';
 import { CARE_CATEGORIES } from '../../lib/onboardingOptions';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 
 export default function Step2CareNeeds() {
+  const { t } = useTranslation('family');
   const data = useOnboardingStore((s) => s.data);
   const updateData = useOnboardingStore((s) => s.updateData);
   const setStep = useOnboardingStore((s) => s.setStep);
@@ -59,8 +61,8 @@ export default function Step2CareNeeds() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['bottom']}>
       <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text className="text-2xl font-bold text-stone-900">What support do you need?</Text>
-        <Text className="mb-6 mt-1 text-sm text-stone-500">Select all categories that apply.</Text>
+        <Text className="text-2xl font-bold text-stone-900">{t('onboarding.stepTitles.whatSupport')}</Text>
+        <Text className="mb-6 mt-1 text-sm text-stone-500">{t('onboarding.careNeeds.selectAll')}</Text>
 
         <View className="flex-row flex-wrap gap-3">
           {CARE_CATEGORIES.map((category) => {
@@ -76,7 +78,9 @@ export default function Step2CareNeeds() {
               >
                 {needsCount > 0 ? (
                   <View className="absolute left-2 top-2 rounded-full bg-teal-600 px-2 py-0.5">
-                    <Text className="text-[10px] font-bold text-white">{needsCount} selected</Text>
+                    <Text className="text-[10px] font-bold text-white">
+                      {t('onboarding.selectedCount', { count: needsCount })}
+                    </Text>
                   </View>
                 ) : null}
                 <View
@@ -90,8 +94,12 @@ export default function Step2CareNeeds() {
                     color={isSelected ? '#fff' : '#0D9488'}
                   />
                 </View>
-                <Text className="text-center font-semibold text-stone-900">{category.label}</Text>
-                <Text className="text-center text-xs text-stone-500">{category.description}</Text>
+                <Text className="text-center font-semibold text-stone-900">
+                  {t(`onboarding.categories.${category.id}.label`)}
+                </Text>
+                <Text className="text-center text-xs text-stone-500">
+                  {t(`onboarding.categories.${category.id}.description`)}
+                </Text>
               </Pressable>
             );
           })}
@@ -100,7 +108,9 @@ export default function Step2CareNeeds() {
         {active && selectedCategories.includes(active.id) ? (
           <View className="mt-6 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200">
             <Text className="mb-3 font-semibold text-stone-900">
-              Specific needs for {active.label}
+              {t('onboarding.specificNeedsFor', {
+                category: t(`onboarding.categories.${active.id}.label`),
+              })}
             </Text>
             <View className="flex-row flex-wrap gap-2">
               {active.options.map((option) => {
@@ -113,8 +123,12 @@ export default function Step2CareNeeds() {
                       selected ? 'border-teal-600 bg-teal-50' : 'border-stone-200 bg-white'
                     }`}
                   >
-                    <Text className="text-sm font-bold text-stone-800">{option.label}</Text>
-                    <Text className="text-[10px] text-stone-400">{option.hint}</Text>
+                    <Text className="text-sm font-bold text-stone-800">
+                      {t(`onboarding.needs.${option.id}.label`)}
+                    </Text>
+                    <Text className="text-[10px] text-stone-400">
+                      {t(`onboarding.needs.${option.id}.hint`)}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -131,12 +145,12 @@ export default function Step2CareNeeds() {
               router.back();
             }}
           >
-            Back
+            {t('onboarding.back')}
           </Button>
         </View>
         <View className="flex-1">
           <Button onPress={onNext} disabled={!isValid}>
-            Continue
+            {t('onboarding.continue')}
           </Button>
         </View>
       </View>

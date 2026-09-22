@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { ArrowLeft, Circle, PanelRight, RefreshCw, Square, UserCheck, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { getSession, type CareSession } from '@/lib/api/scheduling';
+import { localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
+import { familyDateLocale } from '@/lib/familyLanguage';
 import {
   addTelehealthSessionNote,
   admitTelehealthParticipant,
@@ -34,6 +37,8 @@ function ContextPanel({
   onRefresh: () => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation('clinical');
+  const dateLocale = familyDateLocale();
   const [note, setNote] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,10 +51,10 @@ function ContextPanel({
     try {
       await addTelehealthSessionNote(sessionId, { content, isPrivate, noteType: 'session_note' });
       setNote('');
-      toast.success('Note saved to episode');
+      toast.success(t('telehealthJoin.noteSaved'));
       onRefresh();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not save note');
+      toast.error(isApiError(error) ? error.message : t('telehealthJoin.noteFailed'));
     } finally {
       setSaving(false);
     }
@@ -60,13 +65,13 @@ function ContextPanel({
       <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
         <div className="flex items-center gap-2">
           <PanelRight className="size-4 text-teal-700" />
-          <h3 className="text-sm font-semibold text-stone-900">Session context</h3>
+          <h3 className="text-sm font-semibold text-stone-900">{t('telehealthJoin.sessionContext')}</h3>
         </div>
         <button
           type="button"
           onClick={onRefresh}
           className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"
-          aria-label="Refresh context"
+          aria-label={t('telehealthJoin.refreshContext')}
         >
           <RefreshCw className="size-3.5" />
         </button>
@@ -74,23 +79,23 @@ function ContextPanel({
 
       <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4 text-sm">
         {!context ? (
-          <p className="text-stone-500">Loading care context…</p>
+          <p className="text-stone-500">{t('telehealthJoin.loadingContext')}</p>
         ) : (
           <>
             <section>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Episode</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{t('telehealthJoin.episode')}</p>
               {context.episode ? (
                 <div className="mt-1">
-                  <p className="font-medium text-stone-900">{context.episode.title}</p>
+                  <p className="font-medium text-stone-900">{localizeGeneratedLabel(context.episode.title)}</p>
                   <p className="text-xs text-stone-500">{context.episode.status.replace(/_/g, ' ')}</p>
                 </div>
               ) : (
-                <p className="mt-1 text-stone-500">No episode linked</p>
+                <p className="mt-1 text-stone-500">{t('telehealthJoin.noEpisode')}</p>
               )}
             </section>
 
             <section>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Care plan</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{t('telehealthJoin.carePlan')}</p>
               {context.carePlan ? (
                 <div className="mt-1 space-y-2">
                   <p className="font-medium text-stone-900">
@@ -120,24 +125,24 @@ function ContextPanel({
                   )}
                 </div>
               ) : (
-                <p className="mt-1 text-stone-500">No active care plan</p>
+                <p className="mt-1 text-stone-500">{t('telehealthJoin.noCarePlan')}</p>
               )}
             </section>
 
             <section>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Notes</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{t('telehealthJoin.notes')}</p>
               {context.notes.length === 0 ? (
-                <p className="mt-1 text-stone-500">No notes yet</p>
+                <p className="mt-1 text-stone-500">{t('telehealthJoin.noNotes')}</p>
               ) : (
                 <ul className="mt-2 space-y-2">
                   {context.notes.slice(0, 12).map((row) => (
                     <li key={row.id} className="rounded-lg border border-stone-100 px-2.5 py-2">
                       <p className="whitespace-pre-wrap text-stone-800">{row.content}</p>
                       <p className="mt-1 text-[10px] text-stone-400">
-                        {row.author?.name ?? 'Staff'}
-                        {row.isPrivate ? ' · private' : ''}
+                        {row.author?.name ?? t('telehealthJoin.staff')}
+                        {row.isPrivate ? ` · ${t('telehealthJoin.privateTag')}` : ''}
                         {' · '}
-                        {new Date(row.createdAt).toLocaleString('en-QA')}
+                        {new Date(row.createdAt).toLocaleString(dateLocale)}
                       </p>
                     </li>
                   ))}
@@ -153,7 +158,7 @@ function ContextPanel({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          placeholder="Add a session note"
+          placeholder={t('telehealthJoin.notePlaceholder')}
           className="w-full resize-none rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -163,14 +168,14 @@ function ContextPanel({
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
             />
-            Private
+            {t('telehealthJoin.private')}
           </label>
           <button
             type="submit"
             disabled={saving || !note.trim()}
             className="rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
           >
-            Save note
+            {t('telehealthJoin.saveNote')}
           </button>
         </div>
       </form>
@@ -189,23 +194,24 @@ function LobbyPanel({
   onAdmit: (userId: string) => void;
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation('clinical');
   const waiting = lobby?.lobby ?? [];
   const admitted = new Set(lobby?.admitted ?? []);
 
   return (
     <div className="rounded-xl border border-stone-100 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-stone-900">Waiting room</h3>
+        <h3 className="text-sm font-semibold text-stone-900">{t('telehealthJoin.waitingRoom')}</h3>
         <button
           type="button"
           onClick={onRefresh}
           className="inline-flex items-center gap-1 text-xs font-semibold text-stone-500 hover:text-stone-800"
         >
-          <RefreshCw className="size-3.5" /> Refresh
+          <RefreshCw className="size-3.5" /> {t('telehealthJoin.refresh')}
         </button>
       </div>
       {waiting.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-500">No one is waiting.</p>
+        <p className="mt-3 text-sm text-stone-500">{t('telehealthJoin.nobodyWaiting')}</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {waiting.map((user) => {
@@ -217,7 +223,7 @@ function LobbyPanel({
               >
                 <div>
                   <p className="text-sm font-medium text-stone-900">{user.name}</p>
-                  <p className="text-xs text-stone-500">{user.role?.replace(/_/g, ' ') ?? 'Participant'}</p>
+                  <p className="text-xs text-stone-500">{user.role?.replace(/_/g, ' ') ?? t('telehealthJoin.participant')}</p>
                 </div>
                 <button
                   type="button"
@@ -226,7 +232,7 @@ function LobbyPanel({
                   className="inline-flex items-center gap-1 rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
                 >
                   <UserCheck className="size-3.5" />
-                  {already ? 'Admitted' : admittingId === user.id ? '…' : 'Admit'}
+                  {already ? t('telehealthJoin.admitted') : admittingId === user.id ? '…' : t('telehealthJoin.admit')}
                 </button>
               </li>
             );
@@ -234,18 +240,19 @@ function LobbyPanel({
         </ul>
       )}
       {admitted.size > 0 && waiting.length === 0 && (
-        <p className="mt-2 text-xs text-teal-700">{admitted.size} participant(s) admitted</p>
+        <p className="mt-2 text-xs text-teal-700">{t('telehealthJoin.admittedCount', { count: admitted.size })}</p>
       )}
     </div>
   );
 }
 
 function RecordingArchive({ recording }: { recording: TelehealthRecording | null }) {
+  const { t } = useTranslation('clinical');
   if (!recording?.recordingUrl && !recording?.status) return null;
   const status = recording.status?.replace(/_/g, ' ') ?? '';
   return (
     <div className="rounded-xl border border-stone-100 bg-white p-4 shadow-sm space-y-3">
-      <h3 className="text-sm font-semibold text-stone-900">Session recording</h3>
+      <h3 className="text-sm font-semibold text-stone-900">{t('telehealthJoin.sessionRecording')}</h3>
       {status && <p className="text-xs font-medium uppercase tracking-wide text-teal-800">{status}</p>}
       {recording.recordingUrl && (
         <video src={recording.recordingUrl} controls className="w-full rounded-lg bg-black" />
@@ -255,6 +262,7 @@ function RecordingArchive({ recording }: { recording: TelehealthRecording | null
 }
 
 export default function ClinicalTelehealthJoinPage() {
+  const { t } = useTranslation('clinical');
   const { sessionId = '' } = useParams();
   const [session, setSession] = useState<CareSession | null>(null);
   const [join, setJoin] = useState<TelehealthJoin | null>(null);
@@ -280,9 +288,9 @@ export default function ClinicalTelehealthJoinPage() {
     try {
       setContext(await getTelehealthContext(sessionId));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Failed to load session context');
+      toast.error(isApiError(error) ? error.message : t('telehealthJoin.loadFailed'));
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   const refreshRecording = useCallback(async () => {
     try {
@@ -299,10 +307,10 @@ export default function ClinicalTelehealthJoinPage() {
       setError(null);
       return next;
     } catch (err: unknown) {
-      setError(isApiError(err) ? err.message : 'Could not join the session');
+      setError(isApiError(err) ? err.message : t('telehealthJoin.joinFailed'));
       return null;
     }
-  }, []);
+  }, [sessionId, t]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -317,11 +325,11 @@ export default function ClinicalTelehealthJoinPage() {
         refreshRecording(),
       ]);
     } catch (err: unknown) {
-      toast.error(isApiError(err) ? err.message : 'Failed to open session');
+      toast.error(isApiError(err) ? err.message : t('telehealthJoin.openFailed'));
     } finally {
       setLoading(false);
     }
-  }, [refreshContext, refreshLobby, refreshRecording, requestJoin, sessionId]);
+  }, [refreshContext, refreshLobby, refreshRecording, requestJoin, sessionId, t]);
 
   useEffect(() => {
     void load();
@@ -346,10 +354,10 @@ export default function ClinicalTelehealthJoinPage() {
     setAdmittingId(userId);
     try {
       await admitTelehealthParticipant(sessionId, userId);
-      toast.success('Participant admitted');
+      toast.success(t('telehealthJoin.admitSuccess'));
       await refreshLobby();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Admit failed');
+      toast.error(isApiError(error) ? error.message : t('telehealthJoin.admitFailed'));
     } finally {
       setAdmittingId(null);
     }
@@ -359,10 +367,10 @@ export default function ClinicalTelehealthJoinPage() {
     setRecBusy(true);
     try {
       await startTelehealthRecording(sessionId);
-      toast.success('Recording started — both participants are included');
+      toast.success(t('telehealthJoin.recordingStarted'));
       setRecording((prev) => ({ ...(prev ?? {}), status: 'in_progress' }));
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not start recording');
+      toast.error(isApiError(error) ? error.message : t('telehealthJoin.recordingStartFailed'));
     } finally {
       setRecBusy(false);
     }
@@ -372,10 +380,10 @@ export default function ClinicalTelehealthJoinPage() {
     setRecBusy(true);
     try {
       await stopTelehealthRecording(sessionId);
-      toast.success('Recording stopped. Saving video…');
+      toast.success(t('telehealthJoin.recordingStopped'));
       await refreshRecording();
     } catch (error: unknown) {
-      toast.error(isApiError(error) ? error.message : 'Could not stop recording');
+      toast.error(isApiError(error) ? error.message : t('telehealthJoin.recordingStopFailed'));
     } finally {
       setRecBusy(false);
     }
@@ -403,7 +411,7 @@ export default function ClinicalTelehealthJoinPage() {
                 onClick={() => void onStopRecording()}
                 className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
               >
-                <Square className="size-3 fill-current" /> Stop recording
+                <Square className="size-3 fill-current" /> {t('telehealthJoin.stopRecording')}
               </button>
             ) : (
               <button
@@ -412,7 +420,7 @@ export default function ClinicalTelehealthJoinPage() {
                 onClick={() => void onStartRecording()}
                 className="inline-flex items-center gap-1 rounded-lg bg-black/50 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
               >
-                <Circle className="size-3 fill-rose-500 text-rose-500" /> Start recording
+                <Circle className="size-3 fill-rose-500 text-rose-500" /> {t('telehealthJoin.startRecording')}
               </button>
             )}
             <button
@@ -420,7 +428,7 @@ export default function ClinicalTelehealthJoinPage() {
               onClick={() => setShowPanel((v) => !v)}
               className="rounded-lg bg-black/50 px-3 py-1.5 text-xs font-semibold text-white"
             >
-              {showPanel ? 'Hide panel' : 'Show panel'}
+              {showPanel ? t('telehealthJoin.hidePanel') : t('telehealthJoin.showPanel')}
             </button>
           </div>
           <LiveKitRoom
@@ -471,7 +479,7 @@ export default function ClinicalTelehealthJoinPage() {
         to="/clinical/telehealth"
         className="inline-flex items-center gap-1 text-sm font-semibold text-stone-600 hover:text-stone-900"
       >
-        <ArrowLeft className="size-4" /> Video sessions
+        <ArrowLeft className="size-4" /> {t('telehealthJoin.backToSessions')}
       </Link>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -483,7 +491,7 @@ export default function ClinicalTelehealthJoinPage() {
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-stone-900">
-                  {session?.client?.name ?? 'Video session'}
+                  {localizeGeneratedLabel(session?.client?.name) || t('telehealthJoin.videoSession')}
                 </h2>
                 {session && (
                   <p className="mt-1 text-sm text-stone-600">
@@ -495,11 +503,8 @@ export default function ClinicalTelehealthJoinPage() {
 
             {join?.phase === 'in_call' && (
               <div className="mt-6 space-y-2">
-                <p className="font-medium text-stone-800">You are in the session.</p>
-                <p className="text-sm text-stone-600">
-                  Live video starts when the clinic LiveKit server is configured. Admit family from
-                  the waiting room and use the side panel for plan, goals, and notes.
-                </p>
+                <p className="font-medium text-stone-800">{t('telehealthJoin.inSession')}</p>
+                <p className="text-sm text-stone-600">{t('telehealthJoin.liveKitHint')}</p>
               </div>
             )}
 

@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState, StatusBadge } from '../../../components/ui';
 import {
@@ -35,6 +36,7 @@ import {
   type CarePlan,
 } from '../../../lib/api/care';
 import { apiErrorMessage } from '../../../lib/format';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
 function SkeletonCard() {
   const shimmer = useSharedValue(0.4);
@@ -47,7 +49,7 @@ function SkeletonCard() {
       -1,
       false,
     );
-  }, []);
+  }, [shimmer]);
   const style = useAnimatedStyle(() => ({ opacity: shimmer.value }));
   return (
     <Animated.View
@@ -66,6 +68,7 @@ function PlanCard({
   plan: CarePlan;
   highlight?: boolean;
 }) {
+  const { t } = useTranslation('family');
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -101,7 +104,7 @@ function PlanCard({
             }}
           >
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E', letterSpacing: 0.1 }}>
-              Action required
+              {t('mobile.common.actionRequired')}
             </Text>
           </View>
         ) : null}
@@ -126,8 +129,11 @@ function PlanCard({
                   {plan.title}
                 </Text>
                 <Text style={{ marginTop: 2, fontSize: 13, color: FAMILY.stone500 }}>
-                  {plan.goals?.length ?? 0} goals · {plan.items?.length ?? 0} services · v
-                  {plan.version}
+                  {t('common.goalsServices', {
+                    goals: plan.goals?.length ?? 0,
+                    services: plan.items?.length ?? 0,
+                    version: plan.version,
+                  })}
                 </Text>
               </View>
             </View>
@@ -136,7 +142,7 @@ function PlanCard({
                 status={normalizeCarePlanStatus(plan.status)}
                 label={carePlanStatusLabel(plan.status)}
               />
-              <Ionicons name="chevron-forward" size={16} color="#D6D3D1" />
+              <Ionicons name={navForwardIcon()} size={16} color="#D6D3D1" />
             </View>
           </View>
         </View>
@@ -146,6 +152,7 @@ function PlanCard({
 }
 
 export default function FamilyCarePlansScreen() {
+  const { t } = useTranslation('family');
   const query = useQuery({
     queryKey: ['family-care-plans'],
     queryFn: () => listCarePlans(),
@@ -168,8 +175,8 @@ export default function FamilyCarePlansScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
       <FamilyTabHero
-        title="Care Plans"
-        subtitle="Review, approve, or request changes"
+        title={t('carePlans.title')}
+        subtitle={t('mobile.common.plansSubtitle')}
         right={
           awaiting.length > 0 ? (
             <View
@@ -189,7 +196,7 @@ export default function FamilyCarePlansScreen() {
                   fontVariant: ['tabular-nums'],
                 }}
               >
-                {awaiting.length} pending
+                {t('mobile.common.pendingCount', { count: awaiting.length })}
               </Text>
             </View>
           ) : null
@@ -205,9 +212,9 @@ export default function FamilyCarePlansScreen() {
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load care plans"
+          title={t('carePlans.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <ScrollView
@@ -223,8 +230,8 @@ export default function FamilyCarePlansScreen() {
           {plans.length === 0 ? (
             <EmptyState
               icon="document-text-outline"
-              title="No care plans to review yet"
-              subtitle="Your coordinator will share a plan once it is ready."
+              title={t('carePlans.empty')}
+              subtitle={t('mobile.common.plansEmptyHint')}
             />
           ) : (
             <>
@@ -243,7 +250,7 @@ export default function FamilyCarePlansScreen() {
                         color: FAMILY.amber,
                       }}
                     >
-                      Needs your action
+                      {t('carePlans.needsAction')}
                     </Text>
                   </View>
                   {awaiting.map((plan) => (
@@ -265,7 +272,7 @@ export default function FamilyCarePlansScreen() {
                       color: FAMILY.stone400,
                     }}
                   >
-                    Other plans
+                    {t('carePlans.otherPlans')}
                   </Text>
                   {others.map((plan) => (
                     <PlanCard key={plan.id} plan={plan} />

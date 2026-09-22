@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -8,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import {
   FAMILY,
   FamilySectionLabel,
@@ -16,23 +18,16 @@ import {
   familyPressSpring,
   familyReleaseSpring,
 } from '../../../components/family/FamilyChrome';
+import { navForwardIcon } from '../../../lib/rtlIcons';
 
-const LINKS = [
-  {
-    icon: 'people-outline' as const,
-    label: 'Care Unit',
-    hint: 'Upload documents from your care unit',
-    href: '/(family)/care-unit',
-  },
-  {
-    icon: 'heart-outline' as const,
-    label: 'Care Journey',
-    hint: 'View reports attached to your care journey',
-    href: '/(family)/episodes',
-  },
-];
+type DocLink = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  hint: string;
+  href: '/(family)/care-unit' | '/(family)/episodes';
+};
 
-function LinkCard({ link }: { link: (typeof LINKS)[0] }) {
+function LinkCard({ link }: { link: DocLink }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -77,16 +72,40 @@ function LinkCard({ link }: { link: (typeof LINKS)[0] }) {
             {link.hint}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={FAMILY.stone400} />
+        <Ionicons name={navForwardIcon()} size={16} color={FAMILY.stone400} />
       </Pressable>
     </Animated.View>
   );
 }
 
 export default function FamilyDocumentsScreen() {
+  const { t } = useTranslation('family');
+
+  const links = useMemo(
+    (): DocLink[] => [
+      {
+        icon: 'people-outline',
+        label: t('nav.care-unit'),
+        hint: t('mobile.documents.careUnitHint'),
+        href: '/(family)/care-unit',
+      },
+      {
+        icon: 'heart-outline',
+        label: t('episodes.title'),
+        hint: t('mobile.documents.careJourneyHint'),
+        href: '/(family)/episodes',
+      },
+    ],
+    [t],
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
-      <FamilyTabHero title="Documents" subtitle="Reports and files from your care team" showBack />
+      <FamilyTabHero
+        title={t('nav.documents')}
+        subtitle={t('mobile.documents.subtitle')}
+        showBack
+      />
 
       <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20 }}>
         <View style={{ marginBottom: 24, alignItems: 'center', padding: 24, ...familyCardStyle }}>
@@ -112,7 +131,7 @@ export default function FamilyDocumentsScreen() {
               letterSpacing: -0.3,
             }}
           >
-            Documents hub coming soon
+            {t('mobile.documents.hubTitle')}
           </Text>
           <Text
             style={{
@@ -123,15 +142,14 @@ export default function FamilyDocumentsScreen() {
               color: FAMILY.stone500,
             }}
           >
-            A dedicated space for all your care files. For now, documents are available directly from
-            your care unit and care journey.
+            {t('mobile.documents.hubBody')}
           </Text>
         </View>
 
-        <FamilySectionLabel>Access documents from</FamilySectionLabel>
+        <FamilySectionLabel>{t('mobile.documents.accessFrom')}</FamilySectionLabel>
 
         <View style={{ gap: 12 }}>
-          {LINKS.map((link) => (
+          {links.map((link) => (
             <LinkCard key={link.href} link={link} />
           ))}
         </View>

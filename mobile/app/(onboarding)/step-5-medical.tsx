@@ -3,38 +3,25 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useToast } from 'react-native-toast-notifications';
 import { Button } from '../../components/ui';
 import { apiClient } from '../../lib/api/client';
 import { submitFamilyCareRequest } from '../../lib/api/familyOnboarding';
-import { CATEGORY_LABELS } from '../../lib/familyCareseekerIntake';
 import { useAuthStore } from '../../stores/authStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { toastError } from '../../lib/toast';
 
-const CONSENTS = [
-  {
-    id: 'independentProviderAcknowledged' as const,
-    title: 'Independent Providers',
-    description:
-      'I understand providers on Raiyah Plus operate independently. Raiyah Plus connects you with providers but does not employ them.',
-    required: true,
-  },
-  {
-    id: 'termsAccepted' as const,
-    title: 'Terms & Privacy',
-    description: 'I agree to the Terms of Service and Privacy Policy.',
-    required: true,
-  },
-  {
-    id: 'marketingConsentGranted' as const,
-    title: 'Updates & Tips',
-    description: 'Send me helpful care tips and provider updates. (Optional)',
-    required: false,
-  },
+const CONSENT_META = [
+  { id: 'independentProviderAcknowledged' as const, i18nKey: 'independent' as const, required: true },
+  { id: 'termsAccepted' as const, i18nKey: 'terms' as const, required: true },
+  { id: 'marketingConsentGranted' as const, i18nKey: 'marketing' as const, required: false },
 ];
 
+const DATA_BADGE_KEYS = ['encrypted', 'withdraw', 'controlAccess', 'pdpl'] as const;
+
 export default function Step5Consent() {
+  const { t } = useTranslation('family');
   const data = useOnboardingStore((s) => s.data);
   const updateData = useOnboardingStore((s) => s.updateData);
   const setStep = useOnboardingStore((s) => s.setStep);
@@ -48,18 +35,24 @@ export default function Step5Consent() {
 
   const roleLabel =
     data.careRecipientType === 'family_member'
-      ? 'Family Guardian'
+      ? t('onboarding.accounts.family_member.title')
       : data.careRecipientType === 'myself'
-        ? 'Individual'
+        ? t('onboarding.accounts.myself.title')
         : data.careRecipientType === 'support_coordinator'
-          ? 'Support Coordinator'
+          ? t('onboarding.accounts.support_coordinator.title')
           : null;
 
-  const categories = data.careCategories.map((c) => CATEGORY_LABELS[c] ?? c);
+  const categories = data.careCategories.map((c) => t(`onboarding.categories.${c}.label`));
+
+  const scheduleLabel = data.scheduleType
+    ? t(`enums.schedule.${data.scheduleType}`)
+    : null;
+
+  const countryDisplay = data.country ? t(`onboarding.countries.${data.country}`) : null;
 
   const onSubmit = async () => {
     if (!user) {
-      toast.show('Please log in to continue.', { type: 'danger' });
+      toast.show(t('onboarding.mobile.loginRequired'), { type: 'danger' });
       return;
     }
     setSubmitting(true);
@@ -70,7 +63,6 @@ export default function Step5Consent() {
         email: user.email,
       });
       useAuthStore.getState().setUser({ ...user, careUnitId: user.careUnitId ?? 'pending' });
-      // Re-hydrate care unit id from API
       try {
         const units = await apiClient.get('/api/care-units');
         const list = (units.data.data ?? units.data) as { id: string }[];
@@ -82,7 +74,7 @@ export default function Step5Consent() {
       }
       await clearDraft();
       reset();
-      toast.show('Request received — our care team will review it soon.', { type: 'success' });
+      toast.show(t('onboarding.mobile.submitSuccessToast'), { type: 'success' });
       router.replace('/(family)');
     } catch (e) {
       toastError(toast, e);
@@ -94,43 +86,40 @@ export default function Step5Consent() {
   return (
     <SafeAreaView className="flex-1 bg-stone-50" edges={['bottom']}>
       <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text className="text-2xl font-bold text-stone-900">Review & Confirm</Text>
-        <Text className="mb-6 mt-1 text-sm text-stone-500">
-          Review your request, then accept the terms to finish.
-        </Text>
+        <Text className="text-2xl font-bold text-stone-900">{t('onboarding.stepTitles.review')}</Text>
+        <Text className="mb-6 mt-1 text-sm text-stone-500">{t('onboarding.reviewHint')}</Text>
 
         <View className="mb-6 rounded-2xl border border-teal-100 bg-teal-50 p-4">
           <Text className="mb-2 text-xs font-bold uppercase tracking-wider text-teal-700">
-            Your request summary
+            {t('onboarding.requestSummary')}
           </Text>
           {roleLabel ? (
             <Text className="text-sm text-stone-700">
-              Account: <Text className="font-semibold">{roleLabel}</Text>
+              {t('onboarding.accountLabel')}: <Text className="font-semibold">{roleLabel}</Text>
             </Text>
           ) : null}
-          {data.country ? (
+          {countryDisplay ? (
             <Text className="text-sm text-stone-700">
-              Location: <Text className="font-semibold">{data.country}</Text>
+              {t('onboarding.locationLabel')}: <Text className="font-semibold">{countryDisplay}</Text>
             </Text>
           ) : null}
           {categories.length > 0 ? (
             <Text className="text-sm text-stone-700">
-              Support: <Text className="font-semibold">{categories.join(', ')}</Text>
+              {t('onboarding.supportLabel')}:{' '}
+              <Text className="font-semibold">{categories.join(', ')}</Text>
             </Text>
           ) : null}
-          {data.scheduleType ? (
+          {scheduleLabel ? (
             <Text className="text-sm text-stone-700">
-              Schedule:{' '}
-              <Text className="font-semibold">{data.scheduleType.replace(/_/g, ' ')}</Text>
+              {t('onboarding.scheduleLabel')}:{' '}
+              <Text className="font-semibold">{scheduleLabel}</Text>
             </Text>
           ) : null}
-          <Text className="mt-3 text-xs text-teal-800">
-            After you submit, our care team will review your request before your consultation.
-          </Text>
+          <Text className="mt-3 text-xs text-teal-800">{t('onboarding.afterSubmit')}</Text>
         </View>
 
         <View className="gap-3">
-          {CONSENTS.map((consent) => {
+          {CONSENT_META.map((consent) => {
             const checked = Boolean(data[consent.id]);
             return (
               <Pressable
@@ -147,14 +136,18 @@ export default function Step5Consent() {
                 />
                 <View className="flex-1">
                   <View className="mb-1 flex-row items-center gap-2">
-                    <Text className="font-semibold text-stone-900">{consent.title}</Text>
+                    <Text className="font-semibold text-stone-900">
+                      {t(`onboarding.consent.${consent.i18nKey}.title`)}
+                    </Text>
                     {consent.required ? (
                       <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
-                        Required
+                        {t('onboarding.consent.required')}
                       </Text>
                     ) : null}
                   </View>
-                  <Text className="text-sm text-stone-500">{consent.description}</Text>
+                  <Text className="text-sm text-stone-500">
+                    {t(`onboarding.consent.${consent.i18nKey}.description`)}
+                  </Text>
                 </View>
               </Pressable>
             );
@@ -162,9 +155,11 @@ export default function Step5Consent() {
         </View>
 
         <View className="mt-6 rounded-2xl bg-stone-50 p-4">
-          <Text className="mb-2 font-semibold text-stone-900">Your Data Protection</Text>
+          <Text className="mb-2 font-semibold text-stone-900">
+            {t('onboarding.consent.dataProtection')}
+          </Text>
           <Text className="text-xs text-stone-600">
-            Encrypted & secure · Withdraw anytime · You control access · PDPL compliant
+            {DATA_BADGE_KEYS.map((key) => t(`onboarding.consent.${key}`)).join(' · ')}
           </Text>
         </View>
       </ScrollView>
@@ -178,12 +173,12 @@ export default function Step5Consent() {
               router.back();
             }}
           >
-            Back
+            {t('onboarding.back')}
           </Button>
         </View>
         <View className="flex-[1.4]">
           <Button onPress={onSubmit} disabled={!isValid || submitting} isLoading={submitting}>
-            Finish & Submit Request
+            {t('onboarding.finishSubmit')}
           </Button>
         </View>
       </View>

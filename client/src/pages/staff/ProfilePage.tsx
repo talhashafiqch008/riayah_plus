@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Save, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +48,12 @@ function splitTags(raw: string): string[] {
 }
 
 export default function StaffProfileSettingsPage() {
+  const { pathname } = useLocation();
+  const isClinical = pathname.startsWith('/clinical');
+  const isSupport = pathname.startsWith('/support');
+  const isStaffLocalized = isClinical || isSupport;
+  const { t } = useTranslation(isSupport ? 'support' : isClinical ? 'clinical' : 'coordinator');
+  const p = (key: string, fallback: string) => (isStaffLocalized ? t(`profile.${key}`) : fallback);
   const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -106,7 +114,7 @@ export default function StaffProfileSettingsPage() {
         if (!cancelled) applyProfile(profile);
       } catch (error: unknown) {
         if (!cancelled) {
-          toast.error(extractApiError(error).message || 'Failed to load profile');
+          toast.error(extractApiError(error).message || p('loadFailed', 'Failed to load profile'));
           if (user) {
             setForm((f) => ({
               ...f,
@@ -145,18 +153,18 @@ export default function StaffProfileSettingsPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     if (files.length > 1) {
-      toast.error('Select only one profile photo');
+      toast.error(p('photoOneOnly', 'Select only one profile photo'));
       e.target.value = '';
       return;
     }
     const file = files[0];
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Use JPEG, PNG, or WebP only');
+      toast.error(p('photoType', 'Use JPEG, PNG, or WebP only'));
       e.target.value = '';
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Photo must be 2 MB or smaller');
+      toast.error(p('photoSize', 'Photo must be 2 MB or smaller'));
       e.target.value = '';
       return;
     }
@@ -166,9 +174,9 @@ export default function StaffProfileSettingsPage() {
       const { avatar } = await uploadMyStaffAvatar(file);
       setForm((f) => ({ ...f, avatar }));
       await refreshUser().catch(() => undefined);
-      toast.success('Photo updated');
+      toast.success(p('photoUpdated', 'Photo updated'));
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Failed to upload photo');
+      toast.error(extractApiError(error).message || p('photoUploadFailed', 'Failed to upload photo'));
     } finally {
       setUploadingPhoto(false);
       e.target.value = '';
@@ -204,9 +212,9 @@ export default function StaffProfileSettingsPage() {
       });
       applyProfile(updated);
       await refreshUser().catch(() => undefined);
-      toast.success('Profile saved');
+      toast.success(p('saved', 'Profile saved'));
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Failed to save profile');
+      toast.error(extractApiError(error).message || p('saveFailed', 'Failed to save profile'));
     } finally {
       setSaving(false);
     }
@@ -225,8 +233,12 @@ export default function StaffProfileSettingsPage() {
   return (
     <RolePageShell>
       <RolePageHeader
-        title="Profile settings"
-        description="Your public care profile and internal contact details. Families see photo, role, languages, and bio — not Qatar ID or emergency contacts."
+        title={isStaffLocalized ? t('profile.title') : 'Profile settings'}
+        description={
+          isStaffLocalized
+            ? t('profile.description')
+            : 'Your public care profile and internal contact details. Families see photo, role, languages, and bio — not Qatar ID or emergency contacts.'
+        }
       />
 
       <div className="space-y-6 max-w-3xl">
@@ -244,7 +256,7 @@ export default function StaffProfileSettingsPage() {
               )}
             </div>
             <div className="flex-1 space-y-1">
-              <span className="text-xs font-semibold text-stone-500">Profile photo</span>
+              <span className="text-xs font-semibold text-stone-500">{p('photo', 'Profile photo')}</span>
               <div className="flex flex-wrap items-center gap-2">
                 <label
                   className={`inline-flex cursor-pointer items-center rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 ${
@@ -253,10 +265,10 @@ export default function StaffProfileSettingsPage() {
                 >
                   {uploadingPhoto ? (
                     <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-4 animate-spin" /> Uploading…
+                      <Loader2 className="size-4 animate-spin" /> {p('uploading', 'Uploading…')}
                     </span>
                   ) : (
-                    'Choose photo'
+                    p('choosePhoto', 'Choose photo')
                   )}
                   <input
                     type="file"
@@ -268,14 +280,14 @@ export default function StaffProfileSettingsPage() {
                 </label>
               </div>
               <p className="text-[11px] text-stone-400">
-                One image only · JPEG, PNG, or WebP · max 2 MB. Shown on assessments and sessions.
+                {p('photoHint', 'One image only · JPEG, PNG, or WebP · max 2 MB. Shown on assessments and sessions.')}
               </p>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">
-              <span className="text-xs font-semibold text-stone-500">Full name</span>
+              <span className="text-xs font-semibold text-stone-500">{p('fullName', 'Full name')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.name}
@@ -283,7 +295,7 @@ export default function StaffProfileSettingsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Phone</span>
+              <span className="text-xs font-semibold text-stone-500">{p('phone', 'Phone')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.phone}
@@ -291,7 +303,7 @@ export default function StaffProfileSettingsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Date of birth (internal)</span>
+              <span className="text-xs font-semibold text-stone-500">{p('dateOfBirth', 'Date of birth (internal)')}</span>
               <input
                 type="date"
                 className={`mt-1 ${fieldClass}`}
@@ -300,21 +312,21 @@ export default function StaffProfileSettingsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Gender</span>
+              <span className="text-xs font-semibold text-stone-500">{p('gender', 'Gender')}</span>
               <select
                 className={`mt-1 ${fieldClass}`}
                 value={form.gender}
                 onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}
               >
-                <option value="">Select…</option>
-                <option value="female">Female</option>
-                <option value="male">Male</option>
-                <option value="other">Other</option>
-                <option value="prefer_not">Prefer not to say</option>
+                <option value="">{p('genderSelect', 'Select…')}</option>
+                <option value="female">{p('genderFemale', 'Female')}</option>
+                <option value="male">{p('genderMale', 'Male')}</option>
+                <option value="other">{p('genderOther', 'Other')}</option>
+                <option value="prefer_not">{p('genderPreferNot', 'Prefer not to say')}</option>
               </select>
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Nationality</span>
+              <span className="text-xs font-semibold text-stone-500">{p('nationality', 'Nationality')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.nationality}
@@ -322,7 +334,7 @@ export default function StaffProfileSettingsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Years of experience</span>
+              <span className="text-xs font-semibold text-stone-500">{p('yearsExperience', 'Years of experience')}</span>
               <input
                 type="number"
                 min={0}
@@ -333,16 +345,16 @@ export default function StaffProfileSettingsPage() {
               />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="text-xs font-semibold text-stone-500">Specialty / role detail</span>
+              <span className="text-xs font-semibold text-stone-500">{p('specialty', 'Specialty / role detail')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.specialties}
                 onChange={(e) => setForm((f) => ({ ...f, specialties: e.target.value }))}
-                placeholder="e.g. General Practice, Physiotherapy"
+                placeholder={p('specialtyPlaceholder', 'e.g. General Practice, Physiotherapy')}
               />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="text-xs font-semibold text-stone-500">MOH license number (clinicians)</span>
+              <span className="text-xs font-semibold text-stone-500">{p('mohLicense', 'MOH license number (clinicians)')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.mohLicenseNumber}
@@ -353,7 +365,7 @@ export default function StaffProfileSettingsPage() {
         </section>
 
         <section className="rounded-2xl border bg-white p-5 shadow-sm space-y-3">
-          <h3 className="text-sm font-semibold text-stone-900">Languages spoken</h3>
+          <h3 className="text-sm font-semibold text-stone-900">{p('languagesSpoken', 'Languages spoken')}</h3>
           <div className="flex flex-wrap gap-2">
             {LANGUAGE_OPTIONS.map((lang) => {
               const on = form.languages.includes(lang);
@@ -368,7 +380,7 @@ export default function StaffProfileSettingsPage() {
                       : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'
                   }`}
                 >
-                  {lang}
+                  {isStaffLocalized ? t(`profile.lang.${lang}`, { defaultValue: lang }) : lang}
                 </button>
               );
             })}
@@ -376,37 +388,37 @@ export default function StaffProfileSettingsPage() {
         </section>
 
         <section className="rounded-2xl border bg-white p-5 shadow-sm space-y-3">
-          <h3 className="text-sm font-semibold text-stone-900">Public details</h3>
+          <h3 className="text-sm font-semibold text-stone-900">{p('publicDetails', 'Public details')}</h3>
           <label className="block text-sm">
-            <span className="text-xs font-semibold text-stone-500">Certifications (comma-separated)</span>
+            <span className="text-xs font-semibold text-stone-500">{p('certifications', 'Certifications (comma-separated)')}</span>
             <input
               className={`mt-1 ${fieldClass}`}
               value={form.certifications}
               onChange={(e) => setForm((f) => ({ ...f, certifications: e.target.value }))}
-              placeholder="First Aid, CPR, Dementia Care"
+              placeholder={p('certificationsPlaceholder', 'First Aid, CPR, Dementia Care')}
             />
           </label>
           <label className="block text-sm">
-            <span className="text-xs font-semibold text-stone-500">Service areas</span>
+            <span className="text-xs font-semibold text-stone-500">{p('serviceAreas', 'Service areas')}</span>
             <input
               className={`mt-1 ${fieldClass}`}
               value={form.serviceAreas}
               onChange={(e) => setForm((f) => ({ ...f, serviceAreas: e.target.value }))}
-              placeholder="West Bay, Al Sadd, Lusail"
+              placeholder={p('serviceAreasPlaceholder', 'West Bay, Al Sadd, Lusail')}
             />
           </label>
           <label className="block text-sm">
-            <span className="text-xs font-semibold text-stone-500">Bio</span>
+            <span className="text-xs font-semibold text-stone-500">{p('bio', 'Bio')}</span>
             <textarea
               rows={3}
               className={`mt-1 ${fieldClass}`}
               value={form.bio}
               onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-              placeholder="2–3 sentences about your experience"
+              placeholder={p('bioPlaceholder', '2–3 sentences about your experience')}
             />
           </label>
           <div>
-            <p className="text-xs font-semibold text-stone-500 mb-2">Availability days</p>
+            <p className="text-xs font-semibold text-stone-500 mb-2">{p('availabilityDays', 'Availability days')}</p>
             <div className="flex flex-wrap gap-2">
               {DAY_OPTIONS.map((d) => {
                 const on = form.availDays.includes(d.value);
@@ -421,14 +433,14 @@ export default function StaffProfileSettingsPage() {
                         : 'bg-white text-stone-600 border-stone-200'
                     }`}
                   >
-                    {d.label}
+                    {isStaffLocalized ? t(`profile.days.${d.value}`) : d.label}
                   </button>
                 );
               })}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <label className="text-sm">
-                <span className="text-xs font-semibold text-stone-500">From</span>
+                <span className="text-xs font-semibold text-stone-500">{p('from', 'From')}</span>
                 <input
                   type="time"
                   className={`mt-1 ${fieldClass}`}
@@ -437,7 +449,7 @@ export default function StaffProfileSettingsPage() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-xs font-semibold text-stone-500">To</span>
+                <span className="text-xs font-semibold text-stone-500">{p('to', 'To')}</span>
                 <input
                   type="time"
                   className={`mt-1 ${fieldClass}`}
@@ -450,12 +462,12 @@ export default function StaffProfileSettingsPage() {
         </section>
 
         <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 shadow-sm space-y-3">
-          <h3 className="text-sm font-semibold text-stone-900">Internal only</h3>
+          <h3 className="text-sm font-semibold text-stone-900">{p('internalOnly', 'Internal only')}</h3>
           <p className="text-xs text-stone-500">
-            Not shown to families. Visible to you and operations staff.
+            {p('internalHint', 'Not shown to families. Visible to you and operations staff.')}
           </p>
           <label className="block text-sm">
-            <span className="text-xs font-semibold text-stone-500">Qatar ID / Residence no.</span>
+            <span className="text-xs font-semibold text-stone-500">{p('qatarId', 'Qatar ID / Residence no.')}</span>
             <input
               className={`mt-1 ${fieldClass}`}
               value={form.qatarId}
@@ -464,7 +476,7 @@ export default function StaffProfileSettingsPage() {
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Emergency contact name</span>
+              <span className="text-xs font-semibold text-stone-500">{p('emergencyName', 'Emergency contact name')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.emergencyContactName}
@@ -472,7 +484,7 @@ export default function StaffProfileSettingsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold text-stone-500">Emergency contact phone</span>
+              <span className="text-xs font-semibold text-stone-500">{p('emergencyPhone', 'Emergency contact phone')}</span>
               <input
                 className={`mt-1 ${fieldClass}`}
                 value={form.emergencyContactPhone}
@@ -489,7 +501,7 @@ export default function StaffProfileSettingsPage() {
           className={`${btnPrimaryClass} inline-flex items-center gap-2`}
         >
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          Save profile
+          {saving ? p('saving', 'Saving…') : p('save', 'Save profile')}
         </button>
       </div>
     </RolePageShell>

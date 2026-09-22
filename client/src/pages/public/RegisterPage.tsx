@@ -1,10 +1,11 @@
-import { useState, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { m, LazyMotion, domAnimation } from "framer-motion";
 import { isApiError } from '@/lib/errors';
-import { registerSchema } from '@/lib/validation';
+import { createRegisterSchema } from '@/lib/validation';
 import { registerWithPhone } from '@/lib/api/auth';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CountryCode } from '@/config/countries';
@@ -25,6 +26,8 @@ const fadeIn = {
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 function RegisterContent() {
+ const { t } = useTranslation('auth');
+ const registerSchema = useMemo(() => createRegisterSchema(t), [t]);
  const selectedRole = 'family';
  const [method, setMethod] = useState<'email' | 'phone'>('email');
  const [formData, setFormData] = useState({
@@ -56,7 +59,7 @@ function RegisterContent() {
 
  try {
  if (!agreedToTerms) {
- toast.error('Please agree to the terms and conditions');
+ toast.error(t('register.consentRequired'));
  return;
  }
 
@@ -68,7 +71,7 @@ function RegisterContent() {
 
  if (!validation.success) {
  const firstError = validation.error.issues[0];
- toast.error(firstError?.message || 'Please check your details');
+ toast.error(firstError?.message || t('register.checkDetails'));
  return;
  }
 
@@ -83,30 +86,30 @@ function RegisterContent() {
  });
 
  if (result.requiresEmailVerification) {
- toast.success('Account created! Please verify your email before logging in.');
+ toast.success(t('register.accountCreatedVerifyEmail'));
  navigate(`/verify-email?email=${encodeURIComponent(result.user.email)}`);
  return;
  }
 
- toast.success('Account created successfully!');
+ toast.success(t('register.accountCreatedSuccess'));
  navigate('/family');
  return;
  }
 
  if (!formData.firstName.trim() || !formData.lastName.trim()) {
- toast.error('Please enter your first and last name');
+ toast.error(t('register.enterFirstLastName'));
  return;
  }
  if (!phoneE164 || phoneE164.replace(/\D/g, '').length < 8) {
- toast.error('Please enter a valid phone number');
+ toast.error(t('register.validPhone'));
  return;
  }
  if (!passwordRegex.test(formData.password)) {
- toast.error('Password must be 8+ chars with upper, lower, and a number');
+ toast.error(t('register.passwordComplexityShort'));
  return;
  }
  if (formData.password !== formData.confirmPassword) {
- toast.error("Passwords don't match");
+ toast.error(t('register.passwordsMismatch'));
  return;
  }
 
@@ -121,12 +124,12 @@ function RegisterContent() {
 
  if (result.requiresPhoneVerification) {
  const phone = result.user?.phone || phoneE164.replace(/\s+/g, '');
- toast.success('Account created! Enter the SMS code to verify.');
+ toast.success(t('register.accountCreatedSms'));
  navigate(`/verify-phone?phone=${encodeURIComponent(phone)}`);
  return;
  }
 
- toast.success('Account created!');
+ toast.success(t('register.accountCreated'));
  navigate('/login?portal=family');
  } catch (error: unknown) {
  if (isApiError(error) && error.fieldErrors) {
@@ -135,7 +138,7 @@ function RegisterContent() {
  } else if (error instanceof Error) {
  toast.error(error.message);
  } else {
- toast.error('Registration failed. Please try again.');
+ toast.error(t('register.registrationFailed'));
  }
  } finally {
  setLoading(false);
@@ -170,15 +173,15 @@ function RegisterContent() {
  </Link>
 
  <m.div {...fadeIn} className="bg-white/60 backdrop-blur-md p-8 rounded-3xl border border-white/50 shadow-sm">
- <h2 className="text-2xl font-semibold text-stone-900 mb-2">Family Account</h2>
- <p className="text-stone-500 mb-6">Register with email or phone — same family portal either way.</p>
+ <h2 className="text-2xl font-semibold text-stone-900 mb-2">{t('register.familyAccountTitle')}</h2>
+ <p className="text-stone-500 mb-6">{t('register.familyAccountSubtitle')}</p>
  <div className="p-4 bg-teal-50 rounded-xl flex items-start gap-3 border border-teal-100">
  <div className="size-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0 text-teal-600">
  <ShieldCheck className="size-4" />
  </div>
  <div>
- <h3 className="font-semibold text-sm text-stone-900">Information Privacy</h3>
- <p className="text-xs text-stone-500 mt-1">Your data is encrypted and protected. We value your trust.</p>
+ <h3 className="font-semibold text-sm text-stone-900">{t('register.privacyTitle')}</h3>
+ <p className="text-xs text-stone-500 mt-1">{t('register.privacyBody')}</p>
  </div>
  </div>
  </m.div>
@@ -193,7 +196,7 @@ function RegisterContent() {
  <div className="absolute -z-10 -bottom-10 -left-10 size-40 bg-amber-100/50 rounded-full blur-3xl"></div>
 
  <div className="text-center mb-6">
- <h2 className="text-2xl font-semibold text-stone-900">Create Account</h2>
+ <h2 className="text-2xl font-semibold text-stone-900">{t('register.heading')}</h2>
  </div>
 
  <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-stone-100 p-1">
@@ -202,14 +205,14 @@ function RegisterContent() {
  onClick={() => setMethod('email')}
  className={`rounded-xl py-2.5 text-sm font-semibold transition ${method === 'email' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
  >
- Email
+ {t('register.methodEmail')}
  </button>
  <button
  type="button"
  onClick={() => setMethod('phone')}
  className={`rounded-xl py-2.5 text-sm font-semibold transition ${method === 'phone' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
  >
- Phone
+ {t('register.methodPhone')}
  </button>
  </div>
 
@@ -219,7 +222,7 @@ function RegisterContent() {
  <div>
  <Input
  icon={User}
- placeholder="First Name"
+ placeholder={t('register.firstName')}
  name="firstName"
  value={formData.firstName}
  onChange={onValueChange}
@@ -229,7 +232,7 @@ function RegisterContent() {
  <div>
  <Input
  icon={User}
- placeholder="Last Name"
+ placeholder={t('register.lastName')}
  name="lastName"
  value={formData.lastName}
  onChange={onValueChange}
@@ -244,7 +247,7 @@ function RegisterContent() {
  <div>
  <Input
  icon={Mail}
- placeholder="Email Address"
+ placeholder={t('register.emailAddress')}
  type="email"
  name="email"
  value={formData.email}
@@ -255,7 +258,7 @@ function RegisterContent() {
  <div>
  <Input
  icon={Phone}
- placeholder="Phone Number"
+ placeholder={t('register.phone')}
  type="tel"
  name="phone"
  value={formData.phone}
@@ -279,18 +282,22 @@ function RegisterContent() {
 
  <div>
  <PasswordInput
- placeholder="Password"
+ placeholder={t('register.password')}
  name="password"
  value={formData.password}
  onChange={onValueChange}
+ showLabel={t('register.showPassword')}
+ hideLabel={t('register.hidePassword')}
  />
  <FieldError error={fieldErrors.password} />
  </div>
  <PasswordInput
- placeholder="Confirm Password"
+ placeholder={t('register.confirmPassword')}
  name="confirmPassword"
  value={formData.confirmPassword}
  onChange={onValueChange}
+ showLabel={t('register.showPassword')}
+ hideLabel={t('register.hidePassword')}
  />
 
  <label className="flex items-start gap-3 cursor-pointer group mt-2">
@@ -304,7 +311,10 @@ function RegisterContent() {
  {agreedToTerms && <CheckCircle2 className="size-3.5 text-teal-600" />}
  </div>
  <span className="text-xs text-stone-500 leading-snug">
- I agree to the <Link to="/terms" className="text-teal-600 underline">Terms of Service</Link> and <Link to="/privacy" className="text-teal-600 underline">Privacy Policy</Link>.
+ {t('register.agreeLead')}{' '}
+ <Link to="/terms" className="text-teal-600 underline">{t('register.termsOfService')}</Link>
+ {' '}{t('register.agreeAnd')}{' '}
+ <Link to="/privacy" className="text-teal-600 underline">{t('register.privacyPolicy')}</Link>.
  </span>
  </label>
 
@@ -315,18 +325,18 @@ function RegisterContent() {
  disabled={loading}
  className="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold shadow-xl shadow-stone-900/10 hover:shadow-stone-900/20 hover:bg-stone-800 transition-all flex items-center justify-center gap-2 mt-4"
  >
- {loading ? 'Creating Account...' : (
+ {loading ? t('register.creatingAccount') : (
  <>
- <span>{method === 'phone' ? 'Create & send SMS code' : 'Create Account'}</span>
+ <span>{method === 'phone' ? t('register.createAndSendSms') : t('register.createAccountCta')}</span>
  <ArrowRight className="size-5" />
  </>
  )}
  </m.button>
 
  <p className="text-center text-sm text-stone-500 pt-2">
- Already have an account?{' '}
+ {t('register.alreadyHaveAccount')}{' '}
  <Link to="/login?portal=family" className="font-semibold text-teal-700 hover:underline">
- Sign in
+ {t('register.signIn')}
  </Link>
  </p>
  </m.form>
@@ -356,7 +366,12 @@ function Input({ icon: Icon, iconHidden, required = true, ...props }: InputProps
  );
 }
 
-function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+ showLabel?: string;
+ hideLabel?: string;
+}
+
+function PasswordInput({ showLabel, hideLabel, ...props }: PasswordInputProps) {
  const [show, setShow] = useState(false);
  return (
  <div className="relative group">
@@ -371,6 +386,7 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
  <button
  type="button"
  onClick={() => setShow(!show)}
+ aria-label={show ? hideLabel : showLabel}
  className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
  >
  {show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}

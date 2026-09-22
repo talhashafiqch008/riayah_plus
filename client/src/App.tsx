@@ -8,6 +8,8 @@ import { SentryProvider } from '@/components/SentryProvider';
 import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import { BackToTopButton } from '@/components/landing/BackToTopButton';
+import { LanguagePreferenceGate } from '@/components/LanguagePreferenceGate';
+import { PreferredLanguageSync } from '@/components/PreferredLanguageSync';
 import { AppRoutes } from '@/routes';
 import { AuthGate } from '@/routes/AuthGate';
 
@@ -21,6 +23,8 @@ export default function App() {
               <MotionProvider>
                 <SentryProvider>
                   <AuthGate>
+                    <PreferredLanguageSync />
+                    <LanguagePreferenceGate />
                     <ScrollToTop />
                     <AppRoutes />
                     <BackToTopButton />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/lib/errors';
@@ -9,6 +10,8 @@ import {
   type ClinicalNote,
 } from '@/lib/api/clinicalNotes';
 import { getEpisode } from '@/lib/api/episodes';
+import { localizeGeneratedLabel } from '@/lib/localizeStoredEnglish';
+import { familyDateLocale } from '@/lib/familyLanguage';
 import {
   RolePageShell,
   btnPrimaryClass,
@@ -16,6 +19,8 @@ import {
 } from '@/components/care/RolePageChrome';
 
 export default function ClinicalEpisodeNotesPage() {
+  const { t } = useTranslation('clinical');
+  const dateLocale = familyDateLocale();
   const { episodeId = '' } = useParams();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -32,9 +37,9 @@ export default function ClinicalEpisodeNotesPage() {
       if (ep) setTitle(ep.title);
       setNotes(rows);
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Failed to load notes');
+      toast.error(extractApiError(error).message || t('notes.notesLoadError'));
     }
-  }, [episodeId]);
+  }, [episodeId, t]);
 
   useEffect(() => {
     void load();
@@ -42,7 +47,7 @@ export default function ClinicalEpisodeNotesPage() {
 
   async function onCreate() {
     if (!content.trim()) {
-      toast.error('Note content is required');
+      toast.error(t('notes.contentRequired'));
       return;
     }
     setBusy(true);
@@ -53,11 +58,11 @@ export default function ClinicalEpisodeNotesPage() {
         noteType: 'session_note',
         isPrivate,
       });
-      toast.success('Note saved');
+      toast.success(t('notes.saved'));
       setContent('');
       await load();
     } catch (error: unknown) {
-      toast.error(extractApiError(error).message || 'Create failed');
+      toast.error(extractApiError(error).message || t('notes.createFailed'));
     } finally {
       setBusy(false);
     }
@@ -69,15 +74,15 @@ export default function ClinicalEpisodeNotesPage() {
         to="/clinical/notes"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:underline"
       >
-        <ArrowLeft className="size-4" /> Notes hub
+        <ArrowLeft className="size-4 rtl-flip" /> {t('notes.hubBack')}
       </Link>
 
       <div className="min-w-0">
         <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-          Episode notes
+          {t('notes.episodeTitle')}
         </h2>
         <p className="mt-1 break-words text-sm text-stone-600 sm:text-base">
-          {title || episodeId}
+          {localizeGeneratedLabel(title) || episodeId}
         </p>
       </div>
 
@@ -87,7 +92,7 @@ export default function ClinicalEpisodeNotesPage() {
           onChange={(e) => setContent(e.target.value)}
           rows={4}
           className={fieldClass}
-          placeholder="Add an immutable clinical note…"
+          placeholder={t('notes.placeholder')}
         />
         <label className="inline-flex items-center gap-2 text-sm text-stone-700">
           <input
@@ -96,15 +101,15 @@ export default function ClinicalEpisodeNotesPage() {
             onChange={(e) => setIsPrivate(e.target.checked)}
             className="size-4 rounded border-stone-300 text-teal-600 focus:ring-teal-500"
           />
-          Private (hidden from coordinator)
+          {t('notes.private')}
         </label>
         <button type="button" disabled={busy} onClick={() => void onCreate()} className={btnPrimaryClass}>
-          Save note
+          {busy ? t('notes.saving') : t('notes.save')}
         </button>
       </div>
 
       {notes.length === 0 ? (
-        <p className="text-center text-sm text-stone-500 py-6">No notes yet for this episode.</p>
+        <p className="text-center text-sm text-stone-500 py-6">{t('notes.emptyNotes')}</p>
       ) : (
         <ul className="space-y-3">
           {notes.map((n) => (
@@ -114,10 +119,12 @@ export default function ClinicalEpisodeNotesPage() {
             >
               <div className="flex flex-wrap items-start justify-between gap-2 text-xs text-stone-500">
                 <span>
-                  {n.author?.name ?? 'Author'}
-                  {n.isPrivate ? ' · private' : ''}
+                  {n.author?.name ?? t('notes.author')}
+                  {n.isPrivate ? ` · ${t('notes.privateTag')}` : ''}
                 </span>
-                <span className="shrink-0">{new Date(n.createdAt).toLocaleString()}</span>
+                <span className="shrink-0">
+                  {new Date(n.createdAt).toLocaleString(dateLocale)}
+                </span>
               </div>
               <p className="mt-2 whitespace-pre-wrap break-words text-sm text-stone-800">
                 {n.content}

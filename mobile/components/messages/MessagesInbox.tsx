@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../ui';
 import { ROLE, RoleTabHero } from '../shell/RoleChrome';
 import { FAMILY, FamilyTabHero } from '../family/FamilyChrome';
@@ -43,26 +44,34 @@ type StartOption = {
   name: string;
 };
 
+type MessageI18nNs = 'family' | 'clinical' | 'support' | 'coordinator';
+
 type MessagesInboxProps = {
   basePath: string;
   tone?: 'family' | 'role';
+  i18nNs?: MessageI18nNs;
   canStartCoordinatorThread?: boolean;
   canStartStaffThreads?: boolean;
 };
 
-function previewText(conversation: Conversation): string {
+function previewText(conversation: Conversation, t: (key: string) => string): string {
   const last = conversation.messages?.[0];
-  if (!last || last.deleted) return 'No messages yet';
-  if (last.fileUrl) return last.content?.trim() || 'Attachment';
-  return last.content?.trim() || 'No messages yet';
+  const empty = t('messages.noMessagesYet');
+  const attachment = t('messages.attachment');
+  if (!last || last.deleted) return empty;
+  if (last.fileUrl) return last.content?.trim() || attachment;
+  return last.content?.trim() || empty;
 }
 
 export function MessagesInbox({
   basePath,
   tone = 'role',
+  i18nNs,
   canStartCoordinatorThread = false,
   canStartStaffThreads = false,
 }: MessagesInboxProps) {
+  const ns: MessageI18nNs = i18nNs ?? (tone === 'family' ? 'family' : 'clinical');
+  const { t } = useTranslation(ns);
   const toast = useToast();
   const token = useAuthStore((s) => s.token);
   const myId = String(useAuthStore((s) => s.user?.id ?? ''));
@@ -71,16 +80,17 @@ export function MessagesInbox({
   const [starting, setStarting] = useState(false);
   const [startOptions, setStartOptions] = useState<StartOption[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const isFamily = ns === 'family';
 
   const loadThreads = useCallback(async () => {
     try {
       setThreads(await listConversations());
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load messages'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('messages.loadError')), { type: 'danger' });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [t, toast]);
 
   useEffect(() => {
     void loadThreads();
@@ -104,7 +114,9 @@ export function MessagesInbox({
           if (canStartCoordinatorThread && episode.coordinator?.id) {
             push({
               episodeId: episode.id,
-              episodeTitle: episode.title ?? 'Care journey',
+              episodeTitle:
+                episode.title ??
+                (isFamily ? t('episodes.untitled') : t('messages.careJourneyFallback')),
               participantId: episode.coordinator.id,
               name: episode.coordinator.name,
             });
@@ -113,7 +125,9 @@ export function MessagesInbox({
             if (episode.coordinator?.id) {
               push({
                 episodeId: episode.id,
-                episodeTitle: episode.title ?? 'Care journey',
+                episodeTitle:
+                  episode.title ??
+                  (isFamily ? t('episodes.untitled') : t('messages.careJourneyFallback')),
                 participantId: episode.coordinator.id,
                 name: episode.coordinator.name,
               });
@@ -122,9 +136,13 @@ export function MessagesInbox({
             if (familyId) {
               push({
                 episodeId: episode.id,
-                episodeTitle: episode.title ?? 'Care journey',
+                episodeTitle:
+                  episode.title ??
+                  (isFamily ? t('episodes.untitled') : t('messages.careJourneyFallback')),
                 participantId: familyId,
-                name: episode.patient?.name ?? 'Family',
+                name:
+                  episode.patient?.name ??
+                  (isFamily ? t('common.family', { defaultValue: 'Family' }) : t('messages.familyFallback')),
               });
             }
           }
@@ -132,7 +150,7 @@ export function MessagesInbox({
         setStartOptions(options);
       })
       .catch(() => undefined);
-  }, [canStartCoordinatorThread, canStartStaffThreads, myId]);
+  }, [canStartCoordinatorThread, canStartStaffThreads, isFamily, myId, t]);
 
   useEffect(() => {
     if (!token) return;
@@ -157,7 +175,9 @@ export function MessagesInbox({
       await loadThreads();
       router.push(`${basePath}/${thread.id}` as never);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Could not start conversation'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('messages.startFailed', { defaultValue: 'Could not start conversation' })), {
+        type: 'danger',
+      });
     } finally {
       setStarting(false);
     }
@@ -169,8 +189,8 @@ export function MessagesInbox({
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top']}>
       <Hero
-        title="Messages"
-        subtitle="Talk with your care team"
+        title={t('messages.title')}
+        subtitle={t('messages.description')}
         showBack
         right={
           startOptions.length > 0 ? (
@@ -178,7 +198,9 @@ export function MessagesInbox({
               onPress={() => setPickerOpen((v) => !v)}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Start conversation"
+              accessibilityLabel={t('messages.startConversation', {
+                defaultValue: t('messages.startThread', { name: '', defaultValue: 'Start conversation' }),
+              })}
             >
               <Ionicons name="create-outline" size={22} color={FAMILY.white} />
             </Pressable>
@@ -189,7 +211,9 @@ export function MessagesInbox({
       {pickerOpen ? (
         <View className="border-b border-stone-200 bg-white px-4 py-3">
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">
-            Start a conversation
+            {t('messages.startConversationPrompt', {
+              defaultValue: t('messages.startThread', { name: '', defaultValue: 'Start a conversation' }),
+            })}
           </Text>
           {startOptions.slice(0, 8).map((opt) => (
             <Pressable
@@ -219,11 +243,13 @@ export function MessagesInbox({
           ListEmptyComponent={
             <EmptyState
               icon="chatbubble-ellipses-outline"
-              title="No conversations yet"
+              title={isFamily ? t('messages.emptyHint') : t('messages.empty')}
               subtitle={
-                startOptions.length
-                  ? 'Start a thread with your care team from the compose button.'
-                  : 'When your care team messages you, threads will appear here.'
+                isFamily
+                  ? t('messages.description')
+                  : startOptions.length
+                    ? t('messages.emptyHintCompose')
+                    : t('messages.emptyHintWait')
               }
             />
           }
@@ -239,13 +265,13 @@ export function MessagesInbox({
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1">
                     <Text className="text-base font-semibold text-stone-900">
-                      {other?.name ?? item.title ?? 'Conversation'}
+                      {other?.name ?? item.title ?? t('messages.conversationFallback')}
                     </Text>
                     <Text className="mt-0.5 text-xs text-stone-400">
                       {conversationTypeLabel(item.type)}
                     </Text>
                     <Text className="mt-2 text-sm text-stone-600" numberOfLines={2}>
-                      {previewText(item)}
+                      {previewText(item, t)}
                     </Text>
                   </View>
                   {unread ? (
@@ -268,15 +294,23 @@ type MessageThreadProps = {
   conversationId: string;
   basePath: string;
   tone?: 'family' | 'role';
+  i18nNs?: MessageI18nNs;
 };
 
-export function MessageThread({ conversationId, basePath, tone = 'role' }: MessageThreadProps) {
+export function MessageThread({
+  conversationId,
+  basePath,
+  tone = 'role',
+  i18nNs,
+}: MessageThreadProps) {
+  const ns: MessageI18nNs = i18nNs ?? (tone === 'family' ? 'family' : 'clinical');
+  const { t } = useTranslation(ns);
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const myId = String(useAuthStore((s) => s.user?.id ?? ''));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [title, setTitle] = useState('Conversation');
+  const [title, setTitle] = useState('');
   const [draft, setDraft] = useState('');
   const [file, setFile] = useState<{ uri: string; name: string; mimeType?: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,15 +336,15 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
       setMessages(rows);
       const thread = threads.find((t) => t.id === conversationId);
       const other = thread ? otherParticipant(thread, myId) : undefined;
-      setTitle(other?.name ?? thread?.title ?? 'Conversation');
+      setTitle(other?.name ?? thread?.title ?? t('messages.conversationFallback'));
       await markConversationRead(conversationId);
       scrollToLatest(false);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Failed to load thread'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('messages.threadLoadError')), { type: 'danger' });
     } finally {
       setLoading(false);
     }
-  }, [conversationId, myId, toast, scrollToLatest]);
+  }, [conversationId, myId, t, toast, scrollToLatest]);
 
   useEffect(() => {
     void load();
@@ -355,7 +389,7 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
     try {
       await downloadConversationAttachment(conversationId, message.fileUrl);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Could not open attachment'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('messages.openAttachmentFailed')), { type: 'danger' });
     } finally {
       setOpeningAttachmentId(null);
     }
@@ -377,7 +411,7 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
       setFile(null);
       scrollToLatest(true);
     } catch (e: unknown) {
-      toast.show(apiErrorMessage(e, 'Could not send message'), { type: 'danger' });
+      toast.show(apiErrorMessage(e, t('messages.sendFailed')), { type: 'danger' });
     } finally {
       setSending(false);
     }
@@ -395,7 +429,11 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
   );
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top']}>
-      <Hero title={title} subtitle="Secure messaging" showBack />
+      <Hero
+        title={title || t('messages.conversationFallback')}
+        subtitle={t('messages.secureSubtitle')}
+        showBack
+      />
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={ROLE.teal} />
@@ -416,7 +454,11 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
             onContentSizeChange={() => scrollToLatest(false)}
             onLayout={() => scrollToLatest(false)}
             ListEmptyComponent={
-              <EmptyState icon="chatbubble-outline" title="No messages yet" subtitle="Say hello to start the conversation." />
+              <EmptyState
+                icon="chatbubble-outline"
+                title={t('messages.noMessagesYet')}
+                subtitle={t('messages.emptyThreadSubtitle')}
+              />
             }
             renderItem={({ item }) => {
               const mine = item.senderId === myId;
@@ -438,7 +480,9 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
                         disabled={openingAttachmentId === item.id}
                         className="mt-1 flex-row items-center gap-1"
                         accessibilityRole="button"
-                        accessibilityLabel={`Open attachment ${attachmentDisplayName(item.fileUrl)}`}
+                        accessibilityLabel={t('messages.openAttachment', {
+                          name: attachmentDisplayName(item.fileUrl),
+                        })}
                       >
                         {openingAttachmentId === item.id ? (
                           <ActivityIndicator size="small" color={mine ? '#fff' : ROLE.teal} />
@@ -484,14 +528,14 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
                 onPress={() => void onPickFile()}
                 className="mb-1 h-10 w-10 items-center justify-center rounded-full bg-stone-100"
                 accessibilityRole="button"
-                accessibilityLabel="Attach file"
+                accessibilityLabel={t('messages.attachHint')}
               >
                 <Ionicons name="attach" size={20} color={ROLE.teal} />
               </Pressable>
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Write a message"
+                placeholder={t('messages.typeMessage', { defaultValue: t('messages.placeholder', { defaultValue: 'Write a message' }) })}
                 placeholderTextColor={ROLE.stone400}
                 multiline
                 className="max-h-28 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-900"
@@ -503,7 +547,7 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
                   sending || (!draft.trim() && !file) ? 'bg-stone-200' : 'bg-teal-600'
                 }`}
                 accessibilityRole="button"
-                accessibilityLabel="Send"
+                accessibilityLabel={t('messages.send')}
               >
                 {sending ? (
                   <ActivityIndicator color="#fff" size="small" />
@@ -513,7 +557,7 @@ export function MessageThread({ conversationId, basePath, tone = 'role' }: Messa
               </Pressable>
             </View>
             <Pressable onPress={() => router.replace(basePath as never)} className="mt-2 items-center py-1">
-              <Text className="text-xs font-medium text-stone-400">Back to inbox</Text>
+              <Text className="text-xs font-medium text-stone-400">{t('messages.backToInbox')}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>

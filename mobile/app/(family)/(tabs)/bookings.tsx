@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -9,21 +9,28 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, EmptyState, StatusBadge } from '../../../components/ui';
 import { FAMILY, FamilyTabHero, familyCardStyle } from '../../../components/family/FamilyChrome';
 import { listSessions, type CareSession } from '../../../lib/api/scheduling';
-import { apiErrorMessage, formatDateTime } from '../../../lib/format';
-
-const FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'accepted', label: 'Upcoming' },
-  { value: 'completed', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' },
-] as const;
+import { apiErrorMessage } from '../../../lib/format';
+import { familySessionStatusLabel, formatFamilyDateTime } from '../../../lib/familyLanguage';
 
 export default function FamilyBookingsScreen() {
+  const { t } = useTranslation('family');
   const [status, setStatus] = useState('');
+
+  const filters = useMemo(
+    () =>
+      [
+        { value: '', label: t('mobile.common.all') },
+        { value: 'accepted', label: t('mobile.common.filterUpcoming') },
+        { value: 'completed', label: t('mobile.common.filterDone') },
+        { value: 'cancelled', label: t('mobile.common.filterCancelled') },
+      ] as const,
+    [t],
+  );
 
   const query = useQuery({
     queryKey: ['family-sessions', status],
@@ -43,8 +50,8 @@ export default function FamilyBookingsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: FAMILY.stone50 }} edges={['top']}>
       <FamilyTabHero
-        title="Appointments"
-        subtitle="Sessions with your assigned clinician"
+        title={t('appointments.title')}
+        subtitle={t('mobile.common.bookingsSubtitle')}
       />
 
       <View
@@ -61,7 +68,7 @@ export default function FamilyBookingsScreen() {
         }}
       >
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, flex: 1 }}>
-          {FILTERS.map((filter) => {
+          {filters.map((filter) => {
             const active = status === filter.value;
             return (
               <Pressable
@@ -89,19 +96,23 @@ export default function FamilyBookingsScreen() {
             );
           })}
         </View>
-        <Button onPress={() => router.push('/(family)/book-session' as never)}>Book</Button>
+        <Button onPress={() => router.push('/(family)/book-session' as never)}>
+          {t('mobile.common.book')}
+        </Button>
       </View>
 
       {query.isLoading ? (
         <View style={{ padding: 24 }}>
-          <Text style={{ color: FAMILY.stone400, textAlign: 'center' }}>Loading…</Text>
+          <Text style={{ color: FAMILY.stone400, textAlign: 'center' }}>
+            {t('mobile.common.loading')}
+          </Text>
         </View>
       ) : query.isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Could not load appointments"
+          title={t('appointments.loadError')}
           subtitle={apiErrorMessage(query.error)}
-          action={{ label: 'Try again', onPress: () => void query.refetch() }}
+          action={{ label: t('mobile.common.tryAgain'), onPress: () => void query.refetch() }}
         />
       ) : (
         <FlatList
@@ -118,10 +129,10 @@ export default function FamilyBookingsScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="calendar-outline"
-              title="No sessions yet"
-              subtitle="Book an open slot with your assigned clinician, or wait for your coordinator to schedule one."
+              title={t('appointments.empty')}
+              subtitle={t('mobile.common.emptySessionsHint')}
               action={{
-                label: 'Book session',
+                label: t('appointments.bookSession'),
                 onPress: () => router.push('/(family)/book-session' as never),
               }}
             />
@@ -134,6 +145,7 @@ export default function FamilyBookingsScreen() {
 }
 
 function SessionCard({ item }: { item: CareSession }) {
+  const { t } = useTranslation('family');
   const isTelehealth = item.type === 'telehealth';
   return (
     <Pressable
@@ -145,22 +157,26 @@ function SessionCard({ item }: { item: CareSession }) {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: '600', color: FAMILY.stone900 }}>
-            {formatDateTime(item.scheduledAt)}
+            {formatFamilyDateTime(item.scheduledAt)}
           </Text>
           <Text style={{ marginTop: 4, fontSize: 13, color: FAMILY.stone500 }}>
-            {item.provider?.name ? `With ${item.provider.name}` : 'Clinician TBA'}
-            {item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}
+            {item.provider?.name
+              ? t('mobile.common.withProvider', { name: item.provider.name })
+              : t('mobile.common.clinicianTba')}
+            {item.durationMinutes
+              ? ` · ${t('common.min', { count: item.durationMinutes })}`
+              : ''}
           </Text>
           {isTelehealth ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
               <Ionicons name="videocam-outline" size={14} color={FAMILY.teal} />
               <Text style={{ fontSize: 12, fontWeight: '600', color: FAMILY.teal }}>
-                Video visit — tap to join
+                {t('mobile.common.videoTapJoin')}
               </Text>
             </View>
           ) : null}
         </View>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={item.status} label={familySessionStatusLabel(item.status)} />
       </View>
     </Pressable>
   );

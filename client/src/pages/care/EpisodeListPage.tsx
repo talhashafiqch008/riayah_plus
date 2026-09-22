@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { listEpisodes, type CareEpisode } from '@/lib/api/episodes';
 import { familyDateLocale, familyEpisodeStatusLabel } from '@/lib/familyLanguage';
+import { localizeGeneratedLabel, localizeStoredNarrative } from '@/lib/localizeStoredEnglish';
 import {
   RolePageHeader,
   RolePageShell,
@@ -63,12 +64,18 @@ export default function EpisodeListPage({
   title = 'Care Episodes',
   description = 'Track episode status from intake through active care.',
 }: Props) {
-  const { t } = useTranslation('family');
   const familyFacing = basePath.startsWith('/family');
-  const dateLocale = familyDateLocale();
+  const coordinatorFacing = basePath.startsWith('/coordinator');
+  const clinicalFacing = basePath.startsWith('/clinical');
+  const staffLocalized = coordinatorFacing || clinicalFacing;
+  const localized = familyFacing || staffLocalized;
+  const { t } = useTranslation(
+    familyFacing ? 'family' : coordinatorFacing ? 'coordinator' : clinicalFacing ? 'clinical' : 'family',
+  );
+  const dateLocale = localized ? familyDateLocale() : undefined;
   const statusFilters = familyFacing ? FAMILY_STATUS_FILTERS : STAFF_STATUS_FILTERS;
-  const pageTitle = familyFacing ? t('episodes.title') : title;
-  const pageDescription = familyFacing ? t('episodes.description') : description;
+  const pageTitle = localized ? t('episodes.title') : title;
+  const pageDescription = localized ? t('episodes.description') : description;
   const [rows, setRows] = useState<CareEpisode[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -85,15 +92,21 @@ export default function EpisodeListPage({
       setTotal(result.total);
     } catch (error: unknown) {
       if (isApiError(error)) toast.error(error.message);
-      else toast.error(familyFacing ? t('episodes.loadError') : 'Failed to load episodes');
+      else toast.error(localized ? t('episodes.loadError') : 'Failed to load episodes');
     } finally {
       setLoading(false);
     }
-  }, [status, familyFacing, t]);
+  }, [status, localized, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const statusLabel = (value: string) => {
+    if (familyFacing) return familyEpisodeStatusLabel(value);
+    if (staffLocalized) return t(`episodes.status.${value}`, { defaultValue: value.replace(/_/g, ' ') });
+    return value.replace(/_/g, ' ');
+  };
 
   return (
     <RolePageShell>
@@ -102,7 +115,7 @@ export default function EpisodeListPage({
         description={pageDescription}
         actions={
           <button type="button" onClick={() => void load()} className={btnSecondaryClass}>
-            <RefreshCw className="size-4" /> {familyFacing ? t('common.refresh') : 'Refresh'}
+            <RefreshCw className="size-4" /> {localized ? t(familyFacing ? 'common.refresh' : 'episodes.refresh') : 'Refresh'}
           </button>
         }
       />
@@ -119,17 +132,20 @@ export default function EpisodeListPage({
                 ? o.value
                   ? familyEpisodeStatusLabel(o.value)
                   : t('episodes.all')
-                : o.label}
+                : staffLocalized
+                  ? o.value
+                    ? t(`episodes.status.${o.value}`)
+                    : t('episodes.allStatuses')
+                  : o.label}
             </option>
           ))}
         </select>
         <span className="text-sm text-stone-500">
-          {total}{' '}
           {familyFacing
-            ? total === 1
-              ? t('episodes.journey')
-              : t('episodes.journeys')
-            : `episode${total === 1 ? '' : 's'}`}
+            ? `${total} ${total === 1 ? t('episodes.journey') : t('episodes.journeys')}`
+            : staffLocalized
+              ? t('episodes.count', { count: total })
+              : `${total} episode${total === 1 ? '' : 's'}`}
         </span>
       </div>
 
@@ -140,7 +156,7 @@ export default function EpisodeListPage({
           </div>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-sm text-stone-500">
-            {familyFacing ? t('episodes.empty') : 'No episodes yet. Complete intake review to create one.'}
+            {localized ? t('episodes.empty') : 'No episodes yet. Complete intake review to create one.'}
           </p>
         ) : (
           rows.map((ep) => (
@@ -154,25 +170,40 @@ export default function EpisodeListPage({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-stone-900">{ep.title}</p>
+                  <p className="font-semibold text-stone-900">
+                    {staffLocalized ? localizeGeneratedLabel(ep.title) : ep.title}
+                  </p>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(ep.status)}`}
                   >
-                    {familyFacing
-                      ? familyEpisodeStatusLabel(ep.status)
-                      : ep.status.replace(/_/g, ' ')}
+                    {statusLabel(ep.status)}
                   </span>
                 </div>
                 <p className="mt-0.5 text-sm text-stone-500">
-                  {ep.careRecipient?.name || ep.patient?.name || 'Patient'}
-                  {!familyFacing && ep.urgencyLevel ? ` · ${ep.urgencyLevel}` : ''}
+                  {staffLocalized
+                    ? localizeGeneratedLabel(
+                        ep.careRecipient?.name || ep.patient?.name || t('common.patient'),
+                      )
+                    : ep.careRecipient?.name || ep.patient?.name || 'Patient'}
+                  {!familyFacing && ep.urgencyLevel
+                    ? ` · ${
+                        staffLocalized
+                          ? t(
+                              coordinatorFacing
+                                ? `intake.urgency.${ep.urgencyLevel}`
+                                : `urgency.${ep.urgencyLevel}`,
+                              { defaultValue: ep.urgencyLevel },
+                            )
+                          : ep.urgencyLevel
+                      }`
+                    : ''}
                   {ep.createdAt
-                    ? ` · ${new Date(ep.createdAt).toLocaleDateString(familyFacing ? dateLocale : undefined)}`
+                    ? ` · ${new Date(ep.createdAt).toLocaleDateString(dateLocale)}`
                     : ''}
                 </p>
                 {ep.reasonForCare && (
                   <p className="mt-1 line-clamp-2 text-sm text-stone-600 sm:line-clamp-1">
-                    {ep.reasonForCare}
+                    {staffLocalized ? localizeStoredNarrative(ep.reasonForCare) : ep.reasonForCare}
                   </p>
                 )}
               </div>

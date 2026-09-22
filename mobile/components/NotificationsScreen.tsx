@@ -20,12 +20,15 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState } from './ui';
 import { FAMILY, FamilyTabHero, familyCardStyle } from './family/FamilyChrome';
 import { apiClient } from '../lib/api/client';
 import { formatDate } from '../lib/format';
 import { queryClient } from '../lib/query/client';
+import { navBackIcon } from '../lib/rtlIcons';
+import { localizeNotification } from '../lib/localizeNotification';
 
 const NAVY = '#1B2E3C';
 const TEAL = '#0D9488';
@@ -40,6 +43,8 @@ interface NotificationItem {
   title: string;
   body?: string | null;
   message?: string | null;
+  type?: string | null;
+  data?: Record<string, unknown> | null;
   readAt?: string | null;
   createdAt: string;
 }
@@ -92,6 +97,7 @@ function NotificationRow({
   onPress: () => void;
   tone: NotificationsTone;
 }) {
+  const { t: tCommon } = useTranslation('common');
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -99,7 +105,8 @@ function NotificationRow({
   }));
 
   const unread = !item.readAt;
-  const body = item.body ?? item.message ?? '';
+  const localized = localizeNotification(item, tCommon);
+  const body = localized.body;
   const family = tone === 'family';
   const accent = family ? FAMILY.amber : BRASS;
   const titleColor = unread ? (family ? FAMILY.stone900 : NAVY) : family ? FAMILY.stone500 : WARM_BROWN;
@@ -181,7 +188,7 @@ function NotificationRow({
                 letterSpacing: -0.1,
               }}
             >
-              {item.title}
+              {localized.title}
             </Text>
             {body ? (
               <Text style={{ marginTop: 2, fontSize: 13, lineHeight: 18, color: bodyColor }}>
@@ -198,7 +205,26 @@ function NotificationRow({
   );
 }
 
-export function NotificationsScreen({ tone = 'navy' }: { tone?: NotificationsTone }) {
+type NotificationsI18nNs = 'family' | 'clinical' | 'support' | 'coordinator' | 'org';
+
+function notificationsKey(ns: NotificationsI18nNs, leaf: string) {
+  return ns === 'family'
+    ? `mobile.common.notifications.${leaf}`
+    : `mobile.notifications.${leaf}`;
+}
+
+export function NotificationsScreen({
+  tone = 'navy',
+  i18nNs,
+}: {
+  tone?: NotificationsTone;
+  i18nNs?: NotificationsI18nNs;
+}) {
+  const ns: NotificationsI18nNs | undefined =
+    i18nNs ?? (tone === 'family' ? 'family' : undefined);
+  const { t } = useTranslation(ns ?? 'family');
+  const localized = Boolean(ns);
+  const nk = (leaf: string) => (ns ? notificationsKey(ns, leaf) : leaf);
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
@@ -229,9 +255,15 @@ export function NotificationsScreen({ tone = 'navy' }: { tone?: NotificationsTon
   ) : isError ? (
     <EmptyState
       icon="alert-circle-outline"
-      title="Could not load"
-      subtitle={(error as Error)?.message ?? 'Something went wrong'}
-      action={{ label: 'Try again', onPress: () => void refetch() }}
+      title={localized ? t(nk('loadError')) : 'Could not load'}
+      subtitle={
+        (error as Error)?.message ??
+        (localized ? t(nk('somethingWrong')) : 'Something went wrong')
+      }
+      action={{
+        label: localized ? t(nk('tryAgain')) : 'Try again',
+        onPress: () => void refetch(),
+      }}
     />
   ) : (
     <FlatList
@@ -257,8 +289,8 @@ export function NotificationsScreen({ tone = 'navy' }: { tone?: NotificationsTon
       ListEmptyComponent={
         <EmptyState
           icon="notifications-off-outline"
-          title="All caught up"
-          subtitle="No notifications yet."
+          title={localized ? t(nk('allCaughtUp')) : 'All caught up'}
+          subtitle={localized ? t(nk('empty')) : 'No notifications yet.'}
         />
       }
     />
@@ -268,8 +300,12 @@ export function NotificationsScreen({ tone = 'navy' }: { tone?: NotificationsTon
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: page }} edges={['top']}>
         <FamilyTabHero
-          title="Notifications"
-          subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+          title={t(nk('title'))}
+          subtitle={
+            unreadCount > 0
+              ? t(nk('unread'), { count: unreadCount })
+              : t(nk('allCaughtUp'))
+          }
           showBack
           right={
             <View
@@ -327,14 +363,20 @@ export function NotificationsScreen({ tone = 'navy' }: { tone?: NotificationsTon
               backgroundColor: 'rgba(255,255,255,0.1)',
             }}
           >
-            <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.85)" />
+            <Ionicons name={navBackIcon()} size={22} color="rgba(255,255,255,0.85)" />
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.8 }}>
-              Notifications
+              {localized ? t(nk('title')) : 'Notifications'}
             </Text>
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 3 }}>
-              {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+              {unreadCount > 0
+                ? localized
+                  ? t(nk('unread'), { count: unreadCount })
+                  : `${unreadCount} unread`
+                : localized
+                  ? t(nk('allCaughtUp'))
+                  : 'All caught up'}
             </Text>
           </View>
           <View
