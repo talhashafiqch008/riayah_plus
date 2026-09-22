@@ -1,4 +1,6 @@
 import { Stack } from 'expo-router';
+import { RequireAuth } from '../../components/auth/RequireAuth';
+import { ORG_ADMIN_ROLES } from '../../stores/authStore';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -6,15 +8,17 @@ export const unstable_settings = {
 
 export default function OrgLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-        gestureEnabled: true,
-        fullScreenGestureEnabled: true,
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ gestureEnabled: false, animation: 'none' }} />
-    </Stack>
+    <RequireAuth roles={ORG_ADMIN_ROLES}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ gestureEnabled: false, animation: 'none' }} />
+      </Stack>
+    </RequireAuth>
   );
 }

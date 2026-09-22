@@ -19,15 +19,18 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const PERSISTED_QUERY_KEYS = [
-  'care-plan',
-  'sessions-me',
-  'tasks-me-pending',
-] as const;
+/** Storage key for the TanStack AsyncStorage persister (cleared on logout — MOB-02). */
+export const QUERY_CACHE_STORAGE_KEY = 'RAIYAH_QUERY_CACHE_V1';
+
+/**
+ * Persist only non-PHI shell metadata. Never dehydrate care-plan / session / task
+ * payloads to plaintext AsyncStorage (MOB-01).
+ */
+export const PERSISTED_QUERY_KEYS = [] as const;
 
 export const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: 'RAIYAH_QUERY_CACHE_V1',
+  key: QUERY_CACHE_STORAGE_KEY,
   throttleTime: 2000,
 });
 

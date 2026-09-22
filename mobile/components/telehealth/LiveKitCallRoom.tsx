@@ -23,6 +23,7 @@ import {
   useTracks,
   type TrackReferenceOrPlaceholder,
 } from '@livekit/react-native';
+import { registerTelehealthSession } from '../../lib/telehealthSession';
 
 type Props = {
   token: string;
@@ -301,6 +302,13 @@ function RoomBody({ onDisconnected }: { onDisconnected?: () => void }) {
   const leave = useCallback(() => {
     void room.disconnect();
     onDisconnected?.();
+  }, [onDisconnected, room]);
+
+  useEffect(() => {
+    return registerTelehealthSession(() => {
+      void room.disconnect();
+      onDisconnected?.();
+    });
   }, [onDisconnected, room]);
 
   return (

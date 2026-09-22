@@ -1,6 +1,8 @@
 import { apiClient } from './client';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { Alert } from 'react-native';
+import { deleteTempFile } from '../sessionCleanup';
 
 export type InvoiceDocType = 'invoice' | 'quotation';
 
@@ -148,17 +150,42 @@ export async function downloadInvoicePdf(id: string, fileName: string) {
   const safeName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
   const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!dir) throw new Error('File storage is unavailable on this device.');
-  const target = `${dir}${safeName}`;
+  const target = `${dir}invoice-${Date.now()}-${safeName}`;
   const baseURL = String(apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
   const authHeader = apiClient.defaults.headers.common.Authorization;
   const result = await FileSystem.downloadAsync(`${baseURL}/api/invoices/${id}/pdf`, target, {
     headers: authHeader ? { Authorization: String(authHeader) } : undefined,
   });
   if (result.status < 200 || result.status >= 300) {
+    await deleteTempFile(result.uri);
     throw new Error('Could not download PDF');
   }
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: safeName });
+  try {
+    if (await Sharing.isAvailableAsync()) {
+      // MOB-08: warn before PHI leaves the app
+      await new Promise<void>((resolve) => {
+        Alert.alert(
+          'Share invoice?',
+          'This PDF may contain protected health information. Only share with people who are authorized to see it.',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve() },
+            {
+              text: 'Share',
+              onPress: () => {
+                void Sharing.shareAsync(result.uri, {
+                  mimeType: 'application/pdf',
+                  dialogTitle: safeName,
+                }).finally(() => resolve());
+              },
+            },
+          ],
+        );
+      });
+    }
+  } finally {
+    setTimeout(() => {
+      void deleteTempFile(result.uri);
+    }, 60_000);
   }
   return result.uri;
 }

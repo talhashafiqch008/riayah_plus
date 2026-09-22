@@ -1,6 +1,36 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { router } from 'expo-router';
+
+let hardSessionResetPromise: Promise<void> | null = null;
+
+async function hardSessionReset(): Promise<void> {
+  if (hardSessionResetPromise) return hardSessionResetPromise;
+  hardSessionResetPromise = (async () => {
+    await clearAuthTokens();
+    try {
+      const { purgeLocalSession } = await import('../sessionCleanup');
+      await purgeLocalSession();
+    } catch {
+      /* ignore */
+    }
+    try {
+      const { useAuthStore } = await import('../../stores/authStore');
+      useAuthStore.setState({ token: null, user: null });
+    } catch {
+      /* ignore */
+    }
+    try {
+      router.replace('/(auth)/login');
+    } catch {
+      /* ignore */
+    }
+  })().finally(() => {
+    hardSessionResetPromise = null;
+  });
+  return hardSessionResetPromise;
+}
 
 /**
  * Prefer EXPO_PUBLIC_API_URL (should be origin only, e.g. http://192.168.x.x:5001).
@@ -134,14 +164,15 @@ apiClient.interceptors.response.use(
       const next = await refreshPromise;
       refreshPromise = null;
       if (!next) {
-        await clearAuthTokens();
+        // MOB-10: failed refresh → purge caches and return to login
+        await hardSessionReset();
         return Promise.reject(err);
       }
       original.headers.Authorization = `Bearer ${next}`;
       return apiClient(original);
     } catch (refreshErr) {
       refreshPromise = null;
-      await clearAuthTokens();
+      await hardSessionReset();
       return Promise.reject(refreshErr);
     }
   },

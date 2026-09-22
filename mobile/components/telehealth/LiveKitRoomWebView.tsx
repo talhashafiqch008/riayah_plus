@@ -176,7 +176,7 @@ export function LiveKitRoomWebView({ token, serverUrl, onDisconnected }: Props) 
   return (
     <View style={{ flex: 1, backgroundColor: '#1c1917' }}>
       <WebView
-        originWhitelist={['*']}
+        originWhitelist={['https://*', 'http://localhost*', 'https://localhost*']}
         source={{ html, baseUrl: 'https://localhost' }}
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
@@ -184,7 +184,7 @@ export function LiveKitRoomWebView({ token, serverUrl, onDisconnected }: Props) 
         javaScriptEnabled
         domStorageEnabled
         mediaCapturePermissionGrantType="grant"
-        mixedContentMode="always"
+        mixedContentMode="never"
         androidLayerType={Platform.OS === 'android' ? 'hardware' : undefined}
         onMessage={(event) => {
           try {

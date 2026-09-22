@@ -1,16 +1,17 @@
-# Milestone 5 — Phase 1C + 1D + 1E Audit Remediation Tracker
+# Milestone 5 — Phase 1C + 1D + 1E + 1F Audit Remediation Tracker
 
 **Created:** 2026-09-17  
 **Sources of truth (audits):**
 - `audits/M5_PHASE1C_AUTH_SESSION_SECURITY.md` (Auth & Session)
 - `audits/M5_PHASE1D_AUTHORIZATION_TENANT_SECURITY.md` (AuthZ / RBAC / IDOR / Tenant)
 - `audits/M5_PHASE1E_INPUT_INJECTION_XSS_SSRF_SECURITY.md` (Input validation / Injection / XSS / SSRF)
+- `audits/M5_PHASE1F_MOBILE_CLIENT_APPLICATION_HARDENING.md` (Mobile & Client Application Hardening)
 **Auditor:** Karim Ashraf, Cyber Security Engineer  
-**Audit date:** 2026-09-12  
+**Audit date:** 2026-09-12 (1C–1F); 1F-V artifact validation 2026-09-12  
 **Audit target:** `milestone-5-fetched` @ `72c6258b5d665bab7d96a46681eb24e30073c1b0`  
-**Codebase:** `mern/server` (+ related client surfaces)  
-**Overall status:** ✅ **1C/1D/1E complete** · 🧪 **D-01/D-02 app controls / D-03 verified** · ⏸ **Live secret values still need ops cutover**  
-**Last updated:** 2026-09-18  
+**Codebase:** `mern/server` + `mern/client` + `mern/mobile`  
+**Overall status:** ✅ **1C/1D/1E complete** · ✅ **1F code done** · ⏸ **Live secret rotation + release signing keys still ops**  
+**Last updated:** 2026-09-22  
 **Rule:** Check tasks off here as you fix and verify them. Use the audit markdown for *why*; use **this file** for *what to do next*.
 
 ---
@@ -41,7 +42,8 @@
 | **1C** | Auth & Session | 5 | 0 | 12 | 9 | **26** |
 | **1D** | AuthZ / Tenant | 2 | 1 | 5 | 7 | **15** |
 | **1E** | Input / Injection / XSS / SSRF | 1 | 0 | 5 | 6 | **12** |
-| | **Combined** | **8** | **1** | **22** | **22** | **53** |
+| **1F** | Mobile / Client Hardening | 3 | 0 | 5 | 13 | **21** |
+| | **Combined** | **11** | **1** | **27** | **35** | **74** |
 
 ### Release blockers (must fix before production)
 
@@ -54,6 +56,9 @@
 | **AUTHZ-01** | High | Care-summary PDF served from permanent public S3 URL | ✅ Done |
 | **AUTHZ-02** | High | Agency staffing assign accepts any tenant’s booking/shift | ✅ Done |
 | **INJ-01** | High | Unauthenticated formula injection into admin audit-log CSV | 🧪 Verified |
+| **MOB-02** | High | Logout does not clear caches → cross-user PHI on shared device | ✅ Done |
+| **MOB-03** | High | Realtime socket survives logout (`releaseRealtimeSocket` dead) | ✅ Done |
+| **MOB-05** | High | Release APK signed with public Android debug key | ✅ Done (needs upload keystore in CI/EAS) |
 
 ---
 
@@ -69,6 +74,9 @@
 | **1E P1** | CSV / IP export path (INJ-02/03) | **0** | 🧪 Verified (unit + XFF sanitize middleware) |
 | **1E P2** | Prisma operators, pagination, WhatsApp sig (INJ-04/05/10) | **0** | 🧪 Verified (D-01/D-03 scripted) |
 | **1E P3** | URL schemes, email/HTML, sanitization consistency (INJ-06–09/11/12) | **0** | 🧪 Verified (unit) |
+| **1F P1** | Mobile release blockers (MOB-02/03/05) | **0** | ✅ Code done — device retest next |
+| **1F P2** | Storage / GPS / 401 / screenshots / media (MOB-01/06/07/08/10) | **0** | ✅ Code done — device retest next |
+| **1F P3** | Tokens, env, guards, WebView, R8, telehealth teardown | **0** | ✅ Code done — ops/infra items remain |
 
 ---
 
@@ -133,6 +141,70 @@ SQL injection · stored/reflected/DOM XSS · SSRF · OS command injection · pat
 | D-01 | INJ-04 | Confirm operator broadening unreachable | 🧪 Verified | Simple parser; `injPhase1eRetest` contrasts extended qs vs production |
 | D-02 | INJ-03 | Confirm Nginx/ALB XFF + `TRUST_PROXY_HOPS` topology | 🧪 App-verified | XFF sanitize + rate-limit IP + nginx `$remote_addr`; confirm hops in each env (`TRUST_PROXY_TOPOLOGY.md`) |
 | D-03 | INJ-05 | Load/staging measure of large `limit` amplification | 🧪 Code-verified | Unit clamp proven; optional staging: `docx/ops/PAGINATION_LOAD_CHECK.md` |
+
+---
+
+# Phase 1F — Mobile & Client Application Hardening
+
+## 1F — What this audit is about (brief)
+
+**Scope:** If an attacker controls, steals, roots, debugs, backs up, instruments, repackages, proxies, or shares a device running Riayah Plus, what credentials, PHI, privileges, communications, location evidence, or trusted behaviour can they obtain beyond what the platform intends?
+
+**Headline:** Backend remains the authority (good), but the **mobile local-data lifecycle is not production-ready**. Three **release blockers**: cross-user PHI after logout (MOB-02), release signed with the **public debug key** (MOB-05, runtime-confirmed), realtime socket survives logout (MOB-03). Stolen-device path yields onboarding PII draft + cache-dir media without the app password.
+
+**App:** `com.raiyahplus.app` — Expo SDK 54 / RN 0.81.5, Android-only committed native project.
+
+## 1F P1 — Release blockers
+
+| ID | Finding | Severity | Owner files (audit) | Status | Notes |
+|---|---|---|---|---|---|
+| **MOB-02** | Logout does not clear TanStack/Zustand/nav → cross-user PHI on shared device | High | `stores/authStore.ts:logout`; `lib/query/client.ts` | ✅ Done | `purgeLocalSession()` clears query cache + `RAIYAH_QUERY_CACHE_V1`, drafts, shift, socket |
+| **MOB-05** | Release build signed with public AOSP debug keystore | High | `android/app/build.gradle`; committed `debug.keystore` | ✅ Done | Release no longer uses debug signing; requires `RAIYAH_UPLOAD_*` / EAS (`docx/ops/MOBILE_RELEASE_SIGNING.md`) |
+| **MOB-03** | Realtime socket survives logout (`releaseRealtimeSocket` never called) | High | `lib/realtime.ts`; `authStore.logout` | ✅ Done | `releaseRealtimeSocket()` in `purgeLocalSession` |
+
+## 1F P2 — Before production
+
+| ID | Finding | Severity | Status | Notes |
+|---|---|---|---|---|
+| **MOB-01** | PHI/PII in plaintext AsyncStorage (onboarding draft today; query cache latent) | Medium | ✅ Done | Draft cleared on logout; PHI query keys no longer dehydrated |
+| **MOB-06** | GPS attendance client-supplied, un-attested; server accepts out-of-radius | Medium | ✅ Done | Server rejects out-of-radius (422); client mock-location gate + accuracy; `GPS_ALLOW_OUT_OF_RADIUS` escape hatch |
+| **MOB-10** | No 401 handling / no refresh → stale cached data after expiry | Medium | ✅ Done | Failed refresh → `hardSessionReset()` purge + login redirect |
+| **MOB-07** | PHI screens unprotected vs screenshots / recent apps / recording | Medium | ✅ Done | `expo-screen-capture` + app-switcher overlay on telehealth / voice / care plans |
+| **MOB-08** | PHI media/docs persist in `cacheDirectory` and are shared externally | Medium | ✅ Done | Temp delete after upload/view/share + logout sweep; invoice share warning |
+
+## 1F P3 — Hardening / polish
+
+| ID | Finding | Severity | Status | Notes |
+|---|---|---|---|---|
+| **MOB-09** | Push device token not revoked on logout/switch | Low (Med once push ships) | ✅ Done | `revokePushToken()` before logout |
+| **MOB-11** | Committed `mobile/.env` has LAN HTTP API URL + Maps key | Low | ✅ Done | `.env` gitignored + untracked; `.env.example` added |
+| **MOB-12** | Deep-link scheme without group-level auth guards | Low | ✅ Done | `RequireAuth` on family/clinical/support/coord/org/admin/onboarding |
+| **MOB-13** | Over-broad release permissions | Low | ✅ Done | `tools:node="remove"` for SYSTEM_ALERT_WINDOW + external storage |
+| **MOB-14** | LiveKit WebView `originWhitelist:['*']` / mixed content | Low | ✅ Done | Restricted origins; `mixedContentMode=never` |
+| **MOB-15** | Release minify/R8 disabled; no integrity/attestation | Low | ✅ Done | R8 + shrink enabled in `gradle.properties` (Play Integrity still optional) |
+| **MOB-16** | No explicit telehealth teardown on logout/token-expiry | Info | ✅ Done | `registerTelehealthSession` + logout teardown |
+
+### Phase 1F — informational / cleared (no P0–P2 ticket)
+
+| ID | Notes | Status |
+|---|---|---|
+| **MOB-04** | Backup AsyncStorage claim **RUNTIME-FALSIFIED** (artifact): `database` domain not in allowlist | ❌ Won’t fix (optional `allowBackup=false` defence-in-depth) |
+| **MOB-17** | No root/hook/emulator detection | Info — optional resilience |
+| **MOB-18** | LiveKit patch is non-security FGS race fix | Info |
+| **MOB-19** | Maps key restriction status unknown | ⏸ Blocked (infra — Google Cloud) |
+| **MOB-20** | OTA updates not configured | Info |
+| **MOB-21** | Extra exported library components (PreviewActivity, CropImage…) | ✅ Done — crop activities stripped via `tools:node="remove"` |
+
+### Phase 1F — dynamic / infra retest backlog (audit §43 / §46)
+
+| # | Finding | Need | Status |
+|---|---|---|---|
+| M-01 | MOB-02/03 | Emulator + backend: A→logout→B offline + socket closed | ⬜ Todo |
+| M-02 | MOB-05 | `apksigner verify --print-certs` on release → non-debug cert | ⬜ Todo |
+| M-03 | MOB-04 | After Expo upgrades, re-decode APK backup XMLs (`database` still excluded) | ⬜ Todo |
+| M-04 | MOB-19 | Confirm Maps key package + SHA-1 restrictions in Google Cloud | ⏸ Blocked (infra) |
+| M-05 | MOB-08 | Inspect merged FileProvider / `file_paths.xml` scope | ⬜ Todo |
+| M-06 | MOB-05 | Confirm Play App Signing on production distribution | ⏸ Blocked (infra) |
 
 ---
 
@@ -266,6 +338,8 @@ SQL injection · stored/reflected/DOM XSS · SSRF · OS command injection · pat
 | 2026-09-18 | INJ-04…12 | query parser simple + queryString; parsePagination; WhatsApp HMAC; httpUrl/escapeHtml/sanitize edit+AI; S3 host anchor | — |
 | 2026-09-18 | D-01/D-03 | `injPhase1eRetest` verifies simple parser + take clamp; ops checklists for D-02 + secret rotation | — |
 | 2026-09-18 | D-02 + secrets | XFF sanitize middleware; rate-limit trusted IP; nginx overwrite; JWT `*_PREVIOUS` verify; `secrets:generate` | — |
+| 2026-09-22 | — | Phase 1F audit copied to `audits/`; MOB-01…21 tickets added to tracker | — |
+| 2026-09-22 | MOB-01…16 | Mobile logout purge, socket release, release signing, GPS reject, 401 hard reset, screen capture, media cleanup, push revoke, auth layouts, R8 | — |
 
 ---
 
@@ -276,3 +350,5 @@ SQL injection · stored/reflected/DOM XSS · SSRF · OS command injection · pat
 - [x] No new injection bypass introduced (spot-check query parser + pagination + CSV)
 - [x] Tracker rows → `🧪 Verified` for INJ-01…12 (D-02 + secret rotation remain ops)
 - [x] Related client UI updated if API contract changed (N/A for 1E)
+- [x] Phase 1F MOB-02/03/05 code complete (device A→logout→B + release cert retest still open)
+- [ ] Phase 1F device retest M-01/M-02 (emulator logout cross-user + `apksigner` non-debug cert)

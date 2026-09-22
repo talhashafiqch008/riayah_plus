@@ -1,8 +1,11 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { apiClient } from './api/client';
 
 type NotificationsModule = typeof import('expo-notifications');
+
+const PUSH_TOKEN_KEY = 'expo_push_token';
 
 function isExpoGo(): boolean {
   return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -71,7 +74,24 @@ export async function registerPushToken(): Promise<void> {
       token,
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
     });
+    await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token).catch(() => undefined);
   } catch {
     // Non-fatal — app must still work without push
+  }
+}
+
+/** Deactivate this device's push token on the server (MOB-09). Call while auth is still valid. */
+export async function revokePushToken(): Promise<void> {
+  try {
+    const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+    if (!token) return;
+    try {
+      await apiClient.post('/api/device-tokens/revoke', { token });
+    } catch {
+      /* 404/network — still clear local */
+    }
+    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => undefined);
+  } catch {
+    /* ignore */
   }
 }
