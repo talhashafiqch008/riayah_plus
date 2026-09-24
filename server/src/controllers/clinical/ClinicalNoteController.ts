@@ -7,6 +7,7 @@ import { assertTenantOrgAccess } from '../../middleware/tenantAccess';
 import { AuditService } from '../../services/AuditService';
 import { sanitizedString } from '../../utils/sanitize';
 import { canCreate, canView } from '../../middleware/permissions';
+import { logPhiRead } from '../../utils/phiReadLog';
 
 const ADMIN_ROLES: UserRole[] = ['admin', 'super_admin', 'support_admin'];
 
@@ -199,6 +200,16 @@ export class ClinicalNoteController {
     if (!canSeePrivateNote(req.user!.role, req.user!.userId, note)) {
       throw new AppError('Forbidden.', 403);
     }
+
+    await logPhiRead({
+      userId: req.user!.userId,
+      role: req.user!.role,
+      purpose: 'clinical_note_view',
+      entity: 'ClinicalNote',
+      entityId: note.id,
+      metadata: { episodeId: note.episodeId ?? note.session?.episodeId ?? null },
+      req,
+    });
 
     res.json({ data: note });
   }

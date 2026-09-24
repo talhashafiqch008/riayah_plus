@@ -9,6 +9,7 @@ import {
   type Coordinates,
   type GeofenceResult,
 } from './gpsMath';
+import { RETENTION_DAYS, retentionExpiresAtFromNow } from '../utils/retentionPolicy';
 
 export {
   evaluateGeofence,
@@ -183,6 +184,7 @@ export class GPSService {
         address: extras?.address ?? null,
         geofenced: geofenceResult.isWithinRadius,
         geofenceStatus: geofenceResult.status,
+        retentionExpiresAt: retentionExpiresAtFromNow(RETENTION_DAYS.gpsLog),
         metadata: {
           distanceMeters: geofenceResult.distanceMeters,
           radiusMeters: geofenceResult.radiusMeters,
@@ -207,6 +209,7 @@ export class GPSService {
         accuracy: extras?.accuracy ?? null,
         geofenced: true,
         geofenceStatus: 'checkout',
+        retentionExpiresAt: retentionExpiresAtFromNow(RETENTION_DAYS.gpsLog),
       },
     });
   }
@@ -374,6 +377,7 @@ export class GPSService {
           address: target.address,
           geofenced: geofence.isWithinRadius,
           geofenceStatus: geofence.status,
+          retentionExpiresAt: retentionExpiresAtFromNow(RETENTION_DAYS.gpsLog),
           metadata: {
             distanceMeters: geofence.distanceMeters,
             radiusMeters: geofence.radiusMeters,

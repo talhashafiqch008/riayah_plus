@@ -2,6 +2,7 @@ import { NotificationChannel } from '@prisma/client';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { emitNotification } from './RealtimeService';
+import { RETENTION_DAYS, retentionExpiresAtFromNow } from '../utils/retentionPolicy';
 
 interface CreateNotificationOptions {
   userId: string;
@@ -22,6 +23,8 @@ export class NotificationService {
         type: opts.type,
         channel: opts.channel ?? 'in_app',
         data: (opts.data ?? {}) as any,
+        // TM-023: align notification lifecycle with retention policy (1 year)
+        retentionExpiresAt: retentionExpiresAtFromNow(RETENTION_DAYS.notification),
       },
     });
     try {

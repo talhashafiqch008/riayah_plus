@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import { createHash } from 'crypto';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { AuditService } from './AuditService';
@@ -9,6 +10,10 @@ import {
   encryptRecordingTranscript,
 } from '../utils/recordingTranscriptCrypto';
 import { logTelehealthPurposeOfUse } from '../utils/telehealthPurposeLog';
+
+function sha256Hex(plaintext: string): string {
+  return createHash('sha256').update(plaintext, 'utf8').digest('hex');
+}
 
 export class RecordingTranscriptService {
   /** Persist spoken PHI transcript — always encrypted before writing to PostgreSQL (HP3). */
@@ -25,10 +30,15 @@ export class RecordingTranscriptService {
     if (!session) throw new AppError('Session not found.', 404);
     if (!canStartRecording('session', session, actor)) throw new AppError('Forbidden.', 403);
 
+    const nextHash = sha256Hex(plaintext);
+    const previousHash = session.recordingTranscriptSha256;
     const ciphertext = encryptRecordingTranscript(plaintext);
     await prisma.session.update({
       where: { id: sessionId },
-      data: { recordingTranscript: ciphertext },
+      data: {
+        recordingTranscript: ciphertext,
+        recordingTranscriptSha256: nextHash,
+      },
     });
 
     await AuditService.log({
@@ -36,7 +46,12 @@ export class RecordingTranscriptService {
       action: 'recording_transcript_saved',
       entity: 'Session',
       entityId: sessionId,
-      metadata: { plaintextChars: plaintext.length },
+      metadata: {
+        plaintextChars: plaintext.length,
+        contentSha256: nextHash,
+        previousContentSha256: previousHash ?? null,
+        overwritten: Boolean(previousHash && previousHash !== nextHash),
+      },
       req,
     });
   }
@@ -55,6 +70,14 @@ export class RecordingTranscriptService {
     if (!session.recordingTranscript) return null;
 
     const plaintext = decryptRecordingTranscript(session.recordingTranscript);
+
+    // TM-013: integrity check when hash is present
+    if (session.recordingTranscriptSha256) {
+      const actual = sha256Hex(plaintext);
+      if (actual !== session.recordingTranscriptSha256) {
+        throw new AppError('Transcript integrity check failed.', 409);
+      }
+    }
 
     await logTelehealthPurposeOfUse({
       userId: actor.userId,

@@ -905,6 +905,8 @@ model Session {
   recordingUrl    String?
   recordingStatus String?
   recordingTranscript String?
+  /// TM-013: SHA-256 of plaintext transcript for integrity / overwrite detection
+  recordingTranscriptSha256 String?
   recordingEgressId String?
   livekitRoomId   String?
   dailyRoomUrl    String?
@@ -1417,9 +1419,12 @@ model GpsLog {
   geofenceStatus String?
   metadata    Json?
   createdAt   DateTime @default(now())
+  /// TM-022: absolute retention deadline for location PHI (privacy: 90 days).
+  retentionExpiresAt DateTime?
 
   @@index([userId])
   @@index([sessionId])
+  @@index([retentionExpiresAt])
   @@map("gps_logs")
 }
 
@@ -2137,5 +2142,63 @@ model PushNotificationToken {
 
   @@index([userId])
   @@map("push_notification_tokens")
+}
+
+// ── Recording Intelligence ────────────────────────────────────────────────────
+
+model RecordingIntelligenceRun {
+  id               String   @id @default(cuid())
+  recordingId      String
+  pipelineVersion  String
+  sourceKind       String   // session | meeting | voice
+  sourceType       String   @default("mixed")
+  jobId            String?
+  status           String   // processing | available | failed | delivery_failed
+  sessionId        String?
+  meetingId        String?
+  voiceRecordingId String?
+  mediaUrlHint     String?  // last media url used (no secrets preferred — optional omit)
+  languageHint     String?
+  outputLanguage   String?
+  analysisStrategy String?
+  errorCode        String?
+  errorMessage     String?
+  requestedAt      DateTime @default(now())
+  callbackReceivedAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  artifacts        RecordingIntelligenceArtifact[]
+
+  @@unique([recordingId, pipelineVersion])
+  @@index([status, requestedAt])
+  @@index([sessionId])
+  @@index([meetingId])
+  @@map("recording_intelligence_runs")
+}
+
+model RecordingIntelligenceArtifact {
+  id              String   @id @default(cuid())
+  runId           String
+  run             RecordingIntelligenceRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  recordingId     String
+  pipelineVersion String
+  artifactType    String   // transcript | summary | clinicalDraftNote | risk
+  status          String   // completed | failed | skipped
+  payloadEnc      String?  // encrypted JSON when completed
+  errorCode       String?
+  errorMessage    String?
+  isDraft         Boolean  @default(true)
+  requiresReview  Boolean  @default(true)
+  model           String?
+  promptVersion   String?
+  promptTokens    Int?
+  completionTokens Int?
+  totalTokens     Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([recordingId, pipelineVersion, artifactType])
+  @@index([runId])
+  @@map("recording_intelligence_artifacts")
 }
 

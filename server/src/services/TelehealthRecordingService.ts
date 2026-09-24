@@ -17,6 +17,8 @@ import {
   type TelehealthActor,
 } from './LiveKitAccess';
 import { isFamilyRole } from '../utils/careAccess';
+import { logger } from '../config/logger';
+import { RecordingIntelligenceService } from './RecordingIntelligenceService';
 
 export const RECORDING_UNAVAILABLE = 'recording_unavailable';
 
@@ -343,6 +345,15 @@ export class TelehealthRecordingService {
         where: { OR: [{ id: target.id }, { livekitRoomId: roomName.replace(/__waiting$/, '') }] },
         data: { recordingUrl: location, recordingStatus: 'available' },
       });
+      if (result.count > 0 && RecordingIntelligenceService.isEnabled()) {
+        void RecordingIntelligenceService.triggerForSession(target.id).catch((err) => {
+          logger.warn('Recording intelligence trigger failed after egress', {
+            recordingId: target.id,
+            sourceKind: 'session',
+            detail: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+          });
+        });
+      }
       return { updated: result.count, kind: 'session' as const };
     }
 
@@ -350,6 +361,21 @@ export class TelehealthRecordingService {
       where: { roomName: target.roomName },
       data: { recordingUrl: location, recordingStatus: 'available' },
     });
+    if (result.count > 0 && RecordingIntelligenceService.isEnabled()) {
+      const meeting = await prisma.meeting.findFirst({
+        where: { roomName: target.roomName },
+        select: { id: true },
+      });
+      if (meeting) {
+        void RecordingIntelligenceService.triggerForMeeting(meeting.id).catch((err) => {
+          logger.warn('Recording intelligence trigger failed after egress', {
+            recordingId: meeting.id,
+            sourceKind: 'meeting',
+            detail: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+          });
+        });
+      }
+    }
     return { updated: result.count, kind: 'meeting' as const };
   }
 }

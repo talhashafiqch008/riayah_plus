@@ -80,7 +80,13 @@ export class AuditService {
           statusCode: res.statusCode,
           durationMs,
           params: redactForAudit(req.params),
-          body: req.body ? redactForAudit(req.body) : undefined,
+          // Never persist raw webhook buffers / parsed payment bodies as reversible maps
+          body:
+            req.body == null
+              ? undefined
+              : Buffer.isBuffer(req.body)
+                ? '[REDACTED_RAW_BODY]'
+                : redactForAudit(req.body),
         } as object,
       },
     });

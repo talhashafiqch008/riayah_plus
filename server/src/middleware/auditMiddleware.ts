@@ -10,6 +10,8 @@ const SKIP_PATH_PREFIXES = [
   '/health',
   '/stripe/webhook',
   '/paytabs/webhook',
+  '/wallet/stripe/webhook',
+  '/wallet/paytabs/webhook',
   '/webhook/whatsapp',
   '/livekit/webhook',
 ];

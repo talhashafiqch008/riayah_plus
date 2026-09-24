@@ -3,6 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
+import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
 import {
   assertPhiS3UploadConfigured,
@@ -378,8 +379,12 @@ export class VoiceRecordingService {
         const s3 = createPhiS3Client();
         await s3.send(new DeleteObjectCommand({ Bucket: env.AWS_BUCKET, Key: row.s3Key }));
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      // TM-012: do not swallow S3 delete failures silently — object may outlive DB soft-delete
+      logger.error('Voice recording S3 DeleteObject failed after softDelete', {
+        voiceRecordingId: row.id,
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return { success: true };

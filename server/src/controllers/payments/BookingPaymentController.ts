@@ -31,7 +31,7 @@ export class BookingPaymentController {
       if (booking.clientId !== userId) throw new AppError('Forbidden.', 403);
       if (booking.status !== 'pending') throw new AppError('Booking is not awaiting payment.', 400);
 
-      const amount = Number(booking.totalPrice ?? 0);
+      const amount = Number(booking.totalAmount ?? booking.totalPrice ?? 0);
       if (amount <= 0) throw new AppError('Invalid booking amount.', 400);
 
       // ── Wallet payment ─────────────────────────────────────────────────────

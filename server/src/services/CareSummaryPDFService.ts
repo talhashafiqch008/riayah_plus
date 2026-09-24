@@ -47,6 +47,15 @@ export class CareSummaryPDFService {
 
     const pdfBuffer = await CareSummaryPDFService.buildPDF(episode);
 
+    const previousKey = careSummaryObjectKey(episode.summaryPdfUrl ?? '');
+    if (previousKey) {
+      const { deleteS3ObjectBestEffort } = await import('../utils/s3Delete');
+      await deleteS3ObjectBestEffort(previousKey, {
+        purpose: 'care_summary_regenerate',
+        episodeId,
+      });
+    }
+
     const key = `care-summaries/${episodeId}-${uuidv4()}.pdf`;
     const s3 = createPhiS3Client();
     await s3.send(

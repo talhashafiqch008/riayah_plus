@@ -115,6 +115,7 @@ app.use(
 
 // Raw body for Stripe / PayTabs / LiveKit / WhatsApp signature verification
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/wallet/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/paytabs/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/wallet/paytabs/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/livekit/webhook', express.raw({ type: 'application/json' }));

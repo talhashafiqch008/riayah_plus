@@ -5,6 +5,8 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
 import { assertContentPolicy } from '../utils/contentPolicy';
+import { assertAiChatConsent } from '../utils/aiChatConsent';
+import { sanitizePlainText } from '../utils/sanitize';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
@@ -29,6 +31,7 @@ export class AIDoctorController {
     try {
       const { message } = doctorChatSchema.parse(req.body);
       assertContentPolicy(message);
+      await assertAiChatConsent(req.user!.userId);
 
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
@@ -37,7 +40,7 @@ export class AIDoctorController {
 
       const chat = model.startChat({});
       const result = await chat.sendMessage(message);
-      const reply = result.response.text();
+      const reply = sanitizePlainText(result.response.text());
 
       res.json({ data: { reply } });
     } catch (err) {

@@ -49,6 +49,13 @@ const SENSITIVE_KEYS = new Set([
   'poc_name',
   'pocphone',
   'poc_phone',
+  // TM-002 / TM-029 — clinical chat & telehealth transcript bodies
+  'content',
+  'transcript',
+  'recordingtranscript',
+  'recording_transcript',
+  'completetext',
+  'complete_text',
 ]);
 
 function isDecimalLike(value: object): boolean {
@@ -66,6 +73,8 @@ export function redactForAudit(value: unknown, depth = 0): unknown {
   if (typeof value === 'bigint') return value.toString();
   if (typeof value !== 'object') return value;
   if (value instanceof Date) return value.toISOString();
+  // TM-026: never expand raw webhook Buffers into reversible byte maps
+  if (Buffer.isBuffer(value)) return '[REDACTED_RAW_BODY]';
   if (Array.isArray(value)) {
     return value.slice(0, 20).map((item) => redactForAudit(item, depth + 1));
   }

@@ -8,6 +8,8 @@ import { CareSummaryPDFService } from '../services/CareSummaryPDFService';
 import { AppError } from '../middleware/errorHandler';
 import { assertTenantOrgAccess } from '../middleware/tenantAccess';
 import { isFamilyRole } from '../utils/careAccess';
+import { logPhiRead } from '../utils/phiReadLog';
+import { prisma } from '../config/database';
 
 const router = Router();
 router.use(authenticate);
@@ -44,7 +46,6 @@ router.post(
 // Care summary PDF — tenant + party checks (C-5)
 router.get('/:id/summary-pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { prisma } = await import('../config/database');
     const episode = await prisma.careEpisode.findUnique({
       where: { id: req.params.id },
       include: { careUnit: { select: { familyUserId: true } } },
@@ -65,9 +66,21 @@ router.get('/:id/summary-pdf', async (req: Request, res: Response, next: NextFun
       throw new AppError('Forbidden.', 403);
     }
 
-    if (episode.summaryPdfUrl) {
-      const pdfUrl = await CareSummaryPDFService.getSignedDownloadUrl(episode.summaryPdfUrl);
+    const respondWithPdf = async (stored: string) => {
+      const pdfUrl = await CareSummaryPDFService.getSignedDownloadUrl(stored);
+      await logPhiRead({
+        userId: req.user!.userId,
+        role: req.user!.role,
+        purpose: 'care_summary_download',
+        entity: 'CareEpisode',
+        entityId: episode.id,
+        req,
+      });
       res.json({ success: true, pdfUrl, expiresIn: 300 });
+    };
+
+    if (episode.summaryPdfUrl) {
+      await respondWithPdf(episode.summaryPdfUrl);
       return;
     }
 
@@ -79,8 +92,7 @@ router.get('/:id/summary-pdf', async (req: Request, res: Response, next: NextFun
     if (!refreshed?.summaryPdfUrl) {
       throw new AppError('Failed to generate care summary PDF.', 500);
     }
-    const pdfUrl = await CareSummaryPDFService.getSignedDownloadUrl(refreshed.summaryPdfUrl);
-    res.json({ success: true, pdfUrl, expiresIn: 300 });
+    await respondWithPdf(refreshed.summaryPdfUrl);
   } catch (err) {
     next(err);
   }

@@ -154,6 +154,25 @@ export async function performAccountDeletion(opts: {
   disconnectUserSockets(userId);
   if (res) clearAuthCookies(res);
 
+  // TM-012: soft-delete voice recordings and remove S3 objects promptly on deletion request
+  const voices = await prisma.voiceRecording.findMany({
+    where: { userId, deletedAt: null },
+    select: { id: true, s3Key: true },
+  });
+  if (voices.length > 0) {
+    const { deleteS3ObjectBestEffort } = await import('../utils/s3Delete');
+    for (const v of voices) {
+      await deleteS3ObjectBestEffort(v.s3Key, {
+        purpose: 'account_deletion_voice_recording',
+        voiceRecordingId: v.id,
+      });
+    }
+    await prisma.voiceRecording.updateMany({
+      where: { id: { in: voices.map((v) => v.id) } },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   await AuditService.log({
     userId,
     action: 'account_deletion_requested',

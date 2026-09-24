@@ -8,6 +8,7 @@ import { StripeService } from '../services/StripeService';
 import { PayoutIdempotencyService } from '../services/PayoutIdempotencyService';
 import { InvoiceService } from '../services/InvoiceService';
 import { TelehealthReminderService } from '../services/TelehealthReminderService';
+import { RecordingIntelligenceService } from '../services/RecordingIntelligenceService';
 import { anonymizeUser } from '../utils/anonymizeUser';
 import { runRetentionPurgeBatch } from '../services/RetentionPurgeService';
 
@@ -20,6 +21,19 @@ export function startScheduler(): void {
       await TelehealthReminderService.sendDueReminders();
     } catch (err) {
       logger.error('telehealth:send-reminders failed', { err });
+    }
+  });
+
+  // ── recording-intelligence:recover-stale — every 10 min (same pipelineVersion) ─
+  cron.schedule('*/10 * * * *', async () => {
+    if (!RecordingIntelligenceService.isEnabled()) return;
+    try {
+      const result = await RecordingIntelligenceService.recoverStaleRuns(30);
+      if (result.examined > 0) {
+        logger.info('recording-intelligence:recover-stale', result);
+      }
+    } catch (err) {
+      logger.error('recording-intelligence:recover-stale failed', { err });
     }
   });
 

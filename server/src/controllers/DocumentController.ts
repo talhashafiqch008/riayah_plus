@@ -7,6 +7,7 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
 import { AuditService } from '../services/AuditService';
+import { logPhiRead } from '../utils/phiReadLog';
 import {
   UPLOAD_MAX_BYTES,
   assertAllowedUploadMime,
@@ -99,6 +100,16 @@ export class DocumentController {
       });
       const url = await getSignedUrl(s3, command, { expiresIn: ttl });
 
+      await logPhiRead({
+        userId: req.user!.userId,
+        role: req.user!.role,
+        purpose: 'document_signed_url',
+        entity: 'Document',
+        entityId: typeof req.params.id === 'string' ? req.params.id : key,
+        metadata: { key, expiresIn: ttl, admin: isAdmin },
+        req,
+      });
+
       if (isAdmin) {
         await AuditService.log({
           userId: req.user!.userId,
@@ -173,6 +184,16 @@ export class DocumentController {
         ResponseContentDisposition: `attachment; filename="${sanitizeUploadFilename(doc.name)}"`,
       });
       const url = await getSignedUrl(s3, command, { expiresIn: 300 });
+
+      await logPhiRead({
+        userId: req.user!.userId,
+        role: req.user!.role,
+        purpose: 'document_download',
+        entity: 'Document',
+        entityId: id,
+        metadata: { fileKey },
+        req,
+      });
 
       res.redirect(url);
     } catch (err) {

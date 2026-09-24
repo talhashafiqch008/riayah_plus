@@ -12,6 +12,7 @@ import { env } from '../../config/env';
 import { isAllowedFrontendOrigin } from '../../utils/frontendOrigins';
 import { parsePagination } from '../../utils/pagination';
 import { queryString } from '../../utils/queryScalar';
+import { logPhiRead } from '../../utils/phiReadLog';
 
 const lineItemSchema = z.object({
   description: z.string(),
@@ -192,6 +193,15 @@ export class InvoiceController {
     });
     if (!invoice) throw new AppError('Invoice not found.', 404);
     await assertCanAccessInvoice(req, invoice);
+    await logPhiRead({
+      userId: req.user!.userId,
+      role: req.user!.role,
+      purpose: 'invoice_view',
+      entity: 'Invoice',
+      entityId: invoice.id,
+      metadata: { clientId: invoice.clientId },
+      req,
+    });
     res.json({ data: invoice });
   }
 

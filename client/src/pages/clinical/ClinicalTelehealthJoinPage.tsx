@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { ArrowLeft, Circle, PanelRight, RefreshCw, Square, UserCheck, Video } from 'lucide-react';
+import { ArrowLeft, Circle, FileText, Loader2, PanelRight, RefreshCw, Square, UserCheck, Video, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isApiError } from '@/lib/errors';
 import { getSession, type CareSession } from '@/lib/api/scheduling';
@@ -12,6 +12,7 @@ import { familyDateLocale } from '@/lib/familyLanguage';
 import {
   addTelehealthSessionNote,
   admitTelehealthParticipant,
+  getRecordingIntelligence,
   getTelehealthContext,
   getTelehealthLobby,
   getTelehealthRecording,
@@ -20,11 +21,15 @@ import {
   sessionJoinRoomName,
   startTelehealthRecording,
   stopTelehealthRecording,
+  type RecordingIntelligenceRun,
   type TelehealthContext,
   type TelehealthJoin,
   type TelehealthLobby,
   type TelehealthRecording,
+  type TranscriptArtifact,
+  type TranscriptSegment,
 } from '@/lib/api/telehealth';
+
 
 function ContextPanel({
   sessionId,
@@ -246,16 +251,231 @@ function LobbyPanel({
   );
 }
 
-function RecordingArchive({ recording }: { recording: TelehealthRecording | null }) {
+function formatSegmentTime(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function transcriptFromRun(run: RecordingIntelligenceRun): {
+  status: string;
+  segments: TranscriptSegment[];
+  completeText: string;
+  warnings: string[];
+} | null {
+  const row = run.artifacts.find((a) => a.artifactType === 'transcript');
+  if (!row) return null;
+  const payload = (row.artifact ?? null) as TranscriptArtifact | null;
+  const segments = Array.isArray(payload?.segments) ? payload!.segments! : [];
+  const completeText =
+    (typeof payload?.completeText === 'string' && payload.completeText.trim()) ||
+    segments.map((s) => s.text).filter(Boolean).join('\n');
+  return {
+    status: String(row.status),
+    segments,
+    completeText,
+    warnings: Array.isArray(payload?.warnings) ? payload!.warnings! : [],
+  };
+}
+
+function RecordingArchive({
+  sessionId,
+  recording,
+}: {
+  sessionId: string;
+  recording: TelehealthRecording | null;
+}) {
   const { t } = useTranslation('clinical');
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptStatus, setTranscriptStatus] = useState<string | null>(null);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [completeText, setCompleteText] = useState('');
+  const [warnings, setWarnings] = useState<string[]>([]);
+
   if (!recording?.recordingUrl && !recording?.status) return null;
   const status = recording.status?.replace(/_/g, ' ') ?? '';
+
+  const openTranscript = async () => {
+    if (transcriptLoading) return;
+    setTranscriptLoading(true);
+    setTranscriptOpen(true);
+    setTranscriptStatus(null);
+    setPipelineError(null);
+    setSegments([]);
+    setCompleteText('');
+    setWarnings([]);
+    try {
+      const run = await getRecordingIntelligence(sessionId);
+      if (run.status === 'failed' || run.status === 'delivery_failed') {
+        setTranscriptStatus('pipeline_failed');
+        setPipelineError(run.errorMessage || run.errorCode || null);
+        return;
+      }
+      const parsed = transcriptFromRun(run);
+      if (!parsed) {
+        setTranscriptStatus(
+          run.status === 'processing' || run.status === 'queued' ? 'processing' : 'missing',
+        );
+        return;
+      }
+      if (parsed.status !== 'completed') {
+        setTranscriptStatus(parsed.status);
+        return;
+      }
+      setTranscriptStatus('completed');
+      setSegments(parsed.segments);
+      setCompleteText(parsed.completeText);
+      setWarnings(parsed.warnings);
+    } catch (error: unknown) {
+      if (isApiError(error) && error.statusCode === 404) {
+        setTranscriptStatus('missing');
+      } else {
+        setTranscriptOpen(false);
+        toast.error(isApiError(error) ? error.message : t('telehealthJoin.transcriptFailed'));
+      }
+    } finally {
+      setTranscriptLoading(false);
+    }
+  };
+
   return (
     <div className="rounded-xl border border-stone-100 bg-white p-4 shadow-sm space-y-3">
-      <h3 className="text-sm font-semibold text-stone-900">{t('telehealthJoin.sessionRecording')}</h3>
-      {status && <p className="text-xs font-medium uppercase tracking-wide text-teal-800">{status}</p>}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-stone-900">{t('telehealthJoin.sessionRecording')}</h3>
+          {status && <p className="mt-1 text-xs font-medium uppercase tracking-wide text-teal-800">{status}</p>}
+        </div>
+        {recording.recordingUrl && (
+          <button
+            type="button"
+            onClick={() => void openTranscript()}
+            disabled={transcriptLoading}
+            aria-busy={transcriptLoading}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-900 hover:bg-teal-100 disabled:cursor-wait disabled:opacity-70"
+          >
+            {transcriptLoading ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <FileText className="size-3.5" aria-hidden />
+            )}
+            {transcriptLoading ? t('telehealthJoin.loadingTranscript') : t('telehealthJoin.viewTranscript')}
+          </button>
+        )}
+      </div>
       {recording.recordingUrl && (
         <video src={recording.recordingUrl} controls className="w-full rounded-lg bg-black" />
+      )}
+
+      {transcriptOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="session-transcript-title"
+          onClick={() => !transcriptLoading && setTranscriptOpen(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-stone-100 px-4 py-3">
+              <div>
+                <h4 id="session-transcript-title" className="text-sm font-semibold text-stone-900">
+                  {t('telehealthJoin.transcriptTitle')}
+                </h4>
+                <p className="mt-0.5 text-xs text-amber-800">{t('telehealthJoin.transcriptDraft')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTranscriptOpen(false)}
+                disabled={transcriptLoading}
+                className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
+                aria-label={t('telehealthJoin.transcriptClose')}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              {transcriptLoading && (
+                <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-stone-600">
+                  <Loader2 className="size-6 animate-spin text-teal-600" />
+                  {t('telehealthJoin.loadingTranscript')}
+                </div>
+              )}
+
+              {!transcriptLoading && transcriptStatus === 'missing' && (
+                <p className="py-8 text-center text-sm text-stone-600">{t('telehealthJoin.transcriptNotFound')}</p>
+              )}
+
+              {!transcriptLoading && transcriptStatus === 'pipeline_failed' && (
+                <div className="space-y-2 py-8 text-center text-sm text-stone-600">
+                  <p>{t('telehealthJoin.transcriptPipelineFailed')}</p>
+                  {pipelineError && (
+                    <p className="font-mono text-xs text-rose-700">{pipelineError}</p>
+                  )}
+                </div>
+              )}
+
+              {!transcriptLoading &&
+                transcriptStatus &&
+                transcriptStatus !== 'completed' &&
+                transcriptStatus !== 'missing' &&
+                transcriptStatus !== 'pipeline_failed' && (
+                  <p className="py-8 text-center text-sm text-stone-600">{t('telehealthJoin.transcriptNotReady')}</p>
+                )}
+
+              {!transcriptLoading && transcriptStatus === 'completed' && (
+                <div className="space-y-3">
+                  {warnings.length > 0 && (
+                    <ul className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      {warnings.map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {segments.length > 0 ? (
+                    <ul className="space-y-3">
+                      {segments.map((seg) => (
+                        <li key={seg.segmentId} className="rounded-lg bg-stone-50 px-3 py-2">
+                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500">
+                            <span>
+                              {seg.speakerLabel
+                                ? t('telehealthJoin.speaker', { label: seg.speakerLabel })
+                                : t('telehealthJoin.speaker', { label: '—' })}
+                            </span>
+                            <span>
+                              {formatSegmentTime(seg.startMs)}–{formatSegmentTime(seg.endMs)}
+                            </span>
+                          </div>
+                          <p className="text-sm leading-relaxed text-stone-800 whitespace-pre-wrap">{seg.text}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : completeText ? (
+                    <p className="text-sm leading-relaxed text-stone-800 whitespace-pre-wrap">{completeText}</p>
+                  ) : (
+                    <p className="py-8 text-center text-sm text-stone-600">{t('telehealthJoin.transcriptEmpty')}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-stone-100 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setTranscriptOpen(false)}
+                disabled={transcriptLoading}
+                className="w-full rounded-lg bg-stone-900 px-3 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
+              >
+                {t('telehealthJoin.transcriptClose')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -464,7 +684,7 @@ export default function ClinicalTelehealthJoinPage() {
                 compact
               />
               <div className="p-3">
-                <RecordingArchive recording={recording} />
+                <RecordingArchive sessionId={sessionId} recording={recording} />
               </div>
             </div>
           </aside>
@@ -517,7 +737,7 @@ export default function ClinicalTelehealthJoinPage() {
             onAdmit={(id) => void onAdmit(id)}
             onRefresh={() => void refreshLobby()}
           />
-          <RecordingArchive recording={recording} />
+          <RecordingArchive sessionId={sessionId} recording={recording} />
         </div>
 
         <div className="min-h-[28rem]">

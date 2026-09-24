@@ -128,4 +128,50 @@ describe('RiayahAiClient', () => {
       episodeId: 'ep-fail',
     });
   });
+
+  it('processRecording returns httpStatus for 202 and 409 without throwing', async () => {
+    mockPost.mockResolvedValueOnce({
+      status: 202,
+      data: {
+        recordingId: 'rec-1',
+        jobId: 'recording:rec-1:v1',
+        status: 'queued',
+        pipelineVersion: 'v1',
+        reused: false,
+      },
+    });
+
+    const queued = await RiayahAiClient.processRecording({
+      recordingId: 'rec-1',
+      sourceType: 'mixed',
+      mediaUrl: 'https://example.com/a.mp4',
+      pipelineVersion: 'v1',
+    });
+    expect(queued.httpStatus).toBe(202);
+    expect(queued.data.status).toBe('queued');
+    expect(mockPost).toHaveBeenCalledWith(
+      '/v1/recordings/process',
+      expect.objectContaining({ recordingId: 'rec-1' }),
+      expect.objectContaining({ validateStatus: expect.any(Function) }),
+    );
+
+    mockPost.mockResolvedValueOnce({
+      status: 409,
+      data: {
+        recordingId: 'rec-1',
+        jobId: 'recording:rec-1:v1',
+        status: 'failed',
+        pipelineVersion: 'v1',
+        reused: true,
+      },
+    });
+    const conflict = await RiayahAiClient.processRecording({
+      recordingId: 'rec-1',
+      sourceType: 'mixed',
+      mediaUrl: 'https://example.com/a.mp4',
+      pipelineVersion: 'v1',
+    });
+    expect(conflict.httpStatus).toBe(409);
+    expect(conflict.data.reused).toBe(true);
+  });
 });

@@ -118,6 +118,15 @@ export const env = {
   /** How long an encrypted export remains downloadable (hours). */
   DATA_EXPORT_TTL_HOURS: parseInt(process.env.DATA_EXPORT_TTL_HOURS || '24', 10),
 
+  /** Recording Intelligence pipeline (artifact analysis); false-safe when unset. */
+  RECORDING_INTELLIGENCE_ENABLED: process.env.RECORDING_INTELLIGENCE_ENABLED === 'true',
+  RECORDING_INTELLIGENCE_PIPELINE_VERSION:
+    process.env.RECORDING_INTELLIGENCE_PIPELINE_VERSION || '2026-09-recording-v1',
+  RECORDING_INTELLIGENCE_MEDIA_URL_TTL_SECONDS: parseInt(
+    process.env.RECORDING_INTELLIGENCE_MEDIA_URL_TTL_SECONDS || '7200',
+    10,
+  ),
+
   isDev: process.env.NODE_ENV !== 'production',
   isProd: process.env.NODE_ENV === 'production',
 };

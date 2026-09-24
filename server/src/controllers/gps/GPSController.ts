@@ -6,6 +6,7 @@ import { NotificationService } from '../../services/NotificationService';
 import { AppError } from '../../middleware/errorHandler';
 import { tenantOrgWhere } from '../../middleware/tenantScope';
 import { assertTenantOrgAccess } from '../../middleware/tenantAccess';
+import { logPhiRead } from '../../utils/phiReadLog';
 
 const coordsSchema = z.object({
   latitude: z.number().gte(-90).lte(90),
@@ -203,6 +204,15 @@ export class GPSController {
       });
     }
     const workers = await GPSService.listActiveWorkers(organizationId);
+    await logPhiRead({
+      userId: req.user!.userId,
+      role: req.user!.role,
+      purpose: 'gps_map_view',
+      entity: 'GpsLog',
+      entityId: organizationId ?? 'platform',
+      metadata: { workerCount: workers.length },
+      req,
+    });
     res.json({ workers });
   }
 
@@ -236,6 +246,15 @@ export class GPSController {
       workerId: query.workerId,
       page: query.page,
       limit: query.limit,
+    });
+    await logPhiRead({
+      userId: req.user!.userId,
+      role: req.user!.role,
+      purpose: 'gps_log_list',
+      entity: 'GpsLog',
+      entityId: query.sessionId ?? organizationId ?? 'platform',
+      metadata: { page: query.page, workerId: query.workerId },
+      req,
     });
     res.json(result);
   }

@@ -180,6 +180,76 @@ export async function getTelehealthRecording(sessionId: string) {
   }
 }
 
+export type RecordingIntelligenceArtifactType =
+  | 'transcript'
+  | 'summary'
+  | 'clinicalDraftNote'
+  | 'risk';
+
+export type RecordingIntelligenceArtifactStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'skipped';
+
+export type TranscriptSegment = {
+  segmentId: string;
+  startMs: number;
+  endMs: number;
+  text: string;
+  speakerLabel?: string | null;
+  participantId?: string | null;
+  participantRole?: string | null;
+  attributionMode?: string;
+  confidence?: number | null;
+  requiresReview?: boolean;
+};
+
+export type TranscriptArtifact = {
+  language?: string;
+  completeText?: string;
+  segments?: TranscriptSegment[];
+  attributionMode?: string;
+  isDraft?: boolean;
+  reviewStatus?: string;
+  warnings?: string[];
+};
+
+export type RecordingIntelligenceArtifact = {
+  artifactType: RecordingIntelligenceArtifactType;
+  status: RecordingIntelligenceArtifactStatus | string;
+  artifact: TranscriptArtifact | Record<string, unknown> | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  isDraft?: boolean;
+  requiresReview?: boolean;
+};
+
+export type RecordingIntelligenceRun = {
+  id: string;
+  recordingId: string;
+  pipelineVersion: string;
+  status: string;
+  sessionId?: string | null;
+  meetingId?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  artifacts: RecordingIntelligenceArtifact[];
+};
+
+export async function getRecordingIntelligence(sessionId: string, pipelineVersion?: string) {
+  try {
+    const { data } = await client.get<{ success: boolean; data: RecordingIntelligenceRun }>(
+      `/telehealth/sessions/${sessionId}/recording-intelligence`,
+      { params: pipelineVersion ? { pipelineVersion } : undefined },
+    );
+    return data.data;
+  } catch (error) {
+    throw extractApiError(error);
+  }
+}
+
 /** Legacy careseeker/provider video rooms (`POST /video/token`). */
 export async function getLiveKitToken(params: {
   roomName: string;

@@ -56,6 +56,7 @@ import { requireAiServiceApiKey } from '../middleware/aiServiceAuth';
 import { requireCareCoordinator } from '../middleware/rbac';
 import { IntakeController } from '../controllers/patients/IntakeController';
 import { CarePlanDraftCallbackController } from '../controllers/ai/CarePlanDraftCallbackController';
+import { RecordingIntelligenceCallbackController } from '../controllers/ai/RecordingIntelligenceCallbackController';
 
 const router = Router();
 
@@ -77,6 +78,13 @@ router.post(
   requireAiServiceApiKey,
   (req: Request, res: Response, next: NextFunction) => {
     CarePlanDraftCallbackController.handle(req, res).catch(next);
+  },
+);
+router.post(
+  '/ai/callbacks/recording-intelligence',
+  requireAiServiceApiKey,
+  (req: Request, res: Response, next: NextFunction) => {
+    RecordingIntelligenceCallbackController.handle(req, res).catch(next);
   },
 );
 

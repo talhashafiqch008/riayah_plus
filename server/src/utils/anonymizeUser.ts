@@ -1,6 +1,67 @@
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
+import { careSummaryObjectKey } from '../services/CareSummaryPDFService';
+import { s3KeyFromRecordingUrl } from '../services/TelehealthRecordingService';
+import { deleteS3ObjectBestEffort } from './s3Delete';
+
+/**
+ * TM-012 — delete PHI objects from S3 before DB anonymization nulls references.
+ */
+async function deleteUserPhiS3Objects(userId: string): Promise<void> {
+  const [sessions, meetings, voices, episodes] = await Promise.all([
+    prisma.session.findMany({
+      where: {
+        OR: [{ clientId: userId }, { providerId: userId }],
+        recordingUrl: { not: null },
+      },
+      select: { id: true, recordingUrl: true },
+    }),
+    prisma.meeting.findMany({
+      where: {
+        OR: [{ hostId: userId }, { participantId: userId }],
+        recordingUrl: { not: null },
+      },
+      select: { id: true, recordingUrl: true },
+    }),
+    prisma.voiceRecording.findMany({
+      where: { userId, deletedAt: null },
+      select: { id: true, s3Key: true },
+    }),
+    prisma.careEpisode.findMany({
+      where: {
+        OR: [{ patientId: userId }, { coordinatorId: userId }],
+        summaryPdfUrl: { not: null },
+      },
+      select: { id: true, summaryPdfUrl: true },
+    }),
+  ]);
+
+  for (const s of sessions) {
+    await deleteS3ObjectBestEffort(s.recordingUrl ? s3KeyFromRecordingUrl(s.recordingUrl) : null, {
+      purpose: 'account_anonymize_session_recording',
+      sessionId: s.id,
+    });
+  }
+  for (const m of meetings) {
+    await deleteS3ObjectBestEffort(m.recordingUrl ? s3KeyFromRecordingUrl(m.recordingUrl) : null, {
+      purpose: 'account_anonymize_meeting_recording',
+      meetingId: m.id,
+    });
+  }
+  for (const v of voices) {
+    await deleteS3ObjectBestEffort(v.s3Key, {
+      purpose: 'account_anonymize_voice_recording',
+      voiceRecordingId: v.id,
+    });
+  }
+  for (const e of episodes) {
+    await deleteS3ObjectBestEffort(careSummaryObjectKey(e.summaryPdfUrl ?? ''), {
+      purpose: 'account_anonymize_care_summary',
+      episodeId: e.id,
+    });
+  }
+}
 
 /**
  * GDPR Art 17 — anonymize PII after retention grace period (G-3).
@@ -10,6 +71,8 @@ import { prisma } from '../config/database';
 export async function anonymizeUser(userId: string): Promise<void> {
   const placeholder = `deleted_${crypto.randomUUID()}@anonymized.local`;
   const redacted = '[redacted]';
+
+  await deleteUserPhiS3Objects(userId);
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
@@ -204,6 +267,7 @@ export async function anonymizeUser(userId: string): Promise<void> {
           diagnoses: [],
           intakeSummary: { anonymized: true },
           title: 'Anonymized Episode',
+          summaryPdfUrl: null,
         },
       });
 
@@ -253,6 +317,7 @@ export async function anonymizeUser(userId: string): Promise<void> {
         notes: null,
         recordingUrl: null,
         recordingTranscript: null,
+        recordingTranscriptSha256: null,
         recordingStatus: null,
         recordingEgressId: null,
         latitude: null,

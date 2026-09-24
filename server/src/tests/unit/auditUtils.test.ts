@@ -3,17 +3,29 @@ import { buildDeviceInfo } from '../../utils/deviceInfo';
 import { Request } from 'express';
 
 describe('auditRedact', () => {
-  it('redacts sensitive keys', () => {
+  it('redacts sensitive keys including email, content, and transcript', () => {
     const result = redactForAudit({
       email: 'a@b.com',
       password: 'secret',
-      nested: { token: 'abc', name: 'ok' },
+      content: 'clinical chat PHI',
+      transcript: 'session transcript PHI',
+      nested: { token: 'abc', name: 'ok', completeText: 'full transcript' },
     }) as Record<string, unknown>;
 
-    expect(result.email).toBe('a@b.com');
+    expect(result.email).toBe('[REDACTED]');
     expect(result.password).toBe('[REDACTED]');
+    expect(result.content).toBe('[REDACTED]');
+    expect(result.transcript).toBe('[REDACTED]');
     expect((result.nested as Record<string, unknown>).token).toBe('[REDACTED]');
     expect((result.nested as Record<string, unknown>).name).toBe('ok');
+    expect((result.nested as Record<string, unknown>).completeText).toBe('[REDACTED]');
+  });
+
+  it('does not expand raw Buffer bodies into byte maps (TM-026)', () => {
+    const raw = Buffer.from('{"payer_email":"x@y.com"}');
+    expect(redactForAudit(raw)).toBe('[REDACTED_RAW_BODY]');
+    const wrapped = redactForAudit({ body: raw }) as Record<string, unknown>;
+    expect(wrapped.body).toBe('[REDACTED_RAW_BODY]');
   });
 });
 

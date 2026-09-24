@@ -175,20 +175,25 @@ export class TelehealthController {
     const { roomName } = req.params;
     const actor = actorFromReq(req);
 
+    // TM-017: do not distinguish missing vs forbidden (room-ID enumeration).
+    const deny = () => {
+      throw new AppError('Room not found.', 404);
+    };
+
     const session = await loadSessionForRoom(roomName);
     if (session) {
-      if (!canJoinSessionRoom(session, actor)) throw new AppError('Forbidden.', 403);
+      if (!canJoinSessionRoom(session, actor)) deny();
     } else {
       const meeting = await prisma.meeting.findUnique({ where: { roomName } });
-      if (!meeting) throw new AppError('Room not found.', 404);
-      const orgId = await episodeOrganizationId(meeting.episodeId);
-      if (!canJoinMeeting(meetingAccessRow(meeting, orgId), actor)) throw new AppError('Forbidden.', 403);
+      if (!meeting) deny();
+      const orgId = await episodeOrganizationId(meeting!.episodeId);
+      if (!canJoinMeeting(meetingAccessRow(meeting!, orgId), actor)) deny();
     }
 
     assertLiveKitConfigured();
     const svc = new RoomServiceClient(env.LIVEKIT_URL, env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET);
     const rooms = await svc.listRooms([roomName]);
-    if (!rooms.length) throw new AppError('Room not found.', 404);
+    if (!rooms.length) deny();
 
     res.json({ room: rooms[0] });
   }

@@ -1,6 +1,10 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
+import type {
+  RecordingProcessRequest,
+  RecordingProcessResponse,
+} from './recordingIntelligenceTypes';
 
 /** Thrown when the Riayah AI HTTP call fails (callers should catch — never fail intake). */
 export class RiayahAiError extends Error {
@@ -251,6 +255,42 @@ export class RiayahAiClient {
       return data;
     } catch (err) {
       this.wrapError(err, episodeId, 'requestCarePlanDraft');
+    }
+  }
+
+  /**
+   * POST /v1/recordings/process
+   *
+   * Always returns `{ httpStatus, data }` when the AI service responds (including
+   * 202 queued, 200 completed/reused, and 409 failed/reused). Does not throw on 409.
+   * Throws {@link RiayahAiError} only on network failures or missing response body.
+   */
+  static async processRecording(
+    payload: RecordingProcessRequest,
+  ): Promise<{ httpStatus: number; data: RecordingProcessResponse }> {
+    try {
+      const response = await this.getHttp().post<RecordingProcessResponse>(
+        '/v1/recordings/process',
+        payload,
+        {
+          // Caller owns 202/200/409 (+ other HTTP) semantics — never throw on status alone.
+          validateStatus: () => true,
+        },
+      );
+
+      const data = (response.data ?? {}) as RecordingProcessResponse;
+      logger.info('Riayah AI processRecording response', {
+        recordingId: payload.recordingId,
+        pipelineVersion: payload.pipelineVersion,
+        httpStatus: response.status,
+        jobId: data.jobId,
+        status: data.status,
+        reused: data.reused,
+      });
+
+      return { httpStatus: response.status, data };
+    } catch (err) {
+      this.wrapError(err, payload.recordingId, 'processRecording');
     }
   }
 }

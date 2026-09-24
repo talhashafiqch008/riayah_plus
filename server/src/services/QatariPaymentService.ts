@@ -337,7 +337,14 @@ export class QatariPaymentService {
     if (!invoice) {
       // Booking payments use cart_id like BKG-{bookingId}
       if (cart_id.startsWith('BKG-')) {
-        return this.handleBookingWebhook(cart_id.slice(4), tran_ref, payment_result?.response_status, payload);
+        return this.handleBookingWebhook({
+          bookingId: cart_id.slice(4),
+          tran_ref,
+          status: payment_result?.response_status,
+          payload,
+          cart_amount,
+          cart_currency,
+        });
       }
       logger.warn('PayTabs webhook: invoice not found', { cart_id });
       throw new AppError('Invoice not found.', 404);
@@ -458,16 +465,51 @@ export class QatariPaymentService {
     return { ignored: true };
   }
 
-  private static async handleBookingWebhook(
-    bookingId: string,
-    tran_ref: string,
-    status: string | undefined,
-    payload: Record<string, unknown>,
-  ) {
+  private static async handleBookingWebhook(opts: {
+    bookingId: string;
+    tran_ref: string;
+    status: string | undefined;
+    payload: Record<string, unknown>;
+    cart_amount?: number | string;
+    cart_currency?: string;
+  }) {
+    const { bookingId, tran_ref, status, payload, cart_amount, cart_currency } = opts;
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!booking) {
       logger.warn('PayTabs webhook: booking not found', { bookingId });
       throw new AppError('Booking not found.', 404);
+    }
+
+    // TM-027: prefer totalAmount, fall back to totalPrice (legacy column)
+    const expectedAmount = Number(booking.totalAmount ?? booking.totalPrice ?? NaN);
+    if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+      logger.warn('PayTabs booking webhook: booking has no payable amount', { bookingId });
+      throw new AppError('Booking has no amount set.', 422);
+    }
+
+    const expectedCurrency = 'QAR';
+    if (!cart_currency || String(cart_currency).toUpperCase() !== expectedCurrency) {
+      logger.warn('PayTabs booking webhook currency mismatch', {
+        cart_currency,
+        expected: expectedCurrency,
+        bookingId,
+      });
+      throw new AppError('Payment currency mismatch.', 400);
+    }
+
+    // TM-021: require amount verification on booking path (parity with invoice)
+    if (cart_amount === undefined || cart_amount === null || cart_amount === '') {
+      logger.warn('PayTabs booking webhook missing cart_amount', { bookingId, tran_ref });
+      throw new AppError('Payment amount missing.', 400);
+    }
+    const paidAmount = Number(cart_amount);
+    if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - expectedAmount) > 0.01) {
+      logger.warn('PayTabs booking webhook amount mismatch', {
+        paidAmount,
+        expected: expectedAmount,
+        bookingId,
+      });
+      throw new AppError('Payment amount mismatch.', 400);
     }
 
     const existingPaid = await prisma.payment.findFirst({
@@ -486,8 +528,8 @@ export class QatariPaymentService {
           create: {
             bookingId,
             userId: booking.clientId,
-            amount: booking.totalPrice ?? 0,
-            currency: 'QAR',
+            amount: expectedAmount,
+            currency: expectedCurrency,
             status: 'paid',
             gateway: 'paytabs',
             gatewayRef: tran_ref,
@@ -495,6 +537,8 @@ export class QatariPaymentService {
           },
           update: {
             status: 'paid',
+            amount: expectedAmount,
+            currency: expectedCurrency,
             gatewayRef: tran_ref,
             gatewayResponse: payload as object,
           },

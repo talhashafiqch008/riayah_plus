@@ -25,6 +25,7 @@ import {
   isValidIntakeFileKey,
   sanitizeUploadFilename,
 } from '../../utils/uploadAllowlist';
+import { logPhiRead } from '../../utils/phiReadLog';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'support_admin'];
 const COORDINATOR_ROLES = ['care_coordinator', ...ADMIN_ROLES];
@@ -397,6 +398,15 @@ export class IntakeDocumentController {
         })());
 
     if (!allowed) notFound();
+
+    await logPhiRead({
+      userId: req.user!.userId,
+      role: req.user!.role,
+      purpose: 'intake_document_download',
+      entity: 'Document',
+      entityId: doc!.id,
+      req,
+    });
 
     const meta = (doc!.metadata as Record<string, string> | null) ?? {};
     const fileKey = meta.fileKey;

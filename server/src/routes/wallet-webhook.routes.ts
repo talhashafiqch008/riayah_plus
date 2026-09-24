@@ -15,8 +15,18 @@ const stripe = new Stripe(env.STRIPE_SECRET, { apiVersion: '2024-06-20' });
 router.post('/stripe/webhook', async (req: Request, res: Response) => {
   let event: Stripe.Event;
   try {
+    // TM-025: constructEvent requires the exact raw bytes (Buffer/string), not a parsed object.
+    const rawBody = Buffer.isBuffer(req.body)
+      ? req.body
+      : typeof req.body === 'string'
+        ? req.body
+        : null;
+    if (!rawBody) {
+      res.status(400).send('Webhook signature verification failed.');
+      return;
+    }
     event = stripe.webhooks.constructEvent(
-      req.body,
+      rawBody,
       req.headers['stripe-signature'] as string,
       env.STRIPE_WEBHOOK_SECRET
     );

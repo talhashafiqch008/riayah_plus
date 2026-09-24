@@ -7,6 +7,8 @@ export const RETENTION_DAYS = {
   voiceRecording: 90,
   userSession: 90,
   document: 2555,
+  /** Privacy policy: GPS logs 90 days (TM-022). */
+  gpsLog: 90,
 } as const;
 
 export function retentionExpiresAtFromNow(days: number): Date {

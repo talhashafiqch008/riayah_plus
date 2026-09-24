@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TelehealthController } from '../controllers/telehealth/TelehealthController';
+import { RecordingIntelligenceCallbackController } from '../controllers/ai/RecordingIntelligenceCallbackController';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -27,6 +28,9 @@ router.post('/sessions/:sessionId/recording/stop', (req, res, next) => {
 });
 router.get('/sessions/:sessionId/recording', (req, res, next) => {
   TelehealthController.getRecording(req, res).catch(next);
+});
+router.get('/sessions/:sessionId/recording-intelligence', (req, res, next) => {
+  RecordingIntelligenceCallbackController.getForSession(req, res).catch(next);
 });
 router.get('/sessions/:sessionId/transcript', (req, res, next) => {
   TelehealthController.getTranscript(req, res).catch(next);
