@@ -1,4 +1,7 @@
 {
+	"scripts": {
+		"security:check-env": "bash scripts/check-no-tracked-env.sh"
+	},
 	"devDependencies": {
 		"@vitejs/plugin-basic-ssl": "^2.3.0"
 	}

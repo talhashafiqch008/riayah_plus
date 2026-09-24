@@ -31,8 +31,8 @@ export class RecordingIntelligenceCallbackController {
     const body = recordingCallbackPayloadSchema.parse(req.body);
     const result = await RecordingIntelligenceService.handleCallback(body);
 
+    // S2S callback — no User row; leave userId null (FK) and tag actor in metadata.
     await AuditService.log({
-      userId: 'ai-service',
       action: 'ai_recording_intelligence_callback',
       entity: 'RecordingIntelligenceRun',
       entityId: result.runId,
@@ -42,6 +42,7 @@ export class RecordingIntelligenceCallbackController {
         status: result.status,
         artifactStatuses: result.artifactStatuses,
       },
+      metadata: { actor: 'ai-service' },
       req,
     });
 

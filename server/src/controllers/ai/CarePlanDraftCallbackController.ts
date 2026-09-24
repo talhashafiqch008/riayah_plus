@@ -25,8 +25,8 @@ export class CarePlanDraftCallbackController {
     const body = carePlanDraftCallbackSchema.parse(req.body);
     const result = await AiCarePlanDraftService.handleCallback(body);
 
+    // S2S callback — no User row; leave userId null (FK) and tag actor in metadata.
     await AuditService.log({
-      userId: 'ai-service',
       action: 'ai_care_plan_callback',
       entity: 'CarePlan',
       entityId: result.carePlanId,
@@ -37,6 +37,7 @@ export class CarePlanDraftCallbackController {
         status: result.status,
         version: result.version,
       },
+      metadata: { actor: 'ai-service' },
       req,
     });
 

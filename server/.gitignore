@@ -23,9 +23,10 @@
 # misc
 .DS_Store
 *.pem
+
+# Secrets (TM-001) — keep local .env / .env.test untracked
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
 
 # debug

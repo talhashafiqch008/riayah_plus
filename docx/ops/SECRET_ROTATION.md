@@ -15,7 +15,7 @@
 | Refresh JWT | `JWT_REFRESH_SECRET` (+ optional `_PREVIOUS`) | Sign with current only |
 | Break-glass | `ADMIN_SECRET` | Keep break-glass disabled unless needed |
 
-Also rotate if leaked: `WHATSAPP_APP_SECRET`, `STRIPE_WEBHOOK_SECRET`, `AI_SERVICE_API_KEY`, frontend `AUTH_CACHE_SECRET`.
+Also rotate if leaked (TM-001 committed `.env` blast radius): `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, Stripe keys + webhook secret, PayTabs keys, LiveKit, Twilio, SMTP, Pusher, `AI_SERVICE_API_KEY`, KMS/data-export keys. Treat every value that was in the tracked `server/.env` as compromised until rotated. Git history still contains the old blob until a history purge (optional; rotation is the hard requirement).
 
 ## Procedure
 

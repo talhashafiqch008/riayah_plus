@@ -23,6 +23,9 @@ import { verifySmtpTlsAtStartup } from './services/EmailService';
 import { beforeSendScrub, scrubSentryEvent } from './utils/sentryScrub';
 import apiRouter from './routes/index';
 import { sanitizeForwardedForHeader } from './middleware/clientIp';
+import { requireAiServiceApiKey } from './middleware/aiServiceAuth';
+import { CarePlanDraftCallbackController } from './controllers/ai/CarePlanDraftCallbackController';
+import { RecordingIntelligenceCallbackController } from './controllers/ai/RecordingIntelligenceCallbackController';
 
 // ─── Process-level safety net ────────────────────────────────────────────────
 // express-async-errors handles rejections thrown inside route handlers, but this
@@ -128,6 +131,15 @@ app.use(requestLogger);
 app.use(apiLimiter);
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
+// Contract-path AI callbacks (no /api prefix) — RI + care-plan docs use
+// POST /ai/callbacks/... when BACKEND_URL is the public tunnel host.
+app.post('/ai/callbacks/care-plan-draft', requireAiServiceApiKey, (req, res, next) => {
+  CarePlanDraftCallbackController.handle(req, res).catch(next);
+});
+app.post('/ai/callbacks/recording-intelligence', requireAiServiceApiKey, (req, res, next) => {
+  RecordingIntelligenceCallbackController.handle(req, res).catch(next);
+});
+
 app.use('/api', apiRouter);
 
 // ─── SPA static file serving (production only) ───────────────────────────────
