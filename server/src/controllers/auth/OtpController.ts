@@ -12,6 +12,8 @@ import { sanitizedString } from '../../utils/sanitize';
 import { normalizePhoneE164 } from '../../utils/phoneAuth';
 import { TwilioSmsService } from '../../services/TwilioSmsService';
 import { issueMfaPendingToken } from '../../utils/mfaPending';
+import { env } from '../../config/env';
+import { TWILIO_VERIFY_OTP_MARKER } from '../../utils/phoneOtp';
 
 const sendSchema = z.object({
   identifier: sanitizedString(z.string().min(3)),
@@ -32,8 +34,9 @@ export class OtpController {
     const type = raw.type ?? (raw.phone ? 'phone' : 'email');
     const { identifier: parsedIdentifier, type: parsedType } = sendSchema.parse({ identifier, type });
 
-    const otp = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const useTwilioVerify =
+      parsedType === 'phone' && Boolean(env.TWILIO_VERIFY_SERVICE_SID?.trim());
 
     let storeIdentifier = parsedIdentifier;
     if (parsedType === 'phone') {
@@ -43,6 +46,10 @@ export class OtpController {
         throw new AppError('Invalid phone number.', 422);
       }
     }
+
+    const otp = useTwilioVerify
+      ? TWILIO_VERIFY_OTP_MARKER
+      : crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
 
     await prisma.otpVerification.upsert({
       where: {
@@ -64,6 +71,8 @@ export class OtpController {
 
     if (parsedType === 'email') {
       await EmailService.sendOtp(storeIdentifier, otp);
+    } else if (useTwilioVerify) {
+      await TwilioSmsService.startPhoneVerification(storeIdentifier);
     } else {
       await TwilioSmsService.sendOtp(storeIdentifier, otp);
     }
@@ -101,23 +110,59 @@ export class OtpController {
       }
     }
 
-    const record = await prisma.otpVerification.findFirst({
-      where: {
-        identifier: parsedIdentifier,
-        otp: parsedOtp,
-        type: parsedType,
-        verifiedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-    });
+    const useTwilioVerify =
+      parsedType === 'phone' && Boolean(env.TWILIO_VERIFY_SERVICE_SID?.trim());
 
-    if (!record) {
-      await AuditService.log({
-        action: 'otp_failed',
-        after: { type: parsedType },
-        req,
+    let record = null as Awaited<ReturnType<typeof prisma.otpVerification.findFirst>>;
+
+    if (useTwilioVerify) {
+      const approved = await TwilioSmsService.checkPhoneVerification(parsedIdentifier, parsedOtp);
+      if (!approved) {
+        await AuditService.log({
+          action: 'otp_failed',
+          after: { type: parsedType },
+          req,
+        });
+        throw new AppError('Invalid or expired OTP.', 422);
+      }
+      record = await prisma.otpVerification.findFirst({
+        where: {
+          identifier: parsedIdentifier,
+          type: 'phone',
+          verifiedAt: null,
+          expiresAt: { gt: new Date() },
+        },
       });
-      throw new AppError('Invalid or expired OTP.', 422);
+      if (!record) {
+        // Verify approved but no local send record — still accept (Twilio is source of truth)
+        record = await prisma.otpVerification.create({
+          data: {
+            identifier: parsedIdentifier,
+            otp: TWILIO_VERIFY_OTP_MARKER,
+            type: 'phone',
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          },
+        });
+      }
+    } else {
+      record = await prisma.otpVerification.findFirst({
+        where: {
+          identifier: parsedIdentifier,
+          otp: parsedOtp,
+          type: parsedType,
+          verifiedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (!record) {
+        await AuditService.log({
+          action: 'otp_failed',
+          after: { type: parsedType },
+          req,
+        });
+        throw new AppError('Invalid or expired OTP.', 422);
+      }
     }
 
     await prisma.otpVerification.update({

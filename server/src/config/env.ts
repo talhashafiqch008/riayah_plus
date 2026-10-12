@@ -103,6 +103,8 @@ export const env = {
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
+  /** Twilio Verify Service SID (VA...) — preferred for phone OTP / GCC. */
+  TWILIO_VERIFY_SERVICE_SID: process.env.TWILIO_VERIFY_SERVICE_SID || '',
 
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:8001',
